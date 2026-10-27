@@ -1,0 +1,2 @@
+// expect: E1005
+fn helper() {}

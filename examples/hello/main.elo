@@ -1,0 +1,5 @@
+// The smallest Elomar-Lang program.
+fn main() {
+    print("Hello from Elomar-Lang!")
+    print("مرحبًا من Elomar-Lang!")
+}

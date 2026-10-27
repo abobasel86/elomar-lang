@@ -1,0 +1,31 @@
+// Structural records and value semantics (spec §10.4, §10.7).
+
+type Student = {
+    id: Int,
+    name: String,
+    grades: List<Int>
+}
+
+fn describe(s: Student) -> String {
+    return s.name + " (#" + to_string(s.id) + ")"
+}
+
+fn with_grade(s: Student, grade: Int) -> Student {
+    var copy = s
+    copy.grades.push(grade)
+    return copy
+}
+
+fn main() {
+    let lina = { id: 1, name: "Lina", grades: [90] }
+    let updated = with_grade(lina, 75)
+
+    print(describe(lina))
+    print("before:", lina.grades, "after:", updated.grades)
+
+    var students: List<Student> = [lina, { id: 2, name: "Omar", grades: [] }]
+    students[1].grades.push(88)
+    for s in students {
+        print(s)
+    }
+}

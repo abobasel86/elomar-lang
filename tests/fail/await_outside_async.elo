@@ -1,0 +1,8 @@
+// expect: E2013
+async fn answer() -> Int {
+    return 42
+}
+
+fn main() {
+    print(await answer())
+}

@@ -1,0 +1,12 @@
+[package]
+name = "elomar-lexer"
+description = "Tokenizer for Elomar-Lang, including newline-termination rules"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+elomar-diagnostics.workspace = true
+unicode-ident.workspace = true
+unicode-normalization.workspace = true

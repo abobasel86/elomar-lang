@@ -1,0 +1,4 @@
+// expect: E1001
+async fn main() {
+    let r = await ai.infer<String>("mock", "Say hi", "x")
+}

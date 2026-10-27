@@ -1,0 +1,5 @@
+[high] account: Cannot sign in
+AI request failed (InvalidStructuredOutput): the model's answer does not match `{ category: String, priority: String, summary: String }`: $.summary: missing
+AI request failed (Timeout): no answer within 10000 ms (mock latency 15000 ms)
+AI request failed (RateLimited): too many requests, retry later
+[mock] mock: mock

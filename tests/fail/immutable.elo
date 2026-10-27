@@ -1,0 +1,5 @@
+// expect: E1003
+fn main() {
+    let xs = [1, 2]
+    xs.push(3)
+}

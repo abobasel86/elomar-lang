@@ -1,0 +1,298 @@
+//! Abstract syntax tree for Elomar-Lang. Every node carries a [`Span`].
+
+pub use elomar_diagnostics::Span;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ident {
+    pub name: String,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Program {
+    pub items: Vec<Item>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Item {
+    Use(UseDecl),
+    Type(TypeDecl),
+    Const(ConstDecl),
+    Fn(FnDecl),
+}
+
+/// `use std.io`
+#[derive(Debug, Clone, PartialEq)]
+pub struct UseDecl {
+    pub path: Vec<Ident>,
+    pub span: Span,
+}
+
+/// `type Student = { name: String }`
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeDecl {
+    pub name: Ident,
+    pub ty: TypeExpr,
+    pub span: Span,
+}
+
+/// A file-level `let`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstDecl {
+    pub name: Ident,
+    pub ty: Option<TypeExpr>,
+    pub value: Expr,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FnDecl {
+    pub is_pub: bool,
+    /// `async fn`: calling it returns a `Future`; `await` runs it.
+    pub is_async: bool,
+    pub name: Ident,
+    pub params: Vec<Param>,
+    pub ret: Option<TypeExpr>,
+    pub effects: Option<EffectSet>,
+    pub body: Block,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub name: Ident,
+    pub ty: TypeExpr,
+}
+
+/// `!{io, net}`
+#[derive(Debug, Clone, PartialEq)]
+pub struct EffectSet {
+    pub effects: Vec<Ident>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeExpr {
+    pub kind: TypeExprKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeExprKind {
+    /// `Int`, `List<Int>`, `Result<Float, String>`, `Student`
+    Named { name: Ident, args: Vec<TypeExpr> },
+    /// `{ name: String, age: Int }`
+    Record(Vec<(Ident, TypeExpr)>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block {
+    pub stmts: Vec<Stmt>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Stmt {
+    pub kind: StmtKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssignOp {
+    Set,
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StmtKind {
+    Let {
+        mutable: bool,
+        name: Ident,
+        ty: Option<TypeExpr>,
+        value: Expr,
+    },
+    Assign {
+        target: Expr,
+        op: AssignOp,
+        value: Expr,
+    },
+    If {
+        cond: Expr,
+        then: Block,
+        otherwise: Option<Else>,
+    },
+    While {
+        cond: Expr,
+        body: Block,
+    },
+    For {
+        var: Ident,
+        iter: Expr,
+        body: Block,
+    },
+    Return(Option<Expr>),
+    Break,
+    Continue,
+    Block(Block),
+    Expr(Expr),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Else {
+    Block(Block),
+    /// `else if ...`: always a `StmtKind::If`.
+    If(Box<Stmt>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    Neg,
+    Not,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    /// `/`: always produces a `Float`.
+    Div,
+    /// `div`: integer division, truncating toward zero.
+    IntDiv,
+    Rem,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+}
+
+impl BinOp {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::IntDiv => "div",
+            BinOp::Rem => "%",
+            BinOp::Eq => "==",
+            BinOp::Ne => "!=",
+            BinOp::Lt => "<",
+            BinOp::Le => "<=",
+            BinOp::Gt => ">",
+            BinOp::Ge => ">=",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Arg {
+    pub name: Option<Ident>,
+    pub value: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FieldInit {
+    pub name: Ident,
+    pub value: Expr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprKind {
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Bool(bool),
+    /// A duration literal, in milliseconds.
+    Duration(i64),
+    Name(String),
+    List(Vec<Expr>),
+    Record(Vec<FieldInit>),
+    Unary {
+        op: UnaryOp,
+        expr: Box<Expr>,
+    },
+    Binary {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+        inclusive: bool,
+    },
+    /// A call. Method calls have a [`ExprKind::Field`] callee.
+    Call {
+        callee: Box<Expr>,
+        type_args: Vec<TypeExpr>,
+        args: Vec<Arg>,
+    },
+    Field {
+        target: Box<Expr>,
+        name: Ident,
+    },
+    Index {
+        target: Box<Expr>,
+        index: Box<Expr>,
+    },
+    Match {
+        scrutinee: Box<Expr>,
+        arms: Vec<MatchArm>,
+    },
+    /// `await future`
+    Await(Box<Expr>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub body: ArmBody,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArmBody {
+    Expr(Expr),
+    Block(Block),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PatternKind {
+    Wildcard,
+    /// A binding, or the constructor `None` (resolved by name).
+    Name(String),
+    /// `Some(p)`, `Ok(p)`, `Err(p)`.
+    Ctor {
+        name: Ident,
+        args: Vec<Pattern>,
+    },
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Bool(bool),
+}
+
+/// Names of the prelude's value constructors.
+pub const CONSTRUCTORS: [&str; 4] = ["Some", "None", "Ok", "Err"];

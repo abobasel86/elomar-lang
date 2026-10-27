@@ -1,0 +1,10 @@
+// expect: E3002
+use std.ai
+
+pub async fn ask(question: String) -> Result<String, AIError> {
+    return await ai.infer<String>("mock", "Answer briefly", question)
+}
+
+async fn main() {
+    print(await ask("why?"))
+}

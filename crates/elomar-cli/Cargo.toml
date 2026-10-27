@@ -1,0 +1,21 @@
+[package]
+name = "elomar-cli"
+description = "The `elomar` command-line tool"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "elomar"
+path = "src/main.rs"
+
+[dependencies]
+elomar-diagnostics.workspace = true
+elomar-parser.workspace = true
+elomar-types.workspace = true
+elomar-interpreter.workspace = true
+clap.workspace = true
+elomar-ai-core.workspace = true
+elomar-ai-provider-mock.workspace = true
+elomar-ai-provider-openai.workspace = true

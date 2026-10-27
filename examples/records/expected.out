@@ -1,0 +1,4 @@
+Lina (#1)
+before: [90] after: [90, 75]
+{ id: 1, name: "Lina", grades: [90] }
+{ id: 2, name: "Omar", grades: [88] }

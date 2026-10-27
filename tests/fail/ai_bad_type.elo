@@ -1,0 +1,6 @@
+// expect: E2015
+use std.ai
+
+async fn main() {
+    let r = await ai.infer<Result<Int, String>>("mock", "Count", "x")
+}

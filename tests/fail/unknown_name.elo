@@ -1,0 +1,5 @@
+// expect: E1001
+fn main() {
+    let total = 10
+    print(totl)
+}

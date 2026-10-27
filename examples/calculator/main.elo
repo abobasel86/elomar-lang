@@ -1,0 +1,60 @@
+// Proof of concept 1 (spec §28.3): variables, functions and loops, no network.
+
+let OPERATIONS = ["+", "-", "*", "/"]
+
+fn apply(op: String, a: Float, b: Float) -> Result<Float, String> {
+    return match op {
+        "+" => Ok(a + b)
+        "-" => Ok(a - b)
+        "*" => Ok(a * b)
+        "/" => match b == 0 {
+            true => Err("cannot divide by zero")
+            false => Ok(a / b)
+        }
+        _ => Err("unknown operation " + op)
+    }
+}
+
+fn fibonacci(n: Int) -> List<Int> {
+    var out = [0, 1]
+    while out.length < n {
+        let len = out.length
+        out.push(out[len - 1] + out[len - 2])
+    }
+    return out.slice(0, n)
+}
+
+fn is_prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    var d = 2
+    while d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d += 1
+    }
+    return true
+}
+
+fn main() {
+    for op in OPERATIONS + ["^"] {
+        match apply(op, 12, 4) {
+            Ok(v) => print("12", op, "4 =", v)
+            Err(e) => print("error:", e)
+        }
+    }
+    print(apply("/", 1, 0))
+
+    print("fibonacci:", fibonacci(10))
+
+    var primes = []
+    for n in 1..=30 {
+        if is_prime(n) {
+            primes.push(n)
+        }
+    }
+    print("primes:", primes, "sum:", primes.sum())
+    print("7 div 2 =", 7 div 2, "| 7 / 2 =", 7 / 2, "| 7 % 2 =", 7 % 2)
+}

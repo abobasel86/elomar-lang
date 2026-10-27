@@ -1,0 +1,4 @@
+// expect: E2001
+fn main() {
+    let count: Int = "three"
+}

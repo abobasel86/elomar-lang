@@ -1,0 +1,6 @@
+// expect: E2009
+fn main() {
+    match parse_int("4") {
+        Some(n) => print(n)
+    }
+}

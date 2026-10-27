@@ -1,0 +1,24 @@
+// Spec §21, example F: an AI call that runs offline. The built-in model
+// `mock` needs no configuration and answers with a placeholder of the
+// requested type.
+use std.ai
+
+type Summary = {
+    title: String,
+    points: List<String>,
+    confidence: Option<Float>
+}
+
+async fn main() {
+    let greeting = await ai.infer<String>(
+        model: "mock",
+        instructions: "Return a greeting",
+        input: "Hello"
+    )
+    print(greeting)
+
+    match await ai.infer<Summary>("mock", "Summarize the text", "Elomar-Lang is a language.") {
+        Ok(s) => print("title:", s.title, "| points:", s.points.length, "| confidence:", s.confidence)
+        Err(e) => print("failed:", e.kind)
+    }
+}

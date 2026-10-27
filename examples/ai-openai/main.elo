@@ -1,0 +1,26 @@
+// Spec §13.2 against a real OpenAI model. Setup: see README.md here.
+use std.ai
+
+type Ticket = {
+    category: String,
+    priority: String,
+    summary: String
+}
+
+// A cloud model sends data over the network, so `net` is required too.
+pub async fn classify(message: String) -> Result<Ticket, AIError> !{ai, net} {
+    return await ai.infer<Ticket>(
+        model: "support.classifier",
+        instructions: "Classify the support request. priority is one of: low, normal, high, urgent.",
+        input: message,
+        timeout: 30s
+    )
+}
+
+async fn main() {
+    let message = input("Describe your problem: ")
+    match await classify(message) {
+        Ok(t) => print("[" + t.priority + "] " + t.category + ": " + t.summary)
+        Err(e) => print("AI request failed (" + e.kind + "): " + e.message)
+    }
+}

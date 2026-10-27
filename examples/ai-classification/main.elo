@@ -1,0 +1,39 @@
+// Spec §13.2 and §21 example D: typed AI classification, tested offline
+// against the mock rules in elomar.toml.
+use std.ai
+
+type Ticket = {
+    category: String,
+    priority: String,
+    summary: String
+}
+
+// A public function must declare that it calls a model.
+pub async fn classify(message: String) -> Result<Ticket, AIError> !{ai} {
+    return await ai.infer<Ticket>(
+        model: "support.classifier",
+        instructions: "Classify the support request into category, priority and summary.",
+        input: message,
+        timeout: 10s
+    )
+}
+
+fn describe(result: Result<Ticket, AIError>) -> String {
+    return match result {
+        Ok(t) => "[" + t.priority + "] " + t.category + ": " + t.summary
+        Err(e) => "AI request failed (" + e.kind + "): " + e.message
+    }
+}
+
+async fn main() {
+    let requests = [
+        "I forgot my password",
+        "Where is my invoice?",
+        "The app crashes on start",
+        "spam spam spam",
+        "Something else entirely"
+    ]
+    for request in requests {
+        print(describe(await classify(request)))
+    }
+}

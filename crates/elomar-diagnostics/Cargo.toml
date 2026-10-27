@@ -1,0 +1,9 @@
+[package]
+name = "elomar-diagnostics"
+description = "Source spans and bilingual (Arabic/English) diagnostics for Elomar-Lang"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]

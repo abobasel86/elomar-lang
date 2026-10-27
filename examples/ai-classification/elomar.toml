@@ -1,0 +1,30 @@
+# Spec §14.4: models are logical names; the program never names a vendor.
+[package]
+name = "ai-classification"
+version = "0.1.0"
+entry = "main.elo"
+
+[ai.models."support.classifier"]
+provider = "mock"
+
+# Rules are tried in order; the first whose `input_contains` matches wins.
+[[ai.models."support.classifier".mock]]
+input_contains = "password"
+response = '{"category": "account", "priority": "high", "summary": "Cannot sign in"}'
+
+[[ai.models."support.classifier".mock]]
+input_contains = "invoice"
+response = '{"category": "billing", "priority": "urgent"}'   # missing `summary`
+
+[[ai.models."support.classifier".mock]]
+input_contains = "crash"
+delay_ms = 15000                                              # slower than the 10s timeout
+response = '{}'
+
+[[ai.models."support.classifier".mock]]
+input_contains = "spam"
+error = "RateLimited"
+message = "too many requests, retry later"
+
+[ai.policy]
+max_calls_per_run = 10

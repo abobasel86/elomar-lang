@@ -1,0 +1,1235 @@
+//! Parser for Elomar-Lang: recursive descent for items and statements,
+//! Pratt parsing for expressions. The authoritative grammar is
+//! `docs/grammar.md`.
+
+// Syntax errors are the cold path and are returned once per statement, so
+// carrying the full `Diagnostic` by value is simpler than boxing it.
+#![allow(clippy::result_large_err)]
+
+use elomar_ast::*;
+use elomar_diagnostics::{Diagnostic, Span, Text};
+use elomar_lexer::{Token, TokenKind};
+
+/// Lexes and parses a source file. Lexical and syntax errors are both
+/// returned; the program contains every item that parsed successfully.
+pub fn parse(src: &str) -> (Program, Vec<Diagnostic>) {
+    let (tokens, mut diags) = elomar_lexer::lex(src);
+    let (program, parse_diags) = parse_tokens(tokens);
+    diags.extend(parse_diags);
+    (program, diags)
+}
+
+pub fn parse_tokens(tokens: Vec<Token>) -> (Program, Vec<Diagnostic>) {
+    let mut p = Parser {
+        tokens,
+        pos: 0,
+        diags: Vec::new(),
+    };
+    let program = p.program();
+    (program, p.diags)
+}
+
+type PResult<T> = Result<T, Diagnostic>;
+
+/// Stop reporting after this many syntax errors; later ones are usually noise.
+const MAX_ERRORS: usize = 50;
+
+struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
+    diags: Vec<Diagnostic>,
+}
+
+fn not_yet(span: Span, what_en: &str, what_ar: &str, phase: &str) -> Diagnostic {
+    Diagnostic::error(
+        "E0103",
+        span,
+        Text::new(
+            format!("{what_en} is not supported yet"),
+            format!("{what_ar} غير مدعوم بعد"),
+        ),
+    )
+    .with_hint(Text::new(
+        format!("planned for {phase}; see the roadmap in the specification"),
+        format!("مخطط له في {phase}؛ راجع خطة الإصدارات في المواصفة"),
+    ))
+}
+
+impl Parser {
+    // ----- token helpers -------------------------------------------------
+
+    fn peek(&self) -> &TokenKind {
+        &self.tokens[self.pos].kind
+    }
+
+    fn peek_n(&self, n: usize) -> &TokenKind {
+        let i = (self.pos + n).min(self.tokens.len() - 1);
+        &self.tokens[i].kind
+    }
+
+    fn span(&self) -> Span {
+        self.tokens[self.pos].span
+    }
+
+    fn prev_span(&self) -> Span {
+        self.tokens[self.pos.saturating_sub(1)].span
+    }
+
+    fn bump(&mut self) -> Token {
+        let tok = self.tokens[self.pos].clone();
+        if self.pos < self.tokens.len() - 1 {
+            self.pos += 1;
+        }
+        tok
+    }
+
+    fn at(&self, kind: &TokenKind) -> bool {
+        self.peek() == kind
+    }
+
+    fn eat(&mut self, kind: &TokenKind) -> bool {
+        if self.at(kind) {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn expect(&mut self, kind: TokenKind) -> PResult<Span> {
+        if self.at(&kind) {
+            Ok(self.bump().span)
+        } else {
+            Err(self.unexpected(&kind.describe(), &kind.describe_ar()))
+        }
+    }
+
+    fn unexpected(&self, expected_en: &str, expected_ar: &str) -> Diagnostic {
+        let found = self.peek();
+        Diagnostic::error(
+            "E0101",
+            self.span(),
+            Text::new(
+                format!("expected {expected_en}, found {}", found.describe()),
+                format!("المتوقع {expected_ar}، لكن وُجد {}", found.describe_ar()),
+            ),
+        )
+    }
+
+    fn ident(&mut self) -> PResult<Ident> {
+        if let TokenKind::Ident(name) = self.peek() {
+            let name = name.clone();
+            let span = self.bump().span;
+            Ok(Ident { name, span })
+        } else {
+            Err(self.unexpected("a name", "اسم"))
+        }
+    }
+
+    /// Skips statement separators (line breaks and `;`).
+    fn skip_seps(&mut self) {
+        while matches!(self.peek(), TokenKind::Newline | TokenKind::Semi) {
+            self.bump();
+        }
+    }
+
+    fn skip_newlines(&mut self) {
+        while self.at(&TokenKind::Newline) {
+            self.bump();
+        }
+    }
+
+    fn report(&mut self, diag: Diagnostic) {
+        if self.diags.len() < MAX_ERRORS {
+            self.diags.push(diag);
+        }
+    }
+
+    /// A statement or item must be followed by a separator, `}` or EOF.
+    /// Constructs that end in `}` need no separator.
+    fn stmt_end(&mut self) -> PResult<()> {
+        match self.peek() {
+            TokenKind::Newline | TokenKind::Semi => {
+                self.bump();
+                Ok(())
+            }
+            TokenKind::RBrace | TokenKind::Eof => Ok(()),
+            _ if self.pos > 0 && self.tokens[self.pos - 1].kind == TokenKind::RBrace => Ok(()),
+            _ => Err(self.unexpected("end of line or `;`", "نهاية السطر أو `;`")),
+        }
+    }
+
+    // ----- items ---------------------------------------------------------
+
+    fn program(&mut self) -> Program {
+        let mut items = Vec::new();
+        loop {
+            self.skip_seps();
+            if self.at(&TokenKind::Eof) {
+                break;
+            }
+            match self.item().and_then(|item| self.stmt_end().map(|_| item)) {
+                Ok(item) => items.push(item),
+                Err(diag) => {
+                    self.report(diag);
+                    self.recover_item();
+                }
+            }
+        }
+        Program { items }
+    }
+
+    /// Skips to the next token that can start an item at the start of a line.
+    fn recover_item(&mut self) {
+        let mut depth = 0i32;
+        let start = self.pos;
+        loop {
+            let at_line_start = self.pos > start
+                && matches!(
+                    self.tokens[self.pos - 1].kind,
+                    TokenKind::Newline | TokenKind::Semi | TokenKind::RBrace
+                );
+            match self.peek() {
+                TokenKind::Eof => return,
+                TokenKind::Fn
+                | TokenKind::Async
+                | TokenKind::Type
+                | TokenKind::Use
+                | TokenKind::Pub
+                | TokenKind::Let
+                | TokenKind::Var
+                | TokenKind::Enum
+                | TokenKind::Trait
+                | TokenKind::Impl
+                    if depth <= 0 && at_line_start =>
+                {
+                    return;
+                }
+                TokenKind::LBrace => depth += 1,
+                TokenKind::RBrace => depth -= 1,
+                _ => {}
+            }
+            self.bump();
+        }
+    }
+
+    fn item(&mut self) -> PResult<Item> {
+        match self.peek() {
+            TokenKind::Pub => {
+                let start = self.bump().span;
+                self.fn_decl(true, start).map(Item::Fn)
+            }
+            TokenKind::Fn | TokenKind::Async => {
+                let start = self.span();
+                self.fn_decl(false, start).map(Item::Fn)
+            }
+            TokenKind::Type => self.type_decl().map(Item::Type),
+            TokenKind::Let => self.const_decl().map(Item::Const),
+            TokenKind::Use => self.use_decl().map(Item::Use),
+            TokenKind::Var => Err(Diagnostic::error(
+                "E0105",
+                self.span(),
+                Text::new(
+                    "`var` is not allowed at file level",
+                    "لا يُسمح بـ `var` على مستوى الملف",
+                ),
+            )
+            .with_hint(Text::new(
+                "use `let` for a file-level constant, or move the variable into a function",
+                "استخدم `let` لثابت على مستوى الملف، أو انقل المتغير إلى داخل دالة",
+            ))),
+            TokenKind::Enum => Err(not_yet(self.span(), "`enum`", "`enum`", "v0.2")),
+            TokenKind::Trait | TokenKind::Impl => Err(not_yet(
+                self.span(),
+                "`trait`/`impl`",
+                "`trait`/`impl`",
+                "v0.3",
+            )),
+            _ => Err(self.unexpected(
+                "`fn`, `type`, `let` or `use`",
+                "`fn` أو `type` أو `let` أو `use`",
+            )),
+        }
+    }
+
+    fn use_decl(&mut self) -> PResult<UseDecl> {
+        let start = self.expect(TokenKind::Use)?;
+        let mut path = vec![self.ident()?];
+        while self.eat(&TokenKind::Dot) {
+            path.push(self.ident()?);
+        }
+        Ok(UseDecl {
+            path,
+            span: start.to(self.prev_span()),
+        })
+    }
+
+    fn type_decl(&mut self) -> PResult<TypeDecl> {
+        let start = self.expect(TokenKind::Type)?;
+        let name = self.ident()?;
+        self.expect(TokenKind::Eq)?;
+        let ty = self.type_expr()?;
+        Ok(TypeDecl {
+            name,
+            ty,
+            span: start.to(self.prev_span()),
+        })
+    }
+
+    fn const_decl(&mut self) -> PResult<ConstDecl> {
+        let start = self.expect(TokenKind::Let)?;
+        let name = self.ident()?;
+        let ty = if self.eat(&TokenKind::Colon) {
+            Some(self.type_expr()?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::Eq)?;
+        let value = self.expr()?;
+        Ok(ConstDecl {
+            name,
+            ty,
+            value,
+            span: start.to(self.prev_span()),
+        })
+    }
+
+    fn fn_decl(&mut self, is_pub: bool, start: Span) -> PResult<FnDecl> {
+        let is_async = self.eat(&TokenKind::Async);
+        self.expect(TokenKind::Fn)?;
+        let name = self.ident()?;
+        self.expect(TokenKind::LParen)?;
+        let mut params = Vec::new();
+        while !self.at(&TokenKind::RParen) {
+            let pname = self.ident()?;
+            self.expect(TokenKind::Colon)?;
+            let ty = self.type_expr()?;
+            params.push(Param { name: pname, ty });
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect(TokenKind::RParen)?;
+        let ret = if self.eat(&TokenKind::Arrow) {
+            Some(self.type_expr()?)
+        } else {
+            None
+        };
+        let effects = if self.at(&TokenKind::Bang) {
+            Some(self.effect_set()?)
+        } else {
+            None
+        };
+        let body = self.block()?;
+        Ok(FnDecl {
+            is_pub,
+            is_async,
+            name,
+            params,
+            ret,
+            effects,
+            span: start.to(body.span),
+            body,
+        })
+    }
+
+    fn effect_set(&mut self) -> PResult<EffectSet> {
+        let start = self.expect(TokenKind::Bang)?;
+        self.expect(TokenKind::LBrace)?;
+        let mut effects = Vec::new();
+        self.skip_newlines();
+        while !self.at(&TokenKind::RBrace) {
+            effects.push(self.ident()?);
+            self.skip_newlines();
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+            self.skip_newlines();
+        }
+        self.skip_newlines();
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(EffectSet {
+            effects,
+            span: start.to(end),
+        })
+    }
+
+    // ----- types -----------------------------------------------------------
+
+    /// Parses a type. Never reports diagnostics itself, so it can be used
+    /// speculatively (see [`Parser::try_type_args`]).
+    fn type_expr(&mut self) -> PResult<TypeExpr> {
+        match self.peek() {
+            TokenKind::Ident(_) => {
+                let name = self.ident()?;
+                let mut args = Vec::new();
+                if self.eat(&TokenKind::Lt) {
+                    loop {
+                        args.push(self.type_expr()?);
+                        if !self.eat(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    self.expect(TokenKind::Gt)?;
+                }
+                let span = name.span.to(self.prev_span());
+                Ok(TypeExpr {
+                    kind: TypeExprKind::Named { name, args },
+                    span,
+                })
+            }
+            TokenKind::LBrace => {
+                let start = self.bump().span;
+                let mut fields = Vec::new();
+                self.skip_newlines();
+                while !self.at(&TokenKind::RBrace) {
+                    let fname = self.ident()?;
+                    self.expect(TokenKind::Colon)?;
+                    let fty = self.type_expr()?;
+                    fields.push((fname, fty));
+                    let sep = self.eat(&TokenKind::Comma) | self.at(&TokenKind::Newline);
+                    self.skip_newlines();
+                    if !sep {
+                        break;
+                    }
+                }
+                let end = self.expect(TokenKind::RBrace)?;
+                Ok(TypeExpr {
+                    kind: TypeExprKind::Record(fields),
+                    span: start.to(end),
+                })
+            }
+            _ => Err(Diagnostic::error(
+                "E0108",
+                self.span(),
+                Text::new(
+                    format!("expected a type, found {}", self.peek().describe()),
+                    format!("المتوقع نوع، لكن وُجد {}", self.peek().describe_ar()),
+                ),
+            )),
+        }
+    }
+
+    // ----- statements ------------------------------------------------------
+
+    fn block(&mut self) -> PResult<Block> {
+        let start = self.expect(TokenKind::LBrace)?;
+        let mut stmts = Vec::new();
+        loop {
+            self.skip_seps();
+            match self.peek() {
+                TokenKind::RBrace => break,
+                TokenKind::Eof => return Err(self.unexpected("`}`", "`}`")),
+                _ => {}
+            }
+            match self.stmt().and_then(|s| self.stmt_end().map(|_| s)) {
+                Ok(stmt) => stmts.push(stmt),
+                Err(diag) => {
+                    self.report(diag);
+                    self.recover_stmt();
+                }
+            }
+        }
+        let end = self.bump().span;
+        Ok(Block {
+            stmts,
+            span: start.to(end),
+        })
+    }
+
+    /// Skips to the end of the current statement, leaving a closing `}`.
+    fn recover_stmt(&mut self) {
+        let mut depth = 0i32;
+        loop {
+            match self.peek() {
+                TokenKind::Eof => return,
+                TokenKind::Newline | TokenKind::Semi if depth == 0 => {
+                    self.bump();
+                    return;
+                }
+                TokenKind::RBrace if depth == 0 => return,
+                TokenKind::LBrace => depth += 1,
+                TokenKind::RBrace => depth -= 1,
+                _ => {}
+            }
+            self.bump();
+        }
+    }
+
+    fn stmt(&mut self) -> PResult<Stmt> {
+        let start = self.span();
+        let kind = match self.peek() {
+            TokenKind::Let | TokenKind::Var => {
+                let mutable = self.bump().kind == TokenKind::Var;
+                let name = self.ident()?;
+                let ty = if self.eat(&TokenKind::Colon) {
+                    Some(self.type_expr()?)
+                } else {
+                    None
+                };
+                self.expect(TokenKind::Eq)?;
+                let value = self.expr()?;
+                StmtKind::Let {
+                    mutable,
+                    name,
+                    ty,
+                    value,
+                }
+            }
+            TokenKind::If => return self.if_stmt(),
+            TokenKind::While => {
+                self.bump();
+                let cond = self.expr()?;
+                let body = self.block()?;
+                StmtKind::While { cond, body }
+            }
+            TokenKind::For => {
+                self.bump();
+                let var = self.ident()?;
+                self.expect(TokenKind::In)?;
+                let iter = self.expr()?;
+                let body = self.block()?;
+                StmtKind::For { var, iter, body }
+            }
+            TokenKind::Return => {
+                self.bump();
+                let value = if matches!(
+                    self.peek(),
+                    TokenKind::Newline | TokenKind::Semi | TokenKind::RBrace | TokenKind::Eof
+                ) {
+                    None
+                } else {
+                    Some(self.expr()?)
+                };
+                StmtKind::Return(value)
+            }
+            TokenKind::Break => {
+                self.bump();
+                StmtKind::Break
+            }
+            TokenKind::Continue => {
+                self.bump();
+                StmtKind::Continue
+            }
+            TokenKind::LBrace => StmtKind::Block(self.block()?),
+            _ => {
+                let expr = self.expr()?;
+                let op = match self.peek() {
+                    TokenKind::Eq => Some(AssignOp::Set),
+                    TokenKind::PlusEq => Some(AssignOp::Add),
+                    TokenKind::MinusEq => Some(AssignOp::Sub),
+                    TokenKind::StarEq => Some(AssignOp::Mul),
+                    TokenKind::SlashEq => Some(AssignOp::Div),
+                    _ => None,
+                };
+                match op {
+                    None => StmtKind::Expr(expr),
+                    Some(op) => {
+                        if !is_place(&expr) {
+                            return Err(Diagnostic::error(
+                                "E0104",
+                                expr.span,
+                                Text::new(
+                                    "invalid assignment target",
+                                    "هدف إسناد غير صالح",
+                                ),
+                            )
+                            .with_hint(Text::new(
+                                "only variables, fields (`a.b`) and list elements (`a[i]`) can be assigned",
+                                "يمكن الإسناد فقط إلى متغير أو حقل (`a.b`) أو عنصر قائمة (`a[i]`)",
+                            )));
+                        }
+                        self.bump();
+                        let value = self.expr()?;
+                        StmtKind::Assign {
+                            target: expr,
+                            op,
+                            value,
+                        }
+                    }
+                }
+            }
+        };
+        Ok(Stmt {
+            kind,
+            span: start.to(self.prev_span()),
+        })
+    }
+
+    fn if_stmt(&mut self) -> PResult<Stmt> {
+        let start = self.expect(TokenKind::If)?;
+        let cond = self.expr()?;
+        let then = self.block()?;
+        let otherwise = if self.eat(&TokenKind::Else) {
+            if self.at(&TokenKind::If) {
+                Some(Else::If(Box::new(self.if_stmt()?)))
+            } else {
+                Some(Else::Block(self.block()?))
+            }
+        } else {
+            None
+        };
+        Ok(Stmt {
+            kind: StmtKind::If {
+                cond,
+                then,
+                otherwise,
+            },
+            span: start.to(self.prev_span()),
+        })
+    }
+
+    // ----- expressions -----------------------------------------------------
+
+    fn expr(&mut self) -> PResult<Expr> {
+        self.expr_bp(0)
+    }
+
+    fn expr_bp(&mut self, min_bp: u8) -> PResult<Expr> {
+        let mut lhs = self.unary()?;
+        while let Some((infix, l_bp, r_bp)) = infix_op(self.peek()) {
+            if l_bp < min_bp {
+                break;
+            }
+            self.bump();
+            let rhs = self.expr_bp(r_bp)?;
+            let span = lhs.span.to(rhs.span);
+            let kind = match infix {
+                Infix::Bin(op) => ExprKind::Binary {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
+                Infix::Range { inclusive } => ExprKind::Range {
+                    start: Box::new(lhs),
+                    end: Box::new(rhs),
+                    inclusive,
+                },
+            };
+            lhs = Expr { kind, span };
+        }
+        Ok(lhs)
+    }
+
+    fn unary(&mut self) -> PResult<Expr> {
+        if self.at(&TokenKind::Await) {
+            let start = self.bump().span;
+            let expr = self.unary()?;
+            return Ok(Expr {
+                span: start.to(expr.span),
+                kind: ExprKind::Await(Box::new(expr)),
+            });
+        }
+        let op = match self.peek() {
+            TokenKind::Minus => UnaryOp::Neg,
+            TokenKind::Bang => UnaryOp::Not,
+            _ => return self.postfix(),
+        };
+        let start = self.bump().span;
+        let expr = self.unary()?;
+        Ok(Expr {
+            span: start.to(expr.span),
+            kind: ExprKind::Unary {
+                op,
+                expr: Box::new(expr),
+            },
+        })
+    }
+
+    fn postfix(&mut self) -> PResult<Expr> {
+        let mut expr = self.primary()?;
+        loop {
+            match self.peek() {
+                TokenKind::Dot => {
+                    self.bump();
+                    let name = self.ident()?;
+                    expr = Expr {
+                        span: expr.span.to(name.span),
+                        kind: ExprKind::Field {
+                            target: Box::new(expr),
+                            name,
+                        },
+                    };
+                }
+                TokenKind::LParen => {
+                    expr = self.call(expr, Vec::new())?;
+                }
+                TokenKind::LBracket => {
+                    self.bump();
+                    let index = self.expr()?;
+                    let end = self.expect(TokenKind::RBracket)?;
+                    expr = Expr {
+                        span: expr.span.to(end),
+                        kind: ExprKind::Index {
+                            target: Box::new(expr),
+                            index: Box::new(index),
+                        },
+                    };
+                }
+                TokenKind::Lt
+                    if matches!(expr.kind, ExprKind::Name(_) | ExprKind::Field { .. }) =>
+                {
+                    match self.try_type_args() {
+                        Some(type_args) => expr = self.call(expr, type_args)?,
+                        None => break,
+                    }
+                }
+                _ => break,
+            }
+        }
+        Ok(expr)
+    }
+
+    /// Spec §10.5: after a name, `<` starts type arguments only if a type
+    /// list closed by `>` parses and is immediately followed by `(`.
+    fn try_type_args(&mut self) -> Option<Vec<TypeExpr>> {
+        let save = self.pos;
+        self.bump();
+        let mut args = Vec::new();
+        loop {
+            match self.type_expr() {
+                Ok(t) => args.push(t),
+                Err(_) => {
+                    self.pos = save;
+                    return None;
+                }
+            }
+            if self.eat(&TokenKind::Comma) {
+                continue;
+            }
+            if self.eat(&TokenKind::Gt) && self.at(&TokenKind::LParen) {
+                return Some(args);
+            }
+            self.pos = save;
+            return None;
+        }
+    }
+
+    fn call(&mut self, callee: Expr, type_args: Vec<TypeExpr>) -> PResult<Expr> {
+        self.expect(TokenKind::LParen)?;
+        let mut args = Vec::new();
+        while !self.at(&TokenKind::RParen) {
+            let name = if matches!(self.peek(), TokenKind::Ident(_))
+                && self.peek_n(1) == &TokenKind::Colon
+            {
+                let name = self.ident()?;
+                self.bump();
+                Some(name)
+            } else {
+                None
+            };
+            let value = self.expr()?;
+            args.push(Arg { name, value });
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let end = self.expect(TokenKind::RParen)?;
+        Ok(Expr {
+            span: callee.span.to(end),
+            kind: ExprKind::Call {
+                callee: Box::new(callee),
+                type_args,
+                args,
+            },
+        })
+    }
+
+    fn primary(&mut self) -> PResult<Expr> {
+        let span = self.span();
+        let kind = match self.peek().clone() {
+            TokenKind::Int(n) => {
+                self.bump();
+                ExprKind::Int(n)
+            }
+            TokenKind::Float(f) => {
+                self.bump();
+                ExprKind::Float(f)
+            }
+            TokenKind::Duration(ms) => {
+                self.bump();
+                ExprKind::Duration(ms)
+            }
+            TokenKind::Str(s) => {
+                self.bump();
+                ExprKind::Str(s)
+            }
+            TokenKind::True => {
+                self.bump();
+                ExprKind::Bool(true)
+            }
+            TokenKind::False => {
+                self.bump();
+                ExprKind::Bool(false)
+            }
+            TokenKind::Ident(name) => {
+                self.bump();
+                ExprKind::Name(name)
+            }
+            TokenKind::LParen => {
+                self.bump();
+                let inner = self.expr()?;
+                let end = self.expect(TokenKind::RParen)?;
+                return Ok(Expr {
+                    kind: inner.kind,
+                    span: span.to(end),
+                });
+            }
+            TokenKind::LBracket => {
+                self.bump();
+                let mut items = Vec::new();
+                while !self.at(&TokenKind::RBracket) {
+                    items.push(self.expr()?);
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                let end = self.expect(TokenKind::RBracket)?;
+                return Ok(Expr {
+                    kind: ExprKind::List(items),
+                    span: span.to(end),
+                });
+            }
+            TokenKind::LBrace => return self.record_literal(),
+            TokenKind::Match => return self.match_expr(),
+            TokenKind::SelfKw => {
+                return Err(not_yet(span, "`self`", "`self`", "v0.3"));
+            }
+            TokenKind::If => {
+                return Err(Diagnostic::error(
+                    "E0102",
+                    span,
+                    Text::new(
+                        "`if` is a statement and cannot be used as a value",
+                        "`if` جملة ولا يمكن استخدامها كقيمة",
+                    ),
+                )
+                .with_hint(Text::new(
+                    "use `match` on a `Bool` to choose between two values",
+                    "استخدم `match` على قيمة `Bool` للاختيار بين قيمتين",
+                )));
+            }
+            _ => {
+                return Err(Diagnostic::error(
+                    "E0102",
+                    span,
+                    Text::new(
+                        format!("expected an expression, found {}", self.peek().describe()),
+                        format!("المتوقع تعبير، لكن وُجد {}", self.peek().describe_ar()),
+                    ),
+                ));
+            }
+        };
+        Ok(Expr { kind, span })
+    }
+
+    /// `{ name: "Lina", age }` — fields separated by `,` or line breaks;
+    /// a bare name is shorthand for `name: name`.
+    fn record_literal(&mut self) -> PResult<Expr> {
+        let start = self.expect(TokenKind::LBrace)?;
+        let mut fields = Vec::new();
+        self.skip_newlines();
+        while !self.at(&TokenKind::RBrace) {
+            let name = self.ident()?;
+            let value = if self.eat(&TokenKind::Colon) {
+                self.expr()?
+            } else {
+                Expr {
+                    kind: ExprKind::Name(name.name.clone()),
+                    span: name.span,
+                }
+            };
+            fields.push(FieldInit { name, value });
+            let sep = self.eat(&TokenKind::Comma) | self.at(&TokenKind::Newline);
+            self.skip_newlines();
+            if !sep {
+                break;
+            }
+        }
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(Expr {
+            kind: ExprKind::Record(fields),
+            span: start.to(end),
+        })
+    }
+
+    fn match_expr(&mut self) -> PResult<Expr> {
+        let start = self.expect(TokenKind::Match)?;
+        let scrutinee = self.expr()?;
+        self.expect(TokenKind::LBrace)?;
+        let mut arms = Vec::new();
+        self.skip_seps();
+        while !self.at(&TokenKind::RBrace) {
+            let pattern = self.pattern()?;
+            self.expect(TokenKind::FatArrow)?;
+            let body = if self.at(&TokenKind::LBrace) {
+                ArmBody::Block(self.block()?)
+            } else {
+                ArmBody::Expr(self.expr()?)
+            };
+            let span = pattern.span.to(self.prev_span());
+            arms.push(MatchArm {
+                pattern,
+                body,
+                span,
+            });
+            let sep = self.eat(&TokenKind::Comma)
+                | matches!(self.peek(), TokenKind::Newline | TokenKind::Semi);
+            self.skip_seps();
+            if !sep && !self.at(&TokenKind::RBrace) {
+                return Err(self.unexpected("`,`, a new line or `}`", "`,` أو سطر جديد أو `}`"));
+            }
+        }
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(Expr {
+            kind: ExprKind::Match {
+                scrutinee: Box::new(scrutinee),
+                arms,
+            },
+            span: start.to(end),
+        })
+    }
+
+    fn pattern(&mut self) -> PResult<Pattern> {
+        let span = self.span();
+        let kind = match self.peek().clone() {
+            TokenKind::Ident(name) if name == "_" => {
+                self.bump();
+                PatternKind::Wildcard
+            }
+            TokenKind::Ident(_) => {
+                let name = self.ident()?;
+                if self.eat(&TokenKind::LParen) {
+                    let mut args = Vec::new();
+                    while !self.at(&TokenKind::RParen) {
+                        args.push(self.pattern()?);
+                        if !self.eat(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    let end = self.expect(TokenKind::RParen)?;
+                    return Ok(Pattern {
+                        span: span.to(end),
+                        kind: PatternKind::Ctor { name, args },
+                    });
+                }
+                PatternKind::Name(name.name)
+            }
+            TokenKind::Int(n) => {
+                self.bump();
+                PatternKind::Int(n)
+            }
+            TokenKind::Float(f) => {
+                self.bump();
+                PatternKind::Float(f)
+            }
+            TokenKind::Minus => {
+                self.bump();
+                let kind = match self.peek().clone() {
+                    TokenKind::Int(n) => PatternKind::Int(-n),
+                    TokenKind::Float(f) => PatternKind::Float(-f),
+                    _ => return Err(self.unexpected("a number", "عدد")),
+                };
+                self.bump();
+                return Ok(Pattern {
+                    kind,
+                    span: span.to(self.prev_span()),
+                });
+            }
+            TokenKind::Str(s) => {
+                self.bump();
+                PatternKind::Str(s)
+            }
+            TokenKind::True => {
+                self.bump();
+                PatternKind::Bool(true)
+            }
+            TokenKind::False => {
+                self.bump();
+                PatternKind::Bool(false)
+            }
+            _ => {
+                return Err(Diagnostic::error(
+                    "E0107",
+                    span,
+                    Text::new(
+                        format!("expected a pattern, found {}", self.peek().describe()),
+                        format!("المتوقع نمط، لكن وُجد {}", self.peek().describe_ar()),
+                    ),
+                ));
+            }
+        };
+        Ok(Pattern { kind, span })
+    }
+}
+
+enum Infix {
+    Bin(BinOp),
+    Range { inclusive: bool },
+}
+
+/// Binding powers (left, right); higher binds tighter. See spec §8.4.
+fn infix_op(kind: &TokenKind) -> Option<(Infix, u8, u8)> {
+    use TokenKind as T;
+    let (infix, bp) = match kind {
+        T::OrOr => (Infix::Bin(BinOp::Or), 1),
+        T::AndAnd => (Infix::Bin(BinOp::And), 3),
+        T::EqEq => (Infix::Bin(BinOp::Eq), 5),
+        T::BangEq => (Infix::Bin(BinOp::Ne), 5),
+        T::Lt => (Infix::Bin(BinOp::Lt), 7),
+        T::Le => (Infix::Bin(BinOp::Le), 7),
+        T::Gt => (Infix::Bin(BinOp::Gt), 7),
+        T::Ge => (Infix::Bin(BinOp::Ge), 7),
+        T::DotDot => (Infix::Range { inclusive: false }, 9),
+        T::DotDotEq => (Infix::Range { inclusive: true }, 9),
+        T::Plus => (Infix::Bin(BinOp::Add), 11),
+        T::Minus => (Infix::Bin(BinOp::Sub), 11),
+        T::Star => (Infix::Bin(BinOp::Mul), 13),
+        T::Slash => (Infix::Bin(BinOp::Div), 13),
+        T::Div => (Infix::Bin(BinOp::IntDiv), 13),
+        T::Percent => (Infix::Bin(BinOp::Rem), 13),
+        _ => return None,
+    };
+    // Ranges are non-associative: `a..b..c` stops after `a..b`.
+    let r_bp = if matches!(infix, Infix::Range { .. }) {
+        bp + 2
+    } else {
+        bp + 1
+    };
+    Some((infix, bp, r_bp))
+}
+
+fn is_place(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Name(_) => true,
+        ExprKind::Field { target, .. } | ExprKind::Index { target, .. } => is_place(target),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_ok(src: &str) -> Program {
+        let (program, diags) = parse(src);
+        assert!(diags.is_empty(), "unexpected diagnostics: {diags:#?}");
+        program
+    }
+
+    fn main_stmts(src: &str) -> Vec<Stmt> {
+        let program = parse_ok(src);
+        match &program.items[0] {
+            Item::Fn(f) => f.body.stmts.clone(),
+            other => panic!("expected fn, got {other:?}"),
+        }
+    }
+
+    fn first_expr(src: &str) -> Expr {
+        match &main_stmts(&format!("fn main() {{\n{src}\n}}"))[0].kind {
+            StmtKind::Expr(e) => e.clone(),
+            StmtKind::Let { value, .. } => value.clone(),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    /// Renders an expression as an S-expression for compact assertions.
+    fn sexp(e: &Expr) -> String {
+        match &e.kind {
+            ExprKind::Int(n) => n.to_string(),
+            ExprKind::Float(f) => format!("{f:?}"),
+            ExprKind::Str(s) => format!("{s:?}"),
+            ExprKind::Bool(b) => b.to_string(),
+            ExprKind::Name(n) => n.clone(),
+            ExprKind::List(items) => {
+                format!("[{}]", items.iter().map(sexp).collect::<Vec<_>>().join(" "))
+            }
+            ExprKind::Record(fields) => format!(
+                "{{{}}}",
+                fields
+                    .iter()
+                    .map(|f| format!("{}:{}", f.name.name, sexp(&f.value)))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            ExprKind::Unary { op, expr } => {
+                let s = if *op == UnaryOp::Neg { "-" } else { "!" };
+                format!("({s} {})", sexp(expr))
+            }
+            ExprKind::Binary { op, lhs, rhs } => {
+                format!("({} {} {})", op.symbol(), sexp(lhs), sexp(rhs))
+            }
+            ExprKind::Range {
+                start,
+                end,
+                inclusive,
+            } => format!(
+                "({} {} {})",
+                if *inclusive { "..=" } else { ".." },
+                sexp(start),
+                sexp(end)
+            ),
+            ExprKind::Call {
+                callee,
+                type_args,
+                args,
+            } => {
+                let targs = if type_args.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{}>", type_args.len())
+                };
+                let args: Vec<_> = args
+                    .iter()
+                    .map(|a| match &a.name {
+                        Some(n) => format!("{}:{}", n.name, sexp(&a.value)),
+                        None => sexp(&a.value),
+                    })
+                    .collect();
+                format!("(call{targs} {} {})", sexp(callee), args.join(" "))
+            }
+            ExprKind::Field { target, name } => format!("(. {} {})", sexp(target), name.name),
+            ExprKind::Index { target, index } => format!("([] {} {})", sexp(target), sexp(index)),
+            ExprKind::Match { scrutinee, arms } => {
+                format!("(match {} {})", sexp(scrutinee), arms.len())
+            }
+            ExprKind::Duration(ms) => format!("{ms}ms"),
+            ExprKind::Await(e) => format!("(await {})", sexp(e)),
+        }
+    }
+
+    #[test]
+    fn precedence() {
+        assert_eq!(sexp(&first_expr("1 + 2 * 3")), "(+ 1 (* 2 3))");
+        assert_eq!(sexp(&first_expr("1 - 2 - 3")), "(- (- 1 2) 3)");
+        assert_eq!(
+            sexp(&first_expr("a || b && c == d")),
+            "(|| a (&& b (== c d)))"
+        );
+        assert_eq!(sexp(&first_expr("-x.length")), "(- (. x length))");
+        assert_eq!(sexp(&first_expr("7 div 2 % 3")), "(% (div 7 2) 3)");
+        assert_eq!(sexp(&first_expr("0..n + 1")), "(.. 0 (+ n 1))");
+        assert_eq!(sexp(&first_expr("a < b == c > d")), "(== (< a b) (> c d))");
+    }
+
+    #[test]
+    fn calls_methods_and_indexing() {
+        assert_eq!(
+            sexp(&first_expr("xs.push(f(1, 2)[0])")),
+            "(call (. xs push) ([] (call f 1 2) 0))"
+        );
+        assert_eq!(
+            sexp(&first_expr("greet(name: \"Lina\", 3)")),
+            "(call greet name:\"Lina\" 3)"
+        );
+    }
+
+    #[test]
+    fn generic_call_versus_comparison() {
+        assert_eq!(
+            sexp(&first_expr("ai.infer<Ticket>(x)")),
+            "(call<1> (. ai infer) x)"
+        );
+        assert_eq!(sexp(&first_expr("f<List<Int>, String>()")), "(call<2> f )");
+        assert_eq!(sexp(&first_expr("a < b")), "(< a b)");
+        assert_eq!(sexp(&first_expr("a < b && c > d")), "(&& (< a b) (> c d))");
+    }
+
+    #[test]
+    fn records_and_lists() {
+        assert_eq!(
+            sexp(&first_expr("let r = { name: \"Lina\", age }")),
+            "{name:\"Lina\" age:age}"
+        );
+        assert_eq!(
+            sexp(&first_expr("let r = {\n  a: 1\n  b: [1,\n 2]\n}")),
+            "{a:1 b:[1 2]}"
+        );
+        assert_eq!(sexp(&first_expr("let e = {}")), "{}");
+    }
+
+    #[test]
+    fn statements_without_semicolons() {
+        let stmts = main_stmts(
+            "fn main() {\n  var x = 1; x += 2\n  if x > 1 {\n    print(x)\n  }\n  else {\n  }\n  for i in 0..=3 { x = i }\n  while false { break }\n  return\n}",
+        );
+        assert_eq!(stmts.len(), 6);
+        assert!(matches!(
+            stmts[1].kind,
+            StmtKind::Assign {
+                op: AssignOp::Add,
+                ..
+            }
+        ));
+        assert!(matches!(
+            stmts[2].kind,
+            StmtKind::If {
+                otherwise: Some(_),
+                ..
+            }
+        ));
+        assert!(matches!(stmts[5].kind, StmtKind::Return(None)));
+    }
+
+    #[test]
+    fn functions_types_and_effects() {
+        let program = parse_ok(
+            "use std.io\ntype P = { x: Int, y: Int }\nlet ORIGIN: P = { x: 0, y: 0 }\npub fn show(p: P) -> String !{io} {\n  return \"p\"\n}",
+        );
+        assert_eq!(program.items.len(), 4);
+        let Item::Fn(f) = &program.items[3] else {
+            panic!()
+        };
+        assert!(f.is_pub);
+        assert_eq!(f.effects.as_ref().unwrap().effects[0].name, "io");
+    }
+
+    #[test]
+    fn match_arms() {
+        let e = first_expr(
+            "match r {\n  Ok(v) => print(v)\n  Err(_) => { print(1) }, None => 0\n  -1 => 2\n}",
+        );
+        let ExprKind::Match { arms, .. } = e.kind else {
+            panic!()
+        };
+        assert_eq!(arms.len(), 4);
+        assert!(matches!(arms[1].body, ArmBody::Block(_)));
+        assert!(matches!(arms[3].pattern.kind, PatternKind::Int(-1)));
+    }
+
+    #[test]
+    fn reports_errors_and_recovers() {
+        let (program, diags) =
+            parse("fn a() {\n  let = 1\n  print(2)\n}\nfn b() { 1 = 2 }\nfn c() {}");
+        let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
+        assert_eq!(codes, vec!["E0101", "E0104"]);
+        assert_eq!(program.items.len(), 3);
+    }
+
+    #[test]
+    fn two_statements_on_one_line_need_a_separator() {
+        let (_, diags) = parse("fn main() { let a = 1 let b = 2 }");
+        assert_eq!(diags[0].code, "E0101");
+    }
+
+    #[test]
+    fn unsupported_features_are_flagged() {
+        let (_, diags) = parse("enum E {}\ntrait T {}");
+        let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
+        assert_eq!(codes, vec!["E0103", "E0103"]);
+    }
+
+    #[test]
+    fn async_await_and_durations() {
+        let program = parse_ok("pub async fn f() -> Int {\n  return 1\n}");
+        let Item::Fn(f) = &program.items[0] else {
+            panic!()
+        };
+        assert!(f.is_pub && f.is_async);
+        assert_eq!(
+            sexp(&first_expr("await ai.infer<T>(input: x, timeout: 10s).len")),
+            "(await (. (call<1> (. ai infer) input:x timeout:10000ms) len))"
+        );
+        assert_eq!(sexp(&first_expr("-await f()")), "(- (await (call f )))");
+    }
+}

@@ -1,0 +1,5 @@
+[ai.models.bot]
+provider = "mock"
+
+[[ai.models.bot.mock]]
+error = "Oops"

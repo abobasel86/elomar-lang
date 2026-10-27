@@ -1,0 +1,32 @@
+// Arabic identifiers and text are first-class (spec §4.4, §10.8).
+
+type طالب = {
+    الاسم: String,
+    الدرجة: Int
+}
+
+fn التقدير(الدرجة: Int) -> String {
+    return match الدرجة >= 90 {
+        true => "ممتاز"
+        false => match الدرجة >= 75 {
+            true => "جيد جدًا"
+            false => "مقبول"
+        }
+    }
+}
+
+fn main() {
+    let الطلاب: List<طالب> = [
+        { الاسم: "لينا", الدرجة: 95 },
+        { الاسم: "عمر", الدرجة: 80 },
+        { الاسم: "سارة", الدرجة: 70 }
+    ]
+    for ط in الطلاب {
+        print(ط.الاسم, "←", التقدير(ط.الدرجة))
+    }
+
+    let تحية = "مرحبا"
+    print("عدد الحروف:", تحية.length)
+    print("الحرف الأول:", تحية.chars()[0])
+    print("مقلوبة:", تحية.chars().reverse().join(""))
+}

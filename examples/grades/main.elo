@@ -1,0 +1,42 @@
+// Spec §21, examples B and C: averages with and without explicit errors.
+
+fn average(grades: List<Int>) -> Float {
+    var total = 0
+    for grade in grades {
+        total += grade
+    }
+    // `/` always yields Float, so no conversion is needed.
+    return total / grades.length
+}
+
+fn safe_average(grades: List<Int>) -> Result<Float, String> {
+    if grades.is_empty() {
+        return Err("No grades supplied")
+    }
+    return Ok(average(grades))
+}
+
+fn letter(avg: Float) -> String {
+    if avg >= 90 {
+        return "A"
+    } else if avg >= 80 {
+        return "B"
+    } else if avg >= 70 {
+        return "C"
+    }
+    return "F"
+}
+
+fn main() {
+    let grades = [88, 76, 91, 85]
+    let avg = average(grades)
+    print("Average:", avg, "Letter:", letter(avg))
+    print("Best:", grades.sorted().last().unwrap_or(0))
+
+    for list in [grades, []] {
+        match safe_average(list) {
+            Ok(value) => print("Safe average:", value)
+            Err(message) => print("Error:", message)
+        }
+    }
+}

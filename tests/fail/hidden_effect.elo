@@ -1,0 +1,18 @@
+// expect: E3002 E3001
+pub fn log(message: String) {
+    print(message)
+}
+
+fn helper() {
+    print("side effect")
+}
+
+fn quiet() -> Int !{} {
+    helper()
+    return 1
+}
+
+fn main() {
+    log("hi")
+    print(quiet())
+}

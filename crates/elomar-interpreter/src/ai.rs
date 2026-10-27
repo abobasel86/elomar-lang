@@ -1,0 +1,140 @@
+//! Running `ai.infer<T>(...)`: converting values to and from JSON and
+//! turning provider failures into `Err(AIError)` values (spec §13.3).
+
+use std::rc::Rc;
+
+use elomar_ai_core::{AiError, AiRequest, AiRuntime, Schema};
+use elomar_ast::{TypeExpr, TypeExprKind};
+use serde_json::{Map, Number, Value as Json};
+
+use crate::Value;
+
+/// A pending `ai.infer` call, created when the call is evaluated and run
+/// when it is awaited.
+#[derive(Debug, Clone)]
+pub struct InferCall {
+    pub schema: Schema,
+    pub model: String,
+    pub instructions: String,
+    pub input: Value,
+    pub timeout_ms: Option<i64>,
+}
+
+/// The checker has already expanded aliases, so this is purely structural.
+pub(crate) fn schema_of(t: &TypeExpr) -> Schema {
+    match &t.kind {
+        TypeExprKind::Record(fields) => Schema::Record(
+            fields
+                .iter()
+                .map(|(n, t)| (n.name.clone(), schema_of(t)))
+                .collect(),
+        ),
+        TypeExprKind::Named { name, args } => match name.name.as_str() {
+            "String" => Schema::String,
+            "Int" => Schema::Int,
+            "Float" => Schema::Float,
+            "Bool" => Schema::Bool,
+            "List" => Schema::List(Box::new(schema_of(&args[0]))),
+            "Option" => Schema::Option(Box::new(schema_of(&args[0]))),
+            other => unreachable!("checker allows only JSON data types, got `{other}`"),
+        },
+    }
+}
+
+/// Performs the call. Never fails at the interpreter level: every problem
+/// becomes an `Err(AIError)` value the program can `match` on.
+pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
+    let request = AiRequest {
+        model: call.model.clone(),
+        instructions: call.instructions.clone(),
+        input: to_json(&call.input),
+        schema: call.schema.clone(),
+        timeout_ms: call
+            .timeout_ms
+            .map_or_else(|| ai.default_timeout_ms(), |ms| ms.max(0) as u64),
+    };
+    match ai.infer(&request) {
+        Ok(json) => Value::Result(Ok(Rc::new(from_json(&call.schema, &json)))),
+        Err(e) => Value::Result(Err(Rc::new(ai_error_value(&e)))),
+    }
+}
+
+/// `AIError` as a value: `{ kind: String, message: String }`.
+fn ai_error_value(e: &AiError) -> Value {
+    Value::Record(Rc::new(vec![
+        ("kind".into(), Value::str(e.kind.name())),
+        ("message".into(), Value::str(e.message.as_str())),
+    ]))
+}
+
+pub(crate) fn to_json(v: &Value) -> Json {
+    match v {
+        Value::Int(n) => Json::from(*n),
+        Value::Float(x) => Number::from_f64(*x).map_or(Json::Null, Json::Number),
+        Value::Bool(b) => Json::Bool(*b),
+        Value::Str(s) => Json::String(s.to_string()),
+        Value::List(items) => Json::Array(items.iter().map(to_json).collect()),
+        Value::Record(fields) => Json::Object(
+            fields
+                .iter()
+                .map(|(n, v)| (n.to_string(), to_json(v)))
+                .collect::<Map<_, _>>(),
+        ),
+        Value::Option(None) => Json::Null,
+        Value::Option(Some(v)) => to_json(v),
+        // The checker only lets JSON data types reach a model.
+        _ => Json::Null,
+    }
+}
+
+/// Converts JSON that has passed `schema.validate`.
+pub(crate) fn from_json(schema: &Schema, json: &Json) -> Value {
+    match (schema, json) {
+        (Schema::String, Json::String(s)) => Value::str(s.as_str()),
+        (Schema::Int, Json::Number(n)) => Value::Int(
+            n.as_i64()
+                .unwrap_or_else(|| n.as_f64().unwrap_or(0.0) as i64),
+        ),
+        (Schema::Float, Json::Number(n)) => Value::Float(n.as_f64().unwrap_or(0.0)),
+        (Schema::Bool, Json::Bool(b)) => Value::Bool(*b),
+        (Schema::List(t), Json::Array(items)) => {
+            Value::list(items.iter().map(|i| from_json(t, i)).collect())
+        }
+        (Schema::Option(_), Json::Null) => Value::none(),
+        (Schema::Option(t), v) => Value::some(from_json(t, v)),
+        (Schema::Record(fields), Json::Object(obj)) => Value::Record(Rc::new(
+            fields
+                .iter()
+                .map(|(name, t)| {
+                    let v = obj.get(name).map_or(Value::none(), |j| from_json(t, j));
+                    (Rc::from(name.as_str()), v)
+                })
+                .collect(),
+        )),
+        _ => unreachable!("response was validated against {}", schema.describe()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn round_trips_records() {
+        let schema = Schema::Record(vec![
+            ("name".into(), Schema::String),
+            ("score".into(), Schema::Option(Box::new(Schema::Float))),
+            ("tags".into(), Schema::List(Box::new(Schema::Int))),
+        ]);
+        let v = from_json(&schema, &json!({"name": "Lina", "tags": [1, 2]}));
+        assert_eq!(
+            v.to_string(),
+            "{ name: \"Lina\", score: None, tags: [1, 2] }"
+        );
+        assert_eq!(
+            to_json(&v),
+            json!({"name": "Lina", "score": null, "tags": [1, 2]})
+        );
+    }
+}

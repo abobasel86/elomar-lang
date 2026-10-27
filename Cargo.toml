@@ -1,0 +1,41 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/elomar-diagnostics",
+    "crates/elomar-lexer",
+    "crates/elomar-ast",
+    "crates/elomar-parser",
+    "crates/elomar-types",
+    "crates/elomar-ai-core",
+    "crates/elomar-ai-provider-mock",
+    "crates/elomar-ai-provider-openai",
+    "crates/elomar-interpreter",
+    "crates/elomar-cli",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[workspace.dependencies]
+elomar-diagnostics = { path = "crates/elomar-diagnostics" }
+elomar-lexer = { path = "crates/elomar-lexer" }
+elomar-ast = { path = "crates/elomar-ast" }
+elomar-parser = { path = "crates/elomar-parser" }
+elomar-types = { path = "crates/elomar-types" }
+elomar-interpreter = { path = "crates/elomar-interpreter" }
+elomar-ai-core = { path = "crates/elomar-ai-core" }
+elomar-ai-provider-mock = { path = "crates/elomar-ai-provider-mock" }
+elomar-ai-provider-openai = { path = "crates/elomar-ai-provider-openai" }
+
+unicode-ident = "1"
+unicode-normalization = "0.1"
+unicode-segmentation = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+ureq = "2"
+url = "2"

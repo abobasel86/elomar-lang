@@ -1,0 +1,8 @@
+// expect: R0001
+fn average(xs: List<Int>) -> Float {
+    return xs.sum() / xs.length
+}
+
+fn main() {
+    print(average([]))
+}
