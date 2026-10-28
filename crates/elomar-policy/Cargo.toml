@@ -1,0 +1,9 @@
+[package]
+name = "elomar-policy"
+description = "Permission checks at real resource boundaries for Elomar-Lang (spec §16.3)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]

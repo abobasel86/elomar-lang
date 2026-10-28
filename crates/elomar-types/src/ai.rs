@@ -12,7 +12,21 @@ use crate::{Checker, Ty, suggest};
 
 /// Modules that `use` accepts, with the short name they bind (if any).
 /// `std.io` is accepted for compatibility; its functions are in the prelude.
-const KNOWN_MODULES: [(&str, Option<&str>); 2] = [("std.io", None), ("std.ai", Some("ai"))];
+const KNOWN_MODULES: [(&str, Option<&str>); 4] = [
+    ("std.io", None),
+    ("std.ai", Some("ai")),
+    ("std.fs", Some("fs")),
+    ("std.json", Some("json")),
+];
+
+/// Where a value crosses into JSON, for error messages.
+#[derive(Clone, Copy)]
+pub(crate) enum DataRole {
+    AiOutput,
+    AiInput,
+    JsonParse,
+    JsonValue,
+}
 
 /// Parameters of `ai.infer`: (name, required).
 const INFER_PARAMS: [(&str, bool); 4] = [
@@ -142,25 +156,12 @@ impl Checker {
             return Some(Ty::Error);
         }
         *module = (*path).to_string();
-        if func.name != "infer" {
-            self.push(
-                Diagnostic::error(
-                    "E1008",
-                    func.span,
-                    Text::new(
-                        format!("module `ai` has no function `{}`", func.name),
-                        format!("الوحدة `ai` ليس فيها دالة `{}`", func.name),
-                    ),
-                )
-                .with_hint(Text::new(
-                    "available: `infer`; `generate`, `stream` and `embed` are planned",
-                    "المتاح: `infer`؛ و`generate` و`stream` و`embed` مخطط لها",
-                )),
-            );
-            self.check_args_loosely(args);
-            return Some(Ty::Error);
-        }
-        Some(self.check_ai_infer(func.span, type_args, args, span))
+        Some(match *path {
+            "std.fs" => self.check_fs_call(func, type_args, args, span),
+            "std.json" => self.check_json_call(func, type_args, args, span),
+            _ if func.name != "infer" => self.unknown_module_function("ai", func, &["infer"], args),
+            _ => self.check_ai_infer(func.span, type_args, args, span),
+        })
     }
 
     fn check_ai_infer(
@@ -176,8 +177,8 @@ impl Checker {
             [t] => {
                 let ty = self.lower_type(t);
                 let resolved = self.subst.resolve(&ty);
-                if let Some(bad) = self.non_json_part(&resolved) {
-                    self.not_ai_data(&resolved, &bad, t.span, true);
+                if let Some(bad) = self.non_json_part(&resolved, false) {
+                    self.not_json_data(&resolved, &bad, t.span, DataRole::AiOutput);
                     Ty::Error
                 } else {
                     *t = type_expr_of(&resolved, t.span);
@@ -226,8 +227,8 @@ impl Checker {
                 Some(2) => {
                     let t = self.check_expr(&mut arg.value, None);
                     let resolved = self.subst.resolve(&t);
-                    if let Some(bad) = self.non_json_part(&resolved) {
-                        self.not_ai_data(&resolved, &bad, arg.value.span, false);
+                    if let Some(bad) = self.non_json_part(&resolved, false) {
+                        self.not_json_data(&resolved, &bad, arg.value.span, DataRole::AiInput);
                     }
                 }
                 Some(_) => self.check_expr_against(&mut arg.value, &Ty::Duration),
@@ -323,46 +324,62 @@ impl Checker {
     }
 
     /// The first part of `ty` that has no JSON form, if any.
-    fn non_json_part(&self, ty: &Ty) -> Option<Ty> {
+    /// The first part of `ty` that has no JSON form, if any. `Map<String, V>`
+    /// is JSON for `std.json` but not for models (strict schemas forbid it).
+    pub(crate) fn non_json_part(&self, ty: &Ty, allow_maps: bool) -> Option<Ty> {
         match ty {
             Ty::Str | Ty::Int | Ty::Float | Ty::Bool | Ty::Error => None,
-            Ty::List(t) | Ty::Option(t) => self.non_json_part(t),
-            Ty::Record(fields) => fields.iter().find_map(|(_, t)| self.non_json_part(t)),
+            Ty::List(t) | Ty::Option(t) => self.non_json_part(t, allow_maps),
+            Ty::Map(k, v) if allow_maps && matches!(**k, Ty::Str) => {
+                self.non_json_part(v, allow_maps)
+            }
+            Ty::Record(fields) => fields
+                .iter()
+                .find_map(|(_, t)| self.non_json_part(t, allow_maps)),
             // An enum of plain names travels as one of its names (a string).
             Ty::Enum(name) if self.enums.get(name).is_some_and(|e| e.is_unit_only()) => None,
             other => Some(other.clone()),
         }
     }
 
-    fn not_ai_data(&mut self, ty: &Ty, bad: &Ty, span: Span, output: bool) {
+    pub(crate) fn not_json_data(&mut self, ty: &Ty, bad: &Ty, span: Span, role: DataRole) {
         if matches!(bad, Ty::Var(_)) {
             self.cannot_infer(span);
             return;
         }
         let shown = self.subst.show(ty);
         let part = self.subst.show(bad);
-        let (en, ar) = if output {
-            (
+        let (en, ar) = match role {
+            DataRole::AiOutput => (
                 format!("`ai.infer` cannot produce a `{shown}`: `{part}` has no JSON form"),
                 format!(
                     "لا يمكن أن تُنتج `ai.infer` قيمة `{shown}`: النوع `{part}` ليس له تمثيل JSON"
                 ),
-            )
-        } else {
-            (
+            ),
+            DataRole::AiInput => (
                 format!("a `{shown}` cannot be sent to a model: `{part}` has no JSON form"),
                 format!("لا يمكن إرسال `{shown}` إلى نموذج: النوع `{part}` ليس له تمثيل JSON"),
-            )
+            ),
+            DataRole::JsonParse => (
+                format!("`json.parse` cannot produce a `{shown}`: `{part}` has no JSON form"),
+                format!(
+                    "لا يمكن أن تُنتج `json.parse` قيمة `{shown}`: النوع `{part}` ليس له تمثيل JSON"
+                ),
+            ),
+            DataRole::JsonValue => (
+                format!("a `{shown}` cannot be written as JSON: `{part}` has no JSON form"),
+                format!("لا يمكن كتابة `{shown}` بصيغة JSON: النوع `{part}` ليس له تمثيل JSON"),
+            ),
         };
         self.push(Diagnostic::error("E2015", span, Text::new(en, ar)).with_hint(Text::new(
-            "models exchange JSON: use String, Int, Float, Bool, List<T>, Option<T> and records of these",
-            "تتبادل النماذج بيانات JSON: استخدم String وInt وFloat وBool وList<T> وOption<T> والسجلات المكونة منها",
+            "JSON data is String, Int, Float, Bool, List<T>, Option<T>, enums of plain names, records of these, and (outside `ai.infer`) Map<String, T>",
+            "بيانات JSON هي String وInt وFloat وBool وList<T> وOption<T> والأنواع المعدودة الاسمية والسجلات المكونة منها، و(خارج `ai.infer`) Map<String, T>",
         )));
     }
 }
 
 /// Writes a resolved type back as syntax, with aliases expanded.
-fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {
+pub(crate) fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {
     let named = |name: &str, args: Vec<TypeExpr>| TypeExpr {
         kind: TypeExprKind::Named {
             name: Ident {
@@ -381,6 +398,7 @@ fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {
         Ty::List(t) => named("List", vec![type_expr_of(t, span)]),
         Ty::Option(t) => named("Option", vec![type_expr_of(t, span)]),
         Ty::Enum(name) => named(name, vec![]),
+        Ty::Map(k, v) => named("Map", vec![type_expr_of(k, span), type_expr_of(v, span)]),
         Ty::Record(fields) => TypeExpr {
             kind: TypeExprKind::Record(
                 fields

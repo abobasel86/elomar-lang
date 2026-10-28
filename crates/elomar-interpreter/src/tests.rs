@@ -406,3 +406,70 @@ fn ai_answers_into_enums() {
         "Outage Priority.High true\nInvalidStructuredOutput the model's answer does not match `{ priority: Priority, title: String }`: $.priority: expected one of Low, Normal, High, found \"Urgent\"\nmock Priority.Low false\n"
     );
 }
+
+// ----- std.fs and std.json -----------------------------------------------
+
+fn run_fs(src: &str, policy: FsPolicy) -> String {
+    let (mut program, diags) = elomar_parser::parse(src);
+    assert!(diags.is_empty(), "parse errors: {diags:#?}");
+    let diags = elomar_types::check(
+        &mut program,
+        elomar_types::CheckOptions {
+            require_main: true,
+            ..Default::default()
+        },
+    );
+    assert!(
+        diags.iter().all(|d| !d.is_error()),
+        "check errors: {diags:#?}"
+    );
+    let mut host = BufferHost::default();
+    run_with(&program, &mut host, &mut AiRuntime::default(), policy).unwrap();
+    host.output
+}
+
+fn temp_project(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("elomar-interp-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("data")).unwrap();
+    std::fs::create_dir_all(dir.join("out")).unwrap();
+    std::fs::write(dir.join("data/hello.txt"), "\u{feff}مرحبا\nworld").unwrap();
+    std::fs::write(dir.join("secret.txt"), "s").unwrap();
+    dir
+}
+
+#[test]
+fn files_with_permissions() {
+    let dir = temp_project("fs");
+    let policy = FsPolicy::new(&dir, &["data".into(), "out".into()], &["out".into()]);
+    let src = "use std.fs\nfn show(r: Result<String, FsError>) {\n  match r {\n    Ok(t) => print(\"ok:\", t.split(\"\\n\"))\n    Err(e) => print(\"err:\", e.kind())\n  }\n}\nfn main() {\n  show(fs.read_text(\"data/hello.txt\"))\n  show(fs.read_text(\"data/missing.txt\"))\n  show(fs.read_text(\"secret.txt\"))\n  show(fs.read_text(\"data/../secret.txt\"))\n  print(fs.write_text(\"out/a.txt\", \"one\"), fs.append_text(\"out/a.txt\", \"+two\"))\n  show(fs.read_text(\"out/a.txt\"))\n  print(fs.write_text(\"data/x.txt\", \"no\").is_err(), fs.exists(\"out/a.txt\"), fs.list_dir(\"data\"))\n}";
+    assert_eq!(
+        run_fs(src, policy),
+        "ok: [\"مرحبا\", \"world\"]\nerr: NotFound\nerr: PolicyDenied\nerr: PolicyDenied\nOk(()) Ok(())\nok: [\"one+two\"]\ntrue Ok(true) Ok([\"hello.txt\"])\n"
+    );
+    assert!(
+        !dir.join("data/x.txt").exists(),
+        "denied write must not create the file"
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn files_are_denied_by_default() {
+    let src = "use std.fs\nfn main() {\n  match fs.read_text(\"Cargo.toml\") {\n    Ok(_) => print(\"read\")\n    Err(e) => print(e)\n  }\n}";
+    let out = run_fs(src, FsPolicy::deny_all("."));
+    assert!(
+        out.starts_with("FsError.PolicyDenied(\"reading `Cargo.toml` is not permitted"),
+        "{out}"
+    );
+}
+
+#[test]
+fn json_round_trip() {
+    let src = "use std.json\nenum Level { Low, High }\ntype Student = { name: String, grades: List<Int>, level: Level, note: Option<String>, scores: Map<String, Float> }\nfn main() {\n  let text = \"{\\\"name\\\": \\\"Lina\\\", \\\"grades\\\": [90, 85], \\\"level\\\": \\\"High\\\", \\\"scores\\\": {\\\"math\\\": 9.5}}\"\n  match json.parse<Student>(text) {\n    Ok(s) => {\n      print(s.name, s.grades, s.level, s.note, s.scores[\"math\"])\n      print(json.stringify(s))\n    }\n    Err(e) => print(e)\n  }\n  print(json.parse<List<Int>>(\"[1, 2\"))\n  print(json.parse<List<Int>>(\"[1, \\\"x\\\"]\"))\n  print(json.pretty([\"a\": [1, 2]]))\n}";
+    assert_eq!(
+        out(src),
+        // Record types are structural, so parsed records list fields alphabetically.
+        "Lina [90, 85] Level.High None 9.5\n{\"grades\":[90,85],\"level\":\"High\",\"name\":\"Lina\",\"note\":null,\"scores\":{\"math\":9.5}}\nErr(JsonError.InvalidJson(\"invalid JSON: EOF while parsing a list at line 1 column 5\"))\nErr(JsonError.TypeMismatch(\"the JSON does not match `List<Int>`: $[1]: expected Int, found \\\"x\\\"\"))\n{\n  \"a\": [\n    1,\n    2\n  ]\n}\n"
+    );
+}

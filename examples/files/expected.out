@@ -1,0 +1,15 @@
+Ok(())
+Ok(())
+Lina: 91.7 (excellent)
+Omar: 71.7 (good)
+Sara: 47.5 (weak)
+
+{
+  "excellent": 1,
+  "good": 1,
+  "weak": 1
+}
+Err("bad data in data/broken.json (TypeMismatch)")
+Err("NotFound: cannot read `data/missing.json`: no such file or folder")
+denied: PolicyDenied
+true

@@ -23,6 +23,9 @@ by the compiler when they are not declared.
 - `match` with exhaustiveness checking.
 - Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`
   operator for propagating `Err`/`None`.
+- Files and JSON: `std.fs` (the `fs` effect, default-deny `filesystem_read` /
+  `filesystem_write` in `elomar.toml`) and typed `json.parse<T>` /
+  `json.stringify`. See [`examples/files`](examples/files).
 - Effect inference with mandatory declarations on `pub` functions.
 - `async fn` / `await` (sequential, lazy futures).
 - **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>` (`AIError` is an enum, e.g. `AIError.Timeout(msg)`); answers are
@@ -119,7 +122,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-parser` | Recursive-descent + Pratt parser |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
 | `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
-| `crates/elomar-ai-core` | Schemas, AI errors, `elomar.toml`, policy and answer validation |
+| `crates/elomar-ai-core` | Schemas (shared with `std.json`), AI errors, `elomar.toml`, answer validation |
+| `crates/elomar-policy` | File-system permission checks |
 | `crates/elomar-ai-provider-mock` | Deterministic offline model provider |
 | `crates/elomar-ai-provider-openai` | OpenAI Chat Completions provider over HTTPS |
 | `crates/elomar-cli` | The `elomar` command |
@@ -141,7 +145,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, CI; ⏳ `Set`, modules, `std.fs`/`std.json`, formatter, package tooling.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, CI; ⏳ `Set`, modules, formatter, package tooling.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

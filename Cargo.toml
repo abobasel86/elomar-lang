@@ -6,6 +6,7 @@ members = [
     "crates/elomar-ast",
     "crates/elomar-parser",
     "crates/elomar-types",
+    "crates/elomar-policy",
     "crates/elomar-ai-core",
     "crates/elomar-ai-provider-mock",
     "crates/elomar-ai-provider-openai",
@@ -25,6 +26,7 @@ elomar-lexer = { path = "crates/elomar-lexer" }
 elomar-ast = { path = "crates/elomar-ast" }
 elomar-parser = { path = "crates/elomar-parser" }
 elomar-types = { path = "crates/elomar-types" }
+elomar-policy = { path = "crates/elomar-policy" }
 elomar-interpreter = { path = "crates/elomar-interpreter" }
 elomar-ai-core = { path = "crates/elomar-ai-core" }
 elomar-ai-provider-mock = { path = "crates/elomar-ai-provider-mock" }
@@ -35,7 +37,7 @@ unicode-normalization = "0.1"
 unicode-segmentation = "1"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 toml = "0.8"
 ureq = "2"
 url = "2"

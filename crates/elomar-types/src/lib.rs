@@ -9,6 +9,7 @@ mod ai;
 mod builtins;
 mod enums;
 mod expr;
+mod stdlib;
 mod ty;
 
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -17,7 +18,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use builtins::{BUILTIN_FUNCTIONS, KNOWN_EFFECTS};
-pub use enums::AI_ERROR_KINDS;
+pub use enums::{AI_ERROR_KINDS, FS_ERROR_KINDS, JSON_ERROR_KINDS};
 pub use ty::{Subst, Ty};
 
 #[derive(Debug, Clone, Default)]

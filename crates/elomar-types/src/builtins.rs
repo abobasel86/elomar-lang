@@ -25,9 +25,22 @@ pub const BUILTIN_FUNCTIONS: [&str; 11] = [
     "abs",
 ];
 
-pub(crate) const BUILTIN_TYPES: [&str; 13] = [
-    "Int", "Float", "Bool", "String", "Unit", "Range", "Duration", "List", "Option", "Result",
-    "Future", "Map", "AIError",
+pub(crate) const BUILTIN_TYPES: [&str; 15] = [
+    "Int",
+    "Float",
+    "Bool",
+    "String",
+    "Unit",
+    "Range",
+    "Duration",
+    "List",
+    "Option",
+    "Result",
+    "Future",
+    "Map",
+    "AIError",
+    "FsError",
+    "JsonError",
 ];
 
 pub(crate) fn is_builtin_type(name: &str) -> bool {
@@ -89,7 +102,7 @@ const MAP_METHODS: &[&str] = &[
     "is_empty",
     "to_string",
 ];
-const AI_ERROR_METHODS: &[&str] = &["kind", "message", "to_string"];
+const ERROR_METHODS: &[&str] = &["kind", "message", "to_string"];
 const OTHER_METHODS: &[&str] = &["to_string"];
 
 fn methods_of(ty: &Ty) -> &'static [&'static str] {
@@ -102,7 +115,7 @@ fn methods_of(ty: &Ty) -> &'static [&'static str] {
         Ty::Result(..) => RESULT_METHODS,
         Ty::Duration => DURATION_METHODS,
         Ty::Map(..) => MAP_METHODS,
-        Ty::Enum(name) if name == crate::enums::AI_ERROR => AI_ERROR_METHODS,
+        Ty::Enum(name) if crate::enums::is_error_enum(name) => ERROR_METHODS,
         _ => OTHER_METHODS,
     }
 }
@@ -113,7 +126,14 @@ pub(crate) fn has_method(ty: &Ty, name: &str) -> bool {
 
 impl Checker {
     /// Checks the argument count; on mismatch reports `E2002`.
-    fn arity(&mut self, what: &str, args: &mut [Arg], min: usize, max: usize, span: Span) -> bool {
+    pub(crate) fn arity(
+        &mut self,
+        what: &str,
+        args: &mut [Arg],
+        min: usize,
+        max: usize,
+        span: Span,
+    ) -> bool {
         if (min..=max).contains(&args.len()) {
             return true;
         }
@@ -128,7 +148,13 @@ impl Checker {
     }
 
     /// Checks `args` against `params` exactly.
-    fn typed_args(&mut self, what: &str, args: &mut [Arg], params: &[Ty], span: Span) -> bool {
+    pub(crate) fn typed_args(
+        &mut self,
+        what: &str,
+        args: &mut [Arg],
+        params: &[Ty],
+        span: Span,
+    ) -> bool {
         if !self.arity(what, args, params.len(), params.len(), span) {
             return false;
         }
@@ -294,7 +320,7 @@ impl Checker {
             }
             (Ty::Float, "abs" | "sqrt") => self.no_args(m, args, span, Ty::Float),
             (Ty::Map(k, v), _) => self.map_method(recv, k, v, m, args, span),
-            (Ty::Enum(name), "kind" | "message") if name == crate::enums::AI_ERROR => {
+            (Ty::Enum(name), "kind" | "message") if crate::enums::is_error_enum(name) => {
                 self.no_args(m, args, span, Ty::Str)
             }
             (Ty::Duration, "millis") => self.no_args(m, args, span, Ty::Int),

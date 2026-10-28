@@ -63,6 +63,9 @@ document_language: "ar"
 | النوع المعدود ذو الحالات الاسمية يُرسل إلى النموذج كقيمة نصية محصورة ويُتحقق منها | 13.3 |
 | `Map<K, V>` بصياغة `["a": 1]` و`[:]`، ومفاتيح `String`/`Int` | 10.2، grammar §4.8 |
 | المعامل `?` على `Result` و`Option` | 10.6، grammar §4.9 |
+| `std.fs` بتأثير `fs` وصلاحيات `filesystem_read`/`filesystem_write` بمنع افتراضي ومنع الهروب بـ `..` (crate جديد `elomar-policy`) | 16.3، 17، grammar §4.10 |
+| `std.json`: `json.parse<T>` بالتحقق نفسه المستخدم مع AI، و`stringify`/`pretty`؛ `Map<String, T>` نوع JSON | 17، grammar §4.11 |
+| `FsError` و`JsonError` نوعان معدودان مدمجان بحالات تحمل رسائل | 12.2 |
 | مزود OpenAI (Chat Completions + Structured Outputs بوضع strict) بمفتاح من متغير بيئة يُقرأ عند الاستدعاء | 14 |
 | `[permissions] network_hosts` بمنع افتراضي يُفحص قبل كل اتصال، وعدم اتباع إعادة التوجيه، وإلزام https | 16.1، 16.3 |
 | `ai.infer` على نموذج سحابي يُحدث `net` إضافة إلى `ai` (يُستنتج من `elomar.toml` وقت الترجمة) | 13.1، 16.2 |
@@ -997,8 +1000,8 @@ async fn ask_model(text: String)
 | Math | `std.math` | Arithmetic, statistics helpers | v0.1/v0.2 |
 | Collections | `std.collections` | List, Map, Set, iterators | v0.1/v0.2 |
 | Text | `std.text` | Unicode, normalize, split, regex adapter | v0.2 |
-| JSON | `std.json` | Encode, decode, schema | v0.2 |
-| Files | `std.fs` | Read/write/list with policies | v0.2 |
+| JSON | `std.json` | Encode, decode, schema | **منفذ**: `parse<T>` و`stringify` و`pretty` |
+| Files | `std.fs` | Read/write/list with policies | **منفذ**: قراءة وكتابة وإلحاق وسرد بصلاحيات `[permissions]` |
 | Time | `std.time` | Duration, DateTime, timers | v0.2 |
 | HTTP | `std.http` | Client/server, routing, middleware | v0.3 |
 | Network | `std.net` | Network primitives, TLS wrapper | v0.3 |

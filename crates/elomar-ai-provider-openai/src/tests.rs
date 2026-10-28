@@ -266,6 +266,7 @@ fn runtime_enforces_permissions_and_validates() {
     // Allowed: the call goes through and the wrong field type is caught.
     let mut rt = AiRuntime::default().with_permissions(Permissions {
         network_hosts: vec![format!("127.0.0.1:{port}")],
+        ..Default::default()
     });
     rt.register("support", Box::new(provider(&url, Some("k"))));
     let e = rt.infer(&request(ticket(), 5_000)).unwrap_err();

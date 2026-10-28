@@ -148,6 +148,8 @@ pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
 | `Map<K, V>` | `["a": 1]` و`[:]` | المفاتيح `String` أو `Int`؛ الترتيب بحسب المفتاح |
 | أنواع معدودة | `Shape.Circle(1.0)` `Priority.High` | اسمية: `enum` بالحالات نفسها نوع مختلف |
 | `AIError` | `AIError.Timeout("...")` | نوع معدود مدمج؛ كل حالة تحمل رسالة |
+| `FsError` | `NotFound` · `PermissionDenied` · `PolicyDenied` · `InvalidData` · `Other` | لـ `std.fs`؛ كل حالة تحمل رسالة |
+| `JsonError` | `InvalidJson` · `TypeMismatch` | لـ `std.json`؛ كل حالة تحمل رسالة |
 | `{ f: T, ... }` | `{ f: v }` | **بنيوي**: الحقول نفسها بالأنواع نفسها = النوع نفسه |
 
 - `type X = ...` اسم مستعار، والأسماء المستعارة الدائرية خطأ `E1006`.
@@ -353,10 +355,70 @@ fn sum(a: String, b: String) -> Result<Int, String> {
 - خارج دالة تُرجع النوع المناسب (ومنها `main`) `E2016`؛ وعلى قيمة ليست `Result` أو `Option` `E2017`.
 - في `async fn` يعمل على نوع الإرجاع المعلن (ما داخل `Future`).
 
+## 4.10 الملفات: `std.fs`
+
+```elomar
+use std.fs
+
+match fs.read_text("data/students.json") {
+    Ok(text) => print(text.length)
+    Err(FsError.NotFound(_)) => print("no data yet")
+    Err(e) => print(e.kind(), e.message())
+}
+```
+
+| الدالة | النوع | الصلاحية |
+|---|---|---|
+| `fs.read_text(path)` | `Result<String, FsError>` (UTF-8؛ تُحذف علامة BOM) | `filesystem_read` |
+| `fs.write_text(path, text)` | `Result<Unit, FsError>` (ينشئ الملف أو يستبدل محتواه) | `filesystem_write` |
+| `fs.append_text(path, text)` | `Result<Unit, FsError>` (ينشئ الملف إن غاب) | `filesystem_write` |
+| `fs.exists(path)` | `Result<Bool, FsError>` | `filesystem_read` |
+| `fs.list_dir(path)` | `Result<List<String>, FsError>` (أسماء مرتبة) | `filesystem_read` |
+
+- كل دوال `fs` تُحدث التأثير `fs`؛ والدالة `pub` التي تستخدمها يجب أن تصرّح بـ `!{fs}`.
+- لا تُنشأ المجلدات تلقائيًا، ولا يوجد حذف ملفات بعد.
+- كل فشل قيمة `Err(FsError...)`، لا خطأ تنفيذ.
+
+### 4.10.1 صلاحيات الملفات
+
+```toml
+[permissions]
+filesystem_read = ["data", "output"]   # ملفات أو مجلدات
+filesystem_write = ["output"]          # القراءة لا تمنح الكتابة، والعكس
+```
+
+- **منع افتراضي:** دون هذه القوائم يُرفض كل وصول بـ `FsError.PolicyDenied` دون لمس الملف.
+- **المجلد الأساس:** المسارات النسبية في البرنامج وفي القوائم تبدأ من مجلد `elomar.toml`، أو مجلد البرنامج إن لم يوجد الملف (لا من مجلد التشغيل الحالي).
+- **لا هروب:** يُحوَّل المسار إلى شكله الحقيقي (canonical) قبل المقارنة، فلا يتجاوز `..` أو الروابط الرمزية المجلد المسموح.
+- رسائل `NotFound` و`PermissionDenied` بصياغة ثابتة على كل أنظمة التشغيل.
+
+## 4.11 JSON: `std.json`
+
+```elomar
+use std.json
+
+type Student = { name: String, grades: List<Int> }
+
+match json.parse<List<Student>>(text) {
+    Ok(students) => print(students.length)
+    Err(JsonError.TypeMismatch(m)) => print(m)   // "$[0].grades[1]: expected Int, found \"A\""
+    Err(e) => print(e.message())
+}
+print(json.stringify(["a": 1]))   // {"a":1}
+print(json.pretty(students))      // بمسافات بادئة
+```
+
+- `json.parse<T>(text) -> Result<T, JsonError>`: `InvalidJson` إن لم يكن النص JSON صالحًا، و`TypeMismatch` إن لم يطابق `T`
+  (بالقواعد نفسها المستخدمة لإجابات `ai.infer`: الحقول الإلزامية، ورفض الحقول الزائدة، ومسار الحقل المخالف).
+- `json.stringify(value)` و`json.pretty(value)` → `String`.
+- الأنواع المقبولة: أنواع JSON في 4.6 إضافة إلى `Map<String, T>` (كائن JSON بمفاتيح حرة). المخالف `E2015`.
+- `std.json` خالية من التأثيرات.
+- السجلات الناتجة عن `json.parse` تُطبع حقولها بالترتيب الأبجدي، لأن أنواع السجلات بنيوية لا تحفظ ترتيب التعريف.
+
 ## 5. التأثيرات (Effects)
 
 التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
-و`net` (`ai.infer` على نموذج سحابي، انظر 4.6.2).
+و`net` (`ai.infer` على نموذج سحابي، انظر 4.6.2) و`fs` (`std.fs`، انظر 4.10).
 
 | القاعدة | الرمز |
 |---|---|
@@ -405,7 +467,7 @@ fn sum(a: String, b: String) -> Result<Int, String> {
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` |
 | `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` |
-| `AIError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
+| `AIError` · `FsError` · `JsonError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
 
 \* يعدّل القائمة، ويتطلب أن تكون في متغير `var`.
 
@@ -509,5 +571,5 @@ fn sum(a: String, b: String) -> Result<Int, String> {
 ## 9. غير المنفذ بعد (مخطط)
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
-`ai.generate` و`ai.stream` و`ai.embed` · `Set` والوحدات المتعددة الملفات و`std.fs`/`std.json` والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
+`ai.generate` و`ai.stream` و`ai.embed` · `Set` والوحدات المتعددة الملفات وحذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
 الأنواع العامة والدوال كقيم و`trait`/`impl` وتعدد التأثيرات والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي · المعامل `?`.

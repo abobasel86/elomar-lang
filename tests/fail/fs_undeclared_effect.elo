@@ -1,0 +1,10 @@
+// expect: E3002
+use std.fs
+
+pub fn load_config() -> Result<String, FsError> {
+    return fs.read_text("config.json")
+}
+
+fn main() {
+    print(load_config())
+}

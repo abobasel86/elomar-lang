@@ -1,0 +1,9 @@
+[package]
+name = "files"
+version = "0.1.0"
+entry = "main.elo"
+
+# Default deny: only these folders are reachable, relative to this file.
+[permissions]
+filesystem_read = ["data", "output"]
+filesystem_write = ["output"]

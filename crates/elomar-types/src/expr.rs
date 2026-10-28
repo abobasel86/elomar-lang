@@ -535,8 +535,8 @@ impl Checker {
                     ),
                 )
                 .with_hint(Text::new(
-                    "generics are planned for v0.3; today only `ai.infer<T>` takes a type argument",
-                    "الأنواع العامة مخطط لها في v0.3؛ حاليًا تأخذ `ai.infer<T>` وحدها معامل نوع",
+                    "generics are planned for v0.3; today only `ai.infer<T>` and `json.parse<T>` take a type argument",
+                    "الأنواع العامة مخطط لها في v0.3؛ حاليًا تأخذ `ai.infer<T>` و`json.parse<T>` وحدهما معامل نوع",
                 )),
             );
         }

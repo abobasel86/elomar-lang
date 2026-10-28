@@ -19,6 +19,12 @@ pub struct Permissions {
     /// Hosts the program may reach, as `host` or `host:port`.
     #[serde(default)]
     pub network_hosts: Vec<String>,
+    /// Files or folders `std.fs` may read, relative to the project folder.
+    #[serde(default)]
+    pub filesystem_read: Vec<String>,
+    /// Files or folders `std.fs` may create, overwrite or append to.
+    #[serde(default)]
+    pub filesystem_write: Vec<String>,
 }
 
 impl Permissions {
@@ -145,6 +151,7 @@ mod tests {
         assert!(!p.allows_host("127.0.0.1", 9090));
         assert!(!p.allows_host("evil.example", 443));
         assert!(!Permissions::default().allows_host("api.openai.com", 443));
+        assert_eq!(p.filesystem_read, vec!["./data".to_string()]);
     }
 
     #[test]

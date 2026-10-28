@@ -2,3 +2,7 @@
 *.swp
 .DS_Store
 .env
+
+# Files written by examples when they run
+examples/*/output/*
+!examples/*/output/.gitkeep

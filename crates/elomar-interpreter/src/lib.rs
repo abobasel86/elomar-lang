@@ -6,6 +6,7 @@
 
 mod ai;
 mod builtins;
+mod stdlib;
 mod value;
 
 use std::cell::RefCell;
@@ -13,6 +14,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use elomar_ai_core::AiRuntime;
+pub use elomar_policy::FsPolicy;
 
 use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
@@ -113,12 +115,23 @@ pub fn run(program: &Program, host: &mut dyn Host) -> Result<(), RuntimeError> {
 }
 
 /// Like [`run`], with the models and policy `ai.infer` calls go through.
+/// No file may be read or written.
 pub fn run_with_ai(
     program: &Program,
     host: &mut dyn Host,
     ai: &mut AiRuntime,
 ) -> Result<(), RuntimeError> {
-    let mut interp = Interpreter::new(program, host, ai);
+    run_with(program, host, ai, FsPolicy::deny_all("."))
+}
+
+/// Runs with explicit AI models and file permissions for `std.fs`.
+pub fn run_with(
+    program: &Program,
+    host: &mut dyn Host,
+    ai: &mut AiRuntime,
+    fs: FsPolicy,
+) -> Result<(), RuntimeError> {
+    let mut interp = Interpreter::new(program, host, ai, fs);
     for item in &program.items {
         if let Item::Const(c) = item {
             let v = interp.eval(&c.value).map_err(Flow::into_error)?;
@@ -198,12 +211,18 @@ struct Interpreter<'p, 'h> {
     frames: Vec<Vec<Vec<(String, Value)>>>,
     host: &'h mut dyn Host,
     ai: &'h mut AiRuntime,
+    fs: FsPolicy,
     /// Enums whose variants are all plain names, for AI answer schemas.
     unit_enums: HashMap<String, Vec<String>>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
-    fn new(program: &'p Program, host: &'h mut dyn Host, ai: &'h mut AiRuntime) -> Self {
+    fn new(
+        program: &'p Program,
+        host: &'h mut dyn Host,
+        ai: &'h mut AiRuntime,
+        fs: FsPolicy,
+    ) -> Self {
         let fns = program
             .items
             .iter()
@@ -218,6 +237,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             frames: vec![vec![Vec::new()]],
             host,
             ai,
+            fs,
             unit_enums: program
                 .items
                 .iter()
@@ -695,8 +715,20 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 for arg in args {
                     values.push(self.eval(&arg.value)?);
                 }
-                if matches!(&target.kind, ExprKind::Name(m) if m == "std.ai") {
-                    return Ok(infer_future(type_args, values, &self.unit_enums));
+                if let ExprKind::Name(module) = &target.kind {
+                    match module.as_str() {
+                        "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
+                        "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
+                        "std.json" => {
+                            return Ok(stdlib::json_call(
+                                &name.name,
+                                type_args,
+                                &values,
+                                &self.unit_enums,
+                            ));
+                        }
+                        _ => {}
+                    }
                 }
                 let method = name.name.as_str();
                 if builtins::is_mutating(method) {

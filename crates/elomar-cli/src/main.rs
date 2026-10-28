@@ -9,7 +9,7 @@ use elomar_ai_core::{AiRuntime, ModelProvider, ProjectConfig, UnavailableProvide
 use elomar_ai_provider_mock::MockProvider;
 use elomar_ai_provider_openai::OpenAiProvider;
 use elomar_diagnostics::{Diagnostic, Lang, RenderOptions, SourceFile, render};
-use elomar_interpreter::Host;
+use elomar_interpreter::{FsPolicy, Host};
 
 #[derive(Parser)]
 #[command(
@@ -176,8 +176,9 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
     }
 
     let mut runtime = ai.runtime;
+    let fs = ai.fs;
     let result = elomar_interpreter::with_large_stack(|| {
-        elomar_interpreter::run_with_ai(&program, &mut StdHost, &mut runtime)
+        elomar_interpreter::run_with(&program, &mut StdHost, &mut runtime, fs)
     });
     let _ = std::io::stdout().flush();
     match result {
@@ -203,6 +204,8 @@ struct LoadedAi {
     runtime: AiRuntime,
     /// Models whose provider uses the network (they need the `net` effect).
     cloud_models: Vec<String>,
+    /// What `std.fs` may read and write.
+    fs: FsPolicy,
 }
 
 /// Builds the models, policy and network permissions for `ai.infer` from
@@ -216,6 +219,19 @@ fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
         config = parse_config(&text).map_err(|e| (p.clone(), e))?;
     }
     let config_error = |message: String| (config_path.clone().unwrap_or_default(), message);
+    // Relative paths (in the program and in `[permissions]`) start at the
+    // project folder: where elomar.toml is, else the program's folder.
+    let base = config_path
+        .as_deref()
+        .or(Some(source))
+        .and_then(Path::parent)
+        .and_then(|p| std::path::absolute(p).ok())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let fs = FsPolicy::new(
+        base,
+        &config.permissions.filesystem_read,
+        &config.permissions.filesystem_write,
+    );
     let mut runtime =
         AiRuntime::new(config.ai.policy.clone()).with_permissions(config.permissions.clone());
     runtime.register(
@@ -242,5 +258,6 @@ fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
     Ok(LoadedAi {
         runtime,
         cloud_models,
+        fs,
     })
 }

@@ -14,6 +14,8 @@ pub enum Schema {
     Option(Box<Schema>),
     /// Every field is required unless it is an `Option`; no extra fields.
     Record(Vec<(String, Schema)>),
+    /// `Map<String, V>`: a JSON object with any keys.
+    Map(Box<Schema>),
     /// An enum of plain names, sent as one of the names (a JSON string).
     Enum {
         name: String,
@@ -32,6 +34,7 @@ impl Schema {
             Schema::Enum { name, .. } => name.clone(),
             Schema::List(t) => format!("List<{}>", t.describe()),
             Schema::Option(t) => format!("Option<{}>", t.describe()),
+            Schema::Map(t) => format!("Map<String, {}>", t.describe()),
             Schema::Record(fields) => {
                 let inner: Vec<String> = fields
                     .iter()
@@ -53,6 +56,7 @@ impl Schema {
             Schema::Enum { variants, .. } => json!({ "type": "string", "enum": variants }),
             Schema::List(t) => json!({ "type": "array", "items": t.json_schema() }),
             Schema::Option(t) => json!({ "anyOf": [t.json_schema(), { "type": "null" }] }),
+            Schema::Map(t) => json!({ "type": "object", "additionalProperties": t.json_schema() }),
             Schema::Record(fields) => {
                 let mut props = Map::new();
                 let mut required = Vec::new();
@@ -130,6 +134,12 @@ impl Schema {
             (Schema::List(t), Value::Array(items)) => {
                 for (i, item) in items.iter().enumerate() {
                     t.validate_at(item, &format!("{path}[{i}]"))?;
+                }
+                true
+            }
+            (Schema::Map(t), Value::Object(obj)) => {
+                for (key, v) in obj {
+                    t.validate_at(v, &format!("{path}.{key}"))?;
                 }
                 true
             }

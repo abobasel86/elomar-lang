@@ -379,6 +379,7 @@ mod tests {
 
         let mut rt = AiRuntime::default().with_permissions(Permissions {
             network_hosts: vec!["api.example.com".into()],
+            ..Default::default()
         });
         rt.register("r", Box::new(Remote));
         assert_eq!(

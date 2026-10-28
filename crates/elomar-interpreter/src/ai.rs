@@ -38,6 +38,8 @@ pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>)
             "Bool" => Schema::Bool,
             "List" => Schema::List(Box::new(schema_of(&args[0], unit_enums))),
             "Option" => Schema::Option(Box::new(schema_of(&args[0], unit_enums))),
+            // Keys are always strings here (checked).
+            "Map" => Schema::Map(Box::new(schema_of(&args[1], unit_enums))),
             other => match unit_enums.get(other) {
                 Some(variants) => Schema::Enum {
                     name: other.to_string(),
@@ -91,6 +93,18 @@ pub(crate) fn to_json(v: &Value) -> Json {
                 .collect::<Map<_, _>>(),
         ),
         Value::Enum { variant, .. } => Json::String(variant.to_string()),
+        Value::Map(entries) => Json::Object(
+            entries
+                .iter()
+                .map(|(k, v)| {
+                    let key = match k {
+                        crate::MapKey::Str(s) => s.to_string(),
+                        crate::MapKey::Int(n) => n.to_string(),
+                    };
+                    (key, to_json(v))
+                })
+                .collect::<Map<_, _>>(),
+        ),
         Value::Option(None) => Json::Null,
         Value::Option(Some(v)) => to_json(v),
         // The checker only lets JSON data types reach a model.
@@ -116,6 +130,11 @@ pub(crate) fn from_json(schema: &Schema, json: &Json) -> Value {
         (Schema::List(t), Json::Array(items)) => {
             Value::list(items.iter().map(|i| from_json(t, i)).collect())
         }
+        (Schema::Map(t), Json::Object(obj)) => Value::Map(Rc::new(
+            obj.iter()
+                .map(|(k, v)| (crate::MapKey::Str(k.as_str().into()), from_json(t, v)))
+                .collect(),
+        )),
         (Schema::Option(_), Json::Null) => Value::none(),
         (Schema::Option(t), v) => Value::some(from_json(t, v)),
         (Schema::Record(fields), Json::Object(obj)) => Value::Record(Rc::new(

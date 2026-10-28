@@ -1,0 +1,82 @@
+// std.fs and std.json: read students from a JSON file, write a report.
+use std.fs
+use std.json
+
+type Student = { name: String, grades: List<Int> }
+
+enum Level {
+    Excellent
+    Good
+    Weak
+}
+
+fn level(avg: Float) -> Level {
+    if avg >= 90 {
+        return Level.Excellent
+    } else if avg >= 60 {
+        return Level.Good
+    }
+    return Level.Weak
+}
+
+fn label(l: Level) -> String {
+    return match l {
+        Level.Excellent => "excellent"
+        Level.Good => "good"
+        Level.Weak => "weak"
+    }
+}
+
+fn average(grades: List<Int>) -> Float {
+    if grades.is_empty() {
+        return 0
+    }
+    let avg = grades.sum() / grades.length
+    return (avg * 10).round() / 10
+}
+
+// Turns a file error into a message, so `?` can pass it on.
+fn text_of(r: Result<String, FsError>) -> Result<String, String> {
+    return match r {
+        Ok(text) => Ok(text)
+        Err(e) => Err(e.kind() + ": " + e.message())
+    }
+}
+
+fn read_students(path: String) -> Result<List<Student>, String> {
+    let text = text_of(fs.read_text(path))?
+    return match json.parse<List<Student>>(text) {
+        Ok(students) => Ok(students)
+        Err(e) => Err("bad data in " + path + " (" + e.kind() + ")")
+    }
+}
+
+fn main() {
+    match read_students("data/students.json") {
+        Ok(students) => {
+            var lines: List<String> = []
+            var counts: Map<String, Int> = [:]
+            for s in students {
+                let avg = average(s.grades)
+                let name = label(level(avg))
+                lines.push(s.name + ": " + to_string(avg) + " (" + name + ")")
+                counts[name] = counts.get(name).unwrap_or(0) + 1
+            }
+            print(fs.write_text("output/report.txt", lines.join("\n") + "\n"))
+            print(fs.write_text("output/summary.json", json.pretty(counts)))
+            print(text_of(fs.read_text("output/report.txt")).unwrap_or(""))
+            print(fs.read_text("output/summary.json").unwrap_or(""))
+        }
+        Err(message) => print("error:", message)
+    }
+
+    print(read_students("data/broken.json"))
+    print(read_students("data/missing.json"))
+
+    // Not listed in [permissions]: refused without touching the file.
+    match fs.read_text("elomar.toml") {
+        Ok(_) => print("unexpected")
+        Err(e) => print("denied:", e.kind())
+    }
+    print(fs.write_text("data/students.json", "[]").is_err())
+}
