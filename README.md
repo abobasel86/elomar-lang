@@ -21,9 +21,11 @@ by the compiler when they are not declared.
 - No semicolons needed; `/` always returns a `Float`, `div` is integer division.
 - Structural records and value semantics (no surprising aliasing).
 - `match` with exhaustiveness checking.
+- Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`
+  operator for propagating `Err`/`None`.
 - Effect inference with mandatory declarations on `pub` functions.
 - `async fn` / `await` (sequential, lazy futures).
-- **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>`; answers are
+- **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>` (`AIError` is an enum, e.g. `AIError.Timeout(msg)`); answers are
   validated against `T` (missing, extra or mistyped fields become
   `InvalidStructuredOutput`), and calling a model is the `ai` effect.
 - An offline **mock provider** configured in `elomar.toml`: canned answers,
@@ -139,7 +141,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. Modules, standard library (`fs`, `json`, `time`), formatter, package tooling.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, CI; ⏳ `Set`, modules, `std.fs`/`std.json`, formatter, package tooling.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

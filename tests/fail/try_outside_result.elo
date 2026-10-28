@@ -1,0 +1,5 @@
+// expect: E2016
+fn main() {
+    let n = parse_int("42")?
+    print(n)
+}

@@ -1,0 +1,9 @@
+// expect: E1010
+enum Priority {
+    Low
+    High
+}
+
+fn main() {
+    print(Priority.Hihg)
+}

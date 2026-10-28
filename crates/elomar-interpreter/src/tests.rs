@@ -250,7 +250,7 @@ async fn main() {
     for m in [\"forgot my password\", \"app is slow\", \"refund please\", \"weird\"] {
         match await classify(m) {
             Ok(t) => print(\"ok\", t.category, t.priority, t.tags, t.score)
-            Err(e) => print(\"err\", e.kind)
+            Err(e) => print(\"err\", e.kind())
         }
     }
 }
@@ -296,7 +296,7 @@ fn ai_policy_limits_calls() {
 
 #[test]
 fn unknown_model_is_an_error_value() {
-    let src = "use std.ai\nasync fn main() {\n  let r = await ai.infer<String>(\"nope\", \"i\", \"x\")\n  match r {\n    Ok(s) => print(s)\n    Err(e) => print(e.kind)\n  }\n}";
+    let src = "use std.ai\nasync fn main() {\n  let r = await ai.infer<String>(\"nope\", \"i\", \"x\")\n  match r {\n    Ok(s) => print(s)\n    Err(e) => print(e.kind())\n  }\n}";
     assert_eq!(
         run_ai(src, vec![], AiPolicy::default()),
         "ProviderUnavailable\n"
@@ -316,5 +316,93 @@ fn durations_at_runtime() {
             "fn main() {\n  let t = 1m + 30s\n  print(t, t.millis(), t.seconds(), 1500ms, t > 1m)\n}"
         ),
         "90s 90000 90.0 1500ms true\n"
+    );
+}
+
+// ----- Phase 3: enums, Map, `?` --------------------------------------------
+
+#[test]
+fn enums_at_runtime() {
+    let src = "enum Shape {\n  Circle(Float)\n  Rect(Float, Float)\n  Empty\n}\nfn area(s: Shape) -> Float {\n  return match s {\n    Shape.Circle(r) => 3 * r * r\n    Shape.Rect(w, h) => w * h\n    Shape.Empty => 0\n  }\n}\nfn main() {\n  let shapes = [Shape.Circle(1.0), Shape.Rect(2.0, 3.0), Shape.Empty]\n  for s in shapes { print(s, area(s)) }\n  print(Shape.Rect(1.0, 2.0) == Shape.Rect(1.0, 2.0), Shape.Empty == Shape.Circle(0.0))\n}";
+    assert_eq!(
+        out(src),
+        "Shape.Circle(1.0) 3.0\nShape.Rect(2.0, 3.0) 6.0\nShape.Empty 0.0\ntrue false\n"
+    );
+}
+
+#[test]
+fn recursive_enums() {
+    let src = "enum Tree {\n  Leaf\n  Node(Tree, Int, Tree)\n}\nfn sum(t: Tree) -> Int {\n  return match t {\n    Tree.Leaf => 0\n    Tree.Node(l, v, r) => sum(l) + v + sum(r)\n  }\n}\nfn main() {\n  let t = Tree.Node(Tree.Node(Tree.Leaf, 1, Tree.Leaf), 2, Tree.Node(Tree.Leaf, 3, Tree.Leaf))\n  print(sum(t))\n}";
+    assert_eq!(out(src), "6\n");
+}
+
+#[test]
+fn maps_at_runtime() {
+    let src = "fn main() {\n  var stock = [\"pear\": 0, \"apple\": 3]\n  stock[\"kiwi\"] = 5\n  stock[\"apple\"] += 1\n  print(stock, stock.length, stock[\"apple\"], stock.get(\"plum\"))\n  print(stock.keys(), stock.values(), stock.contains_key(\"pear\"), stock.remove(\"pear\"), stock.length)\n  for e in stock { print(e.key, \"=\", e.value) }\n  let copy = stock\n  stock[\"kiwi\"] = 0\n  print(copy[\"kiwi\"], stock[\"kiwi\"])\n  var nested: Map<String, List<Int>> = [\"a\": [1]]\n  nested[\"a\"].push(2)\n  print(nested, [:] == nested)\n}";
+    assert_eq!(
+        out(src),
+        "[\"apple\": 4, \"kiwi\": 5, \"pear\": 0] 3 4 None\n[\"apple\", \"kiwi\", \"pear\"] [4, 5, 0] true Some(0) 2\napple = 4\nkiwi = 5\n5 0\n[\"a\": [1, 2]] false\n"
+    );
+}
+
+#[test]
+fn missing_map_key_is_a_runtime_error() {
+    assert_eq!(
+        err_code("fn main() {\n  let m = [\"a\": 1]\n  print(m[\"b\"])\n}"),
+        "R0011"
+    );
+    assert_eq!(
+        err_code("fn main() {\n  var m = [\"a\": 1]\n  m[\"b\"] += 1\n}"),
+        "R0011"
+    );
+}
+
+#[test]
+fn try_operator_at_runtime() {
+    let src = "fn parse(s: String) -> Result<Int, String> {\n  return match parse_int(s) { Some(n) => Ok(n), None => Err(\"not a number: \" + s) }\n}\nfn sum(a: String, b: String) -> Result<Int, String> {\n  let x = parse(a)?\n  print(\"parsed\", x)\n  return Ok(x + parse(b)?)\n}\nfn first_doubled(xs: List<Int>) -> Option<Int> {\n  return Some(xs.first()? * 2)\n}\nfn main() {\n  print(sum(\"1\", \"2\"))\n  print(sum(\"x\", \"2\"))\n  print(sum(\"1\", \"y\"))\n  print(first_doubled([4]), first_doubled([]))\n}";
+    assert_eq!(
+        out(src),
+        "parsed 1\nOk(3)\nErr(\"not a number: x\")\nparsed 1\nErr(\"not a number: y\")\nSome(8) None\n"
+    );
+}
+
+#[test]
+fn ai_errors_are_enum_values() {
+    let mut slow = rule(Some("slow"), Some("\"x\""), None);
+    slow.delay_ms = Some(9_000);
+    let src = "use std.ai\nasync fn ask(q: String) -> Result<String, AIError> {\n  return await ai.infer<String>(\"support\", \"i\", q, timeout: 1s)\n}\nasync fn main() {\n  for q in [\"slow\", \"limit\"] {\n    match await ask(q) {\n      Ok(s) => print(s)\n      Err(AIError.Timeout(msg)) => print(\"timeout:\", msg)\n      Err(e) => print(e, e.kind(), e.message())\n    }\n  }\n}";
+    let out = run_ai(
+        src,
+        vec![slow, rule(Some("limit"), None, Some("RateLimited"))],
+        AiPolicy::default(),
+    );
+    assert_eq!(
+        out,
+        "timeout: no answer within 1000 ms (mock latency 9000 ms)\nAIError.RateLimited(\"simulated RateLimited error\") RateLimited simulated RateLimited error\n"
+    );
+}
+
+#[test]
+fn ai_answers_into_enums() {
+    let src = "use std.ai\nenum Priority { Low, Normal, High }\ntype Ticket = { priority: Priority, title: String }\nasync fn main() {\n  for q in [\"server down\", \"typo\", \"other\"] {\n    match await ai.infer<Ticket>(\"support\", \"Classify\", q) {\n      Ok(t) => print(t.title, t.priority, t.priority == Priority.High)\n      Err(e) => print(e.kind(), e.message())\n    }\n  }\n}";
+    let out = run_ai(
+        src,
+        vec![
+            rule(
+                Some("down"),
+                Some(r#"{"priority": "High", "title": "Outage"}"#),
+                None,
+            ),
+            rule(
+                Some("typo"),
+                Some(r#"{"priority": "Urgent", "title": "Typo"}"#),
+                None,
+            ),
+        ],
+        AiPolicy::default(),
+    );
+    assert_eq!(
+        out,
+        "Outage Priority.High true\nInvalidStructuredOutput the model's answer does not match `{ priority: Priority, title: String }`: $.priority: expected one of Low, Normal, High, found \"Urgent\"\nmock Priority.Low false\n"
     );
 }

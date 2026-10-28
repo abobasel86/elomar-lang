@@ -21,7 +21,9 @@ pub async fn classify(message: String) -> Result<Ticket, AIError> !{ai} {
 fn describe(result: Result<Ticket, AIError>) -> String {
     return match result {
         Ok(t) => "[" + t.priority + "] " + t.category + ": " + t.summary
-        Err(e) => "AI request failed (" + e.kind + "): " + e.message
+        // `AIError` is an enum: handle the cases you care about, then the rest.
+        Err(AIError.Timeout(_)) => "AI request timed out; please try again later"
+        Err(e) => "AI request failed (" + e.kind() + "): " + e.message()
     }
 }
 

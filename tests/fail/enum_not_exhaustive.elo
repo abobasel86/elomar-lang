@@ -1,0 +1,17 @@
+// expect: E2009
+enum Light {
+    Red
+    Yellow
+    Green
+}
+
+fn action(l: Light) -> String {
+    return match l {
+        Light.Red => "stop"
+        Light.Green => "go"
+    }
+}
+
+fn main() {
+    print(action(Light.Red))
+}

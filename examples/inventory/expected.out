@@ -1,0 +1,8 @@
+ok: apple Change.Sell(3)
+rejected: not enough milk: have 2, asked 5
+rejected: unknown item: banana
+ok: carrot Change.Restock(6)
+ok: milk Change.Discontinue
+items: ["apple", "carrot"]
+total value: 6.0
+by category: ["fruit": 1, "vegetable": 1]

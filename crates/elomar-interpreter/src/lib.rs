@@ -18,7 +18,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use ai::InferCall;
-pub use value::{FutureState, Thunk, Value, format_duration, format_float};
+pub use value::{FutureState, MapKey, Thunk, Value, format_duration, format_float};
 
 /// Services the running program can use. Implemented by the CLI with real
 /// stdin/stdout and by tests with in-memory buffers.
@@ -187,7 +187,8 @@ type Exec<T> = Result<T, Flow>;
 /// One step in an assignable place: `.field` or `[index]`.
 enum Step {
     Field(String),
-    Index(i64, Span),
+    /// A list index or a map key.
+    Index(Value, Span),
 }
 
 struct Interpreter<'p, 'h> {
@@ -197,6 +198,8 @@ struct Interpreter<'p, 'h> {
     frames: Vec<Vec<Vec<(String, Value)>>>,
     host: &'h mut dyn Host,
     ai: &'h mut AiRuntime,
+    /// Enums whose variants are all plain names, for AI answer schemas.
+    unit_enums: HashMap<String, Vec<String>>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -215,6 +218,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             frames: vec![vec![Vec::new()]],
             host,
             ai,
+            unit_enums: program
+                .items
+                .iter()
+                .filter_map(|i| match i {
+                    Item::Enum(e) if e.variants.iter().all(|v| v.fields.is_empty()) => Some((
+                        e.name.name.clone(),
+                        e.variants.iter().map(|v| v.name.name.clone()).collect(),
+                    )),
+                    _ => None,
+                })
+                .collect(),
         }
     }
 
@@ -304,7 +318,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         self.binary(bin, current, rhs, stmt.span)?
                     }
                 };
-                self.with_place(target, |slot| {
+                // `m[k] = v` adds the key; `m[k] += 1` needs it to exist.
+                let insert = *op == AssignOp::Set;
+                self.with_place(target, insert, |slot| {
                     *slot = new;
                     Ok(())
                 })?;
@@ -377,6 +393,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                             }
                         }
                     }
+                    Value::Map(entries) => {
+                        for (k, v) in entries.iter() {
+                            let entry = Value::Record(Rc::new(vec![
+                                ("key".into(), k.to_value()),
+                                ("value".into(), v.clone()),
+                            ]));
+                            if !run(self, entry)? {
+                                break;
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -406,6 +433,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     fn with_place<T>(
         &mut self,
         target: &Expr,
+        insert_missing_key: bool,
         f: impl FnOnce(&mut Value) -> Result<T, RuntimeError>,
     ) -> Exec<T> {
         let mut steps = Vec::new();
@@ -418,11 +446,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     cur = target;
                 }
                 ExprKind::Index { target, index } => {
-                    let i = match self.eval(index)? {
-                        Value::Int(i) => i,
-                        _ => 0,
-                    };
-                    steps.push(Step::Index(i, index.span));
+                    let key = self.eval(index)?;
+                    steps.push(Step::Index(key, index.span));
                     cur = target;
                 }
                 _ => unreachable!("checker only allows places here"),
@@ -432,7 +457,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         let Some(mut slot) = self.lookup_mut(root) else {
             unreachable!("checker only allows local `var` roots");
         };
-        for step in &steps {
+        let last = steps.len().saturating_sub(1);
+        for (i, step) in steps.iter().enumerate() {
             slot = match (step, slot) {
                 (Step::Field(name), Value::Record(fields)) => {
                     let fields = Rc::make_mut(fields);
@@ -442,10 +468,22 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         .expect("checked field")
                         .1
                 }
-                (Step::Index(i, span), Value::List(items)) => {
+                (Step::Index(Value::Int(n), span), Value::List(items)) => {
                     let len = items.len();
-                    let idx = builtins::check_index(*i, len, *span)?;
+                    let idx = builtins::check_index(*n, len, *span)?;
                     &mut Rc::make_mut(items)[idx]
+                }
+                (Step::Index(key, span), Value::Map(entries)) => {
+                    let entries = Rc::make_mut(entries);
+                    let k = MapKey::from_value(key);
+                    if insert_missing_key && i == last {
+                        entries.entry(k).or_insert(Value::Unit)
+                    } else {
+                        match entries.get_mut(&k) {
+                            Some(v) => v,
+                            None => return Err(builtins::missing_key(key, *span).into()),
+                        }
+                    }
                 }
                 _ => unreachable!("checked place"),
             };
@@ -529,18 +567,53 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         .map(|(_, v)| v.clone())
                         .expect("checked field"),
                     Value::List(items) => Value::Int(items.len() as i64),
+                    Value::Map(entries) => Value::Int(entries.len() as i64),
                     Value::Str(s) => Value::Int(builtins::graphemes(&s).count() as i64),
                     _ => unreachable!("checked field access"),
                 }
             }
-            ExprKind::Index { target, index } => {
-                let (Value::List(items), Value::Int(i)) = (self.eval(target)?, self.eval(index)?)
-                else {
-                    unreachable!("checked indexing");
-                };
-                let idx = builtins::check_index(i, items.len(), index.span)?;
-                items[idx].clone()
+            ExprKind::Index { target, index } => match (self.eval(target)?, self.eval(index)?) {
+                (Value::List(items), Value::Int(i)) => {
+                    let idx = builtins::check_index(i, items.len(), index.span)?;
+                    items[idx].clone()
+                }
+                (Value::Map(entries), key) => match entries.get(&MapKey::from_value(&key)) {
+                    Some(v) => v.clone(),
+                    None => return Err(builtins::missing_key(&key, index.span).into()),
+                },
+                _ => unreachable!("checked indexing"),
+            },
+            ExprKind::Map(entries) => {
+                let mut out = std::collections::BTreeMap::new();
+                for (k, v) in entries {
+                    let key = MapKey::from_value(&self.eval(k)?);
+                    out.insert(key, self.eval(v)?);
+                }
+                Value::Map(Rc::new(out))
             }
+            ExprKind::Variant {
+                enum_name,
+                variant,
+                args,
+            } => {
+                let mut fields = Vec::with_capacity(args.len());
+                for a in args {
+                    fields.push(self.eval(a)?);
+                }
+                Value::Enum {
+                    enum_name: enum_name.as_str().into(),
+                    variant: variant.as_str().into(),
+                    fields: Rc::new(fields),
+                }
+            }
+            // `?`: unwrap, or return the `Err`/`None` from this function.
+            ExprKind::Try(inner) => match self.eval(inner)? {
+                Value::Result(Ok(v)) | Value::Option(Some(v)) => (*v).clone(),
+                err @ (Value::Result(Err(_)) | Value::Option(None)) => {
+                    return Err(Flow::Return(err));
+                }
+                _ => unreachable!("checker only allows `?` on Result and Option"),
+            },
             ExprKind::Match { scrutinee, arms } => {
                 let v = self.eval(scrutinee)?;
                 for arm in arms {
@@ -623,11 +696,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     values.push(self.eval(&arg.value)?);
                 }
                 if matches!(&target.kind, ExprKind::Name(m) if m == "std.ai") {
-                    return Ok(infer_future(type_args, values));
+                    return Ok(infer_future(type_args, values, &self.unit_enums));
                 }
                 let method = name.name.as_str();
                 if builtins::is_mutating(method) {
-                    return self.with_place(target, |slot| {
+                    return self.with_place(target, false, |slot| {
                         builtins::call_mutating(slot, method, values, span)
                     });
                 }
@@ -708,7 +781,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
 /// The future for `ai.infer<T>(model, instructions, input[, timeout])`;
 /// the checker put the arguments in this order.
-fn infer_future(type_args: &[TypeExpr], args: Vec<Value>) -> Value {
+fn infer_future(
+    type_args: &[TypeExpr],
+    args: Vec<Value>,
+    unit_enums: &HashMap<String, Vec<String>>,
+) -> Value {
     let mut args = args.into_iter();
     let mut text = || match args.next() {
         Some(Value::Str(s)) => s.to_string(),
@@ -722,7 +799,7 @@ fn infer_future(type_args: &[TypeExpr], args: Vec<Value>) -> Value {
         _ => None,
     };
     Value::future(Thunk::Infer(InferCall {
-        schema: ai::schema_of(&type_args[0]),
+        schema: ai::schema_of(&type_args[0], unit_enums),
         model,
         instructions,
         input,
@@ -749,6 +826,26 @@ fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) ->
             args.first()
                 .is_some_and(|a| match_pattern(a, inner, bindings))
         }
+        (
+            PatternKind::Variant {
+                enum_name,
+                variant,
+                args,
+            },
+            Value::Enum {
+                enum_name: e,
+                variant: v,
+                fields,
+            },
+        ) => {
+            **e == *enum_name.name
+                && **v == *variant.name
+                && args
+                    .iter()
+                    .zip(fields.iter())
+                    .all(|(p, f)| match_pattern(p, f, bindings))
+        }
+        (PatternKind::Variant { .. }, _) => false,
         (PatternKind::Int(n), Value::Int(m)) => n == m,
         (PatternKind::Float(x), _) => v.as_f64() == Some(*x),
         (PatternKind::Int(n), Value::Float(x)) => *n as f64 == *x,

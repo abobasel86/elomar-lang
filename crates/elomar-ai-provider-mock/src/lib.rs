@@ -96,6 +96,7 @@ pub fn placeholder(schema: &Schema) -> Value {
         Schema::Int => json!(0),
         Schema::Float => json!(0.0),
         Schema::Bool => json!(false),
+        Schema::Enum { variants, .. } => json!(variants.first().cloned().unwrap_or_default()),
         Schema::List(_) => json!([]),
         Schema::Option(_) => Value::Null,
         Schema::Record(fields) => Value::Object(

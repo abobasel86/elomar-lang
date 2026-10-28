@@ -238,7 +238,7 @@ impl Parser {
                 "use `let` for a file-level constant, or move the variable into a function",
                 "استخدم `let` لثابت على مستوى الملف، أو انقل المتغير إلى داخل دالة",
             ))),
-            TokenKind::Enum => Err(not_yet(self.span(), "`enum`", "`enum`", "v0.2")),
+            TokenKind::Enum => self.enum_decl().map(Item::Enum),
             TokenKind::Trait | TokenKind::Impl => Err(not_yet(
                 self.span(),
                 "`trait`/`impl`",
@@ -250,6 +250,42 @@ impl Parser {
                 "`fn` أو `type` أو `let` أو `use`",
             )),
         }
+    }
+
+    fn enum_decl(&mut self) -> PResult<EnumDecl> {
+        let start = self.expect(TokenKind::Enum)?;
+        let name = self.ident()?;
+        self.expect(TokenKind::LBrace)?;
+        let mut variants = Vec::new();
+        self.skip_newlines();
+        while !self.at(&TokenKind::RBrace) {
+            let vname = self.ident()?;
+            let mut fields = Vec::new();
+            if self.eat(&TokenKind::LParen) {
+                while !self.at(&TokenKind::RParen) {
+                    fields.push(self.type_expr()?);
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::RParen)?;
+            }
+            variants.push(VariantDecl {
+                name: vname,
+                fields,
+            });
+            let sep = self.eat(&TokenKind::Comma) | self.at(&TokenKind::Newline);
+            self.skip_newlines();
+            if !sep {
+                break;
+            }
+        }
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(EnumDecl {
+            name,
+            variants,
+            span: start.to(end),
+        })
     }
 
     fn use_decl(&mut self) -> PResult<UseDecl> {
@@ -654,6 +690,13 @@ impl Parser {
                 TokenKind::LParen => {
                     expr = self.call(expr, Vec::new())?;
                 }
+                TokenKind::Question => {
+                    let end = self.bump().span;
+                    expr = Expr {
+                        span: expr.span.to(end),
+                        kind: ExprKind::Try(Box::new(expr)),
+                    };
+                }
                 TokenKind::LBracket => {
                     self.bump();
                     let index = self.expr()?;
@@ -775,21 +818,7 @@ impl Parser {
                     span: span.to(end),
                 });
             }
-            TokenKind::LBracket => {
-                self.bump();
-                let mut items = Vec::new();
-                while !self.at(&TokenKind::RBracket) {
-                    items.push(self.expr()?);
-                    if !self.eat(&TokenKind::Comma) {
-                        break;
-                    }
-                }
-                let end = self.expect(TokenKind::RBracket)?;
-                return Ok(Expr {
-                    kind: ExprKind::List(items),
-                    span: span.to(end),
-                });
-            }
+            TokenKind::LBracket => return self.list_or_map(),
             TokenKind::LBrace => return self.record_literal(),
             TokenKind::Match => return self.match_expr(),
             TokenKind::SelfKw => {
@@ -821,6 +850,49 @@ impl Parser {
             }
         };
         Ok(Expr { kind, span })
+    }
+
+    /// `[1, 2]`, `["a": 1, "b": 2]` or the empty map `[:]`. A `:` after the
+    /// first element makes it a map.
+    fn list_or_map(&mut self) -> PResult<Expr> {
+        let start = self.expect(TokenKind::LBracket)?;
+        if self.at(&TokenKind::Colon) && self.peek_n(1) == &TokenKind::RBracket {
+            self.bump();
+            let end = self.bump().span;
+            return Ok(Expr {
+                kind: ExprKind::Map(Vec::new()),
+                span: start.to(end),
+            });
+        }
+        let mut items = Vec::new();
+        let mut entries = Vec::new();
+        let mut is_map = false;
+        while !self.at(&TokenKind::RBracket) {
+            let first = self.expr()?;
+            if items.is_empty() && entries.is_empty() {
+                is_map = self.at(&TokenKind::Colon);
+            }
+            if is_map {
+                self.expect(TokenKind::Colon)?;
+                let value = self.expr()?;
+                entries.push((first, value));
+            } else {
+                items.push(first);
+            }
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let end = self.expect(TokenKind::RBracket)?;
+        let kind = if is_map {
+            ExprKind::Map(entries)
+        } else {
+            ExprKind::List(items)
+        };
+        Ok(Expr {
+            kind,
+            span: start.to(end),
+        })
     }
 
     /// `{ name: "Lina", age }` — fields separated by `,` or line breaks;
@@ -899,6 +971,27 @@ impl Parser {
             }
             TokenKind::Ident(_) => {
                 let name = self.ident()?;
+                if self.eat(&TokenKind::Dot) {
+                    let variant = self.ident()?;
+                    let mut args = Vec::new();
+                    if self.eat(&TokenKind::LParen) {
+                        while !self.at(&TokenKind::RParen) {
+                            args.push(self.pattern()?);
+                            if !self.eat(&TokenKind::Comma) {
+                                break;
+                            }
+                        }
+                        self.expect(TokenKind::RParen)?;
+                    }
+                    return Ok(Pattern {
+                        span: span.to(self.prev_span()),
+                        kind: PatternKind::Variant {
+                            enum_name: name,
+                            variant,
+                            args,
+                        },
+                    });
+                }
                 if self.eat(&TokenKind::LParen) {
                     let mut args = Vec::new();
                     while !self.at(&TokenKind::RParen) {
@@ -1095,6 +1188,20 @@ mod tests {
             }
             ExprKind::Duration(ms) => format!("{ms}ms"),
             ExprKind::Await(e) => format!("(await {})", sexp(e)),
+            ExprKind::Try(e) => format!("(? {})", sexp(e)),
+            ExprKind::Map(entries) => format!(
+                "[{}]",
+                entries
+                    .iter()
+                    .map(|(k, v)| format!("{}:{}", sexp(k), sexp(v)))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            ExprKind::Variant {
+                enum_name,
+                variant,
+                args,
+            } => format!("({enum_name}.{variant} {})", args.len()),
         }
     }
 
@@ -1214,9 +1321,45 @@ mod tests {
 
     #[test]
     fn unsupported_features_are_flagged() {
-        let (_, diags) = parse("enum E {}\ntrait T {}");
+        let (_, diags) = parse("impl E {}\ntrait T {}");
         let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
         assert_eq!(codes, vec!["E0103", "E0103"]);
+    }
+
+    #[test]
+    fn enums_maps_and_try() {
+        let program = parse_ok("enum Shape {\n  Circle(Float)\n  Rect(Float, Float),\n  Empty\n}");
+        let Item::Enum(e) = &program.items[0] else {
+            panic!()
+        };
+        assert_eq!(e.variants.len(), 3);
+        assert_eq!(e.variants[1].fields.len(), 2);
+        assert!(e.variants[2].fields.is_empty());
+
+        assert_eq!(
+            sexp(&first_expr("let m = [\"a\": 1, \"b\": 2]")),
+            "[\"a\":1 \"b\":2]"
+        );
+        assert_eq!(sexp(&first_expr("let m = [:]")), "[]");
+        assert_eq!(sexp(&first_expr("let xs = [1, 2]")), "[1 2]");
+        assert_eq!(
+            sexp(&first_expr("let v = f(x)?.len")),
+            "(. (? (call f x)) len)"
+        );
+
+        let m =
+            first_expr("match s {\n  Shape.Circle(r) => r\n  Shape.Empty => 0.0\n  _ => 1.0\n}");
+        let ExprKind::Match { arms, .. } = m.kind else {
+            panic!()
+        };
+        assert!(matches!(
+            &arms[0].pattern.kind,
+            PatternKind::Variant { variant, args, .. } if variant.name == "Circle" && args.len() == 1
+        ));
+        assert!(matches!(
+            &arms[1].pattern.kind,
+            PatternKind::Variant { args, .. } if args.is_empty()
+        ));
     }
 
     #[test]

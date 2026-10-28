@@ -1,4 +1,4 @@
-# Elomar-Lang — القواعد النحوية والدلالية للنواة (المرحلتان 1 و2)
+# Elomar-Lang — القواعد النحوية والدلالية للنواة (المراحل 1 و2 و3)
 
 > **هذا الملف هو المرجع الملزم** لما ينفذه المفسّر الحالي. عند أي تعارض مع
 > `Elomar-Lang_Master_Specification_AR.md` يُعتمد هذا الملف، ويُحدَّث مع كل
@@ -54,10 +54,12 @@ let a = 1; let b = 2      // جملتان في سطر واحد تحتاجان ;
 
 ```ebnf
 program     = { SEP } , { item , ( SEP | EOF ) , { SEP } } ;
-item        = use_decl | type_decl | const_decl | fn_decl ;
+item        = use_decl | type_decl | enum_decl | const_decl | fn_decl ;
 
 use_decl    = "use" , IDENT , { "." , IDENT } ;
 type_decl   = "type" , IDENT , "=" , type ;
+enum_decl   = "enum" , IDENT , "{" , [ variant , { ( "," | NEWLINE ) , variant } ] , "}" ;
+variant     = IDENT , [ "(" , type , { "," , type } , ")" ] ;
 const_decl  = "let" , IDENT , [ ":" , type ] , "=" , expr ;
 fn_decl     = [ "pub" ] , [ "async" ] , "fn" , IDENT , "(" , [ param , { "," , param } , [ "," ] ] , ")" ,
               [ "->" , type ] , [ effects ] , block ;
@@ -83,17 +85,20 @@ expr        = binary ;                       (* الأسبقية في القسم
 unary       = ( "-" | "!" | "await" ) , unary | postfix ;
 postfix     = primary , { "." , IDENT
                         | "[" , expr , "]"
+                        | "?"
                         | [ type_args ] , "(" , [ arg , { "," , arg } , [ "," ] ] , ")" } ;
 type_args   = "<" , type , { "," , type } , ">" ;   (* بقاعدة فك الغموض 3.1 *)
 arg         = [ IDENT , ":" ] , expr ;
 primary     = INT | FLOAT | DURATION | STRING | "true" | "false" | IDENT
             | "(" , expr , ")"
             | "[" , [ expr , { "," , expr } , [ "," ] ] , "]"
+            | "[" , ( ":" | expr , ":" , expr , { "," , expr , ":" , expr } , [ "," ] ) , "]"
             | "{" , [ field , { ( "," | NEWLINE ) , field } ] , "}"
             | "match" , expr , "{" , { arm , ( "," | SEP ) } , "}" ;
 field       = IDENT , [ ":" , expr ] ;           (* { name } اختصار لـ { name: name } *)
 arm         = pattern , "=>" , ( block | expr ) ;
 pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
+            | IDENT , "." , IDENT , [ "(" , pattern , { "," , pattern } , ")" ]
             | [ "-" ] , ( INT | FLOAT ) | STRING | "true" | "false" ;
 ```
 
@@ -107,7 +112,7 @@ pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
 
 | من الأعلى | العمليات | التجميع |
 |---|---|---|
-| 1 | `.f` `f()` `a[i]` | يسار |
+| 1 | `.f` `f()` `a[i]` `x?` | يسار |
 | 2 | `-x` `!x` `await x` | — |
 | 3 | `*` `/` `div` `%` | يسار |
 | 4 | `+` `-` | يسار |
@@ -140,7 +145,9 @@ pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
 | `Range` | `a..b` `a..=b` | للحلقات |
 | `Duration` | `500ms` `10s` `2m` `1h` | `+` و`-` والمقارنة؛ `.millis()` و`.seconds()` |
 | `Future<T>` | ناتج استدعاء `async fn` أو `ai.infer` | يُستخرج `T` بـ `await` |
-| `AIError` | `{ kind: String, message: String }` | يصبح `enum` في v0.2 |
+| `Map<K, V>` | `["a": 1]` و`[:]` | المفاتيح `String` أو `Int`؛ الترتيب بحسب المفتاح |
+| أنواع معدودة | `Shape.Circle(1.0)` `Priority.High` | اسمية: `enum` بالحالات نفسها نوع مختلف |
+| `AIError` | `AIError.Timeout("...")` | نوع معدود مدمج؛ كل حالة تحمل رسالة |
 | `{ f: T, ... }` | `{ f: v }` | **بنيوي**: الحقول نفسها بالأنواع نفسها = النوع نفسه |
 
 - `type X = ...` اسم مستعار، والأسماء المستعارة الدائرية خطأ `E1006`.
@@ -219,9 +226,20 @@ pub async fn classify(message: String) -> Result<Ticket, AIError> !{ai} {
 **التحقق من مطابقة `T`** (الحقول الإلزامية، وغياب الحقول الزائدة، والأنواع) ← `Ok(T)` أو `Err(AIError)`.
 المطابقة البنيوية لا تعني صحة المعلومة واقعيًا. حين يكون `T` هو `String` يُقبل النص الحر.
 
-**أنواع `AIError.kind`:** `Authentication` · `ProviderUnavailable` · `RateLimited` · `Timeout` · `Network` ·
+**حالات `AIError`** (كل منها تحمل نص الرسالة): `Authentication` · `ProviderUnavailable` · `RateLimited` · `Timeout` · `Network` ·
 `UnsupportedCapability` · `InvalidStructuredOutput` · `PolicyDenied` · `BudgetExceeded` · `ContextLimitExceeded` · `Cancelled`.
-كل فشل في الاستدعاء قيمة `Err` يعالجها البرنامج، وليس خطأ تنفيذ يوقفه.
+كل فشل في الاستدعاء قيمة `Err` يعالجها البرنامج، وليس خطأ تنفيذ يوقفه:
+
+```elomar
+match await classify(message) {
+    Ok(t) => print(t.summary)
+    Err(AIError.Timeout(_)) => print("try again later")
+    Err(e) => print(e.kind(), e.message())   // e.kind() اسم الحالة نصًا
+}
+```
+
+النوع المعدود الذي حالاته أسماء فقط (بلا قيم) يمكن أن يكون جزءًا من `T` أو من `input`، ويُرسل إلى النموذج قيمةً نصية
+من حالاته (`{"type": "string", "enum": [...]}`)؛ والإجابة بقيمة خارج الحالات ← `InvalidStructuredOutput`.
 
 ### 4.6.1 `elomar.toml` والمزود الوهمي (Mock)
 
@@ -278,6 +296,63 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 ثم تُفك، و`String` يُطلب نصًا حرًا. `instructions` في رسالة النظام مع تنبيه بأن رسالة المستخدم بيانات لا تعليمات، و`input`
 في رسالة المستخدم. إعادة التوجيه (Redirects) لا تُتبع، والمفتاح يُقرأ عند كل استدعاء ويُخفى (`sk-***`) في رسائل الخطأ.
 
+## 4.7 الأنواع المعدودة (`enum`)
+
+```elomar
+enum Shape {
+    Circle(Float)
+    Rect(Float, Float)
+    Empty
+}
+
+fn area(s: Shape) -> Float {
+    return match s {
+        Shape.Circle(r) => 3.14 * r * r
+        Shape.Rect(w, h) => w * h
+        Shape.Empty => 0
+    }
+}
+```
+
+- الحالات تُفصل بفاصلة أو سطر جديد؛ لكل حالة قيم موضعية اختيارية.
+- الإنشاء والأنماط بالاسم الكامل `Shape.Circle(r)`؛ الحالة بلا قيم تُكتب دون أقواس (`E2002` إن خالفت).
+- الحالة غير الموجودة `E1010` مع اقتراح أقرب اسم.
+- `match` على نوع معدود يجب أن يغطي كل حالاته أو يحتوي `_` (`E2009` مع قائمة الناقص).
+- الأنواع المعدودة **اسمية**، ويمكن أن تكون **تعاودية** (`enum Tree { Leaf, Node(Tree, Int, Tree) }`).
+- المساواة `==` بنيوية؛ ولا ترتيب (`<`) بين قيمها بعد.
+- القيمة تُطبع `Shape.Circle(1.0)` أو `Shape.Empty`.
+
+## 4.8 القاموس `Map<K, V>`
+
+```elomar
+var stock = ["apple": 3, "pear": 0]
+stock["kiwi"] = 5            // يضيف المفتاح أو يحدّثه
+stock["apple"] += 1          // المفتاح يجب أن يكون موجودًا (R0011)
+print(stock.get("plum"))     // None — القراءة الآمنة
+for entry in stock {         // سجلات { key, value } بترتيب المفاتيح
+    print(entry.key, entry.value)
+}
+var empty: Map<String, Int> = [:]
+```
+
+- المفاتيح `String` أو `Int` فقط (`E2018`). كل القيم من نوع واحد.
+- `m[k]` تُرجع القيمة أو خطأ تنفيذ `R0011` إن غاب المفتاح؛ `m.get(k)` تُرجع `Option<V>`.
+- دلالة القيمة كالقوائم: النسخ مستقل، والتعديل يتطلب `var`.
+- القاموس ليس من أنواع JSON المقبولة في `ai.infer` بعد.
+
+## 4.9 المعامل `?`
+
+```elomar
+fn sum(a: String, b: String) -> Result<Int, String> {
+    return Ok(parse(a)? + parse(b)?)
+}
+```
+
+- على `Result<T, E>`: يُرجع `T`، أو يُنهي الدالة فورًا بـ `Err(e)`. يجب أن تُرجع الدالة `Result<_, E>` بنوع الخطأ نفسه (`E2001`).
+- على `Option<T>`: يُرجع `T`، أو يُنهي الدالة بـ `None`. يجب أن تُرجع الدالة `Option<_>`.
+- خارج دالة تُرجع النوع المناسب (ومنها `main`) `E2016`؛ وعلى قيمة ليست `Result` أو `Option` `E2017`.
+- في `async fn` يعمل على نوع الإرجاع المعلن (ما داخل `Future`).
+
 ## 5. التأثيرات (Effects)
 
 التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
@@ -329,6 +404,8 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 | `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` |
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` |
+| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` |
+| `AIError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
 
 \* يعدّل القائمة، ويتطلب أن تكون في متغير `var`.
 
@@ -369,6 +446,7 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 | `E1007` | حقل غير موجود |
 | `E1008` | دالة تابعة غير موجودة، أو دالة غير موجودة في وحدة |
 | `E1009` | وحدة غير معروفة في `use` |
+| `E1010` | حالة غير موجودة في نوع معدود |
 
 ### أخطاء الأنواع (`E2xxx`)
 
@@ -389,6 +467,9 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 | `E2013` | `await` خارج `async fn` |
 | `E2014` | `await` على قيمة ليست `Future` |
 | `E2015` | نوع ليس له تمثيل JSON في `ai.infer` (ناتجًا أو مدخلًا) |
+| `E2016` | `?` في دالة لا تُرجع `Result`/`Option` المناسب |
+| `E2017` | `?` على قيمة ليست `Result` ولا `Option` |
+| `E2018` | مفتاح `Map` ليس `String` ولا `Int` |
 
 ### أخطاء التأثيرات (`E3xxx`)
 
@@ -421,11 +502,12 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 | `R0008` | استخدام ثابت قبل تهيئته |
 | `R0009` | خطأ داخلي في المفسّر (يُبلَّغ عنه كعلة) |
 | `R0010` | انتظار `Future` أثناء تنفيذه |
+| `R0011` | مفتاح غير موجود في `Map` عند `m[k]` |
 
 ---
 
 ## 9. غير المنفذ بعد (مخطط)
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
-`ai.generate` و`ai.stream` و`ai.embed` · `Map`/`Set`/`enum` والوحدات المتعددة الملفات و`std.fs`/`std.json` (v0.2) ·
+`ai.generate` و`ai.stream` و`ai.embed` · `Set` والوحدات المتعددة الملفات و`std.fs`/`std.json` والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
 الأنواع العامة والدوال كقيم و`trait`/`impl` وتعدد التأثيرات والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي · المعامل `?`.

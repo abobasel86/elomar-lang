@@ -25,9 +25,9 @@ pub const BUILTIN_FUNCTIONS: [&str; 11] = [
     "abs",
 ];
 
-pub(crate) const BUILTIN_TYPES: [&str; 12] = [
+pub(crate) const BUILTIN_TYPES: [&str; 13] = [
     "Int", "Float", "Bool", "String", "Unit", "Range", "Duration", "List", "Option", "Result",
-    "Future", "AIError",
+    "Future", "Map", "AIError",
 ];
 
 pub(crate) fn is_builtin_type(name: &str) -> bool {
@@ -80,6 +80,16 @@ const FLOAT_METHODS: &[&str] = &[
 const OPTION_METHODS: &[&str] = &["is_some", "is_none", "unwrap_or", "to_string"];
 const RESULT_METHODS: &[&str] = &["is_ok", "is_err", "unwrap_or", "to_string"];
 const DURATION_METHODS: &[&str] = &["millis", "seconds", "to_string"];
+const MAP_METHODS: &[&str] = &[
+    "get",
+    "contains_key",
+    "remove",
+    "keys",
+    "values",
+    "is_empty",
+    "to_string",
+];
+const AI_ERROR_METHODS: &[&str] = &["kind", "message", "to_string"];
 const OTHER_METHODS: &[&str] = &["to_string"];
 
 fn methods_of(ty: &Ty) -> &'static [&'static str] {
@@ -91,6 +101,8 @@ fn methods_of(ty: &Ty) -> &'static [&'static str] {
         Ty::Option(_) => OPTION_METHODS,
         Ty::Result(..) => RESULT_METHODS,
         Ty::Duration => DURATION_METHODS,
+        Ty::Map(..) => MAP_METHODS,
+        Ty::Enum(name) if name == crate::enums::AI_ERROR => AI_ERROR_METHODS,
         _ => OTHER_METHODS,
     }
 }
@@ -255,7 +267,7 @@ impl Checker {
             self.arity(m, args, 0, 0, span);
             return Ty::Str;
         }
-        if m == "length" && matches!(r, Ty::List(_) | Ty::Str) {
+        if m == "length" && matches!(r, Ty::List(_) | Ty::Str | Ty::Map(..)) {
             self.push(
                 Diagnostic::error(
                     "E2004",
@@ -281,6 +293,10 @@ impl Checker {
                 self.no_args(m, args, span, Ty::Int)
             }
             (Ty::Float, "abs" | "sqrt") => self.no_args(m, args, span, Ty::Float),
+            (Ty::Map(k, v), _) => self.map_method(recv, k, v, m, args, span),
+            (Ty::Enum(name), "kind" | "message") if name == crate::enums::AI_ERROR => {
+                self.no_args(m, args, span, Ty::Str)
+            }
             (Ty::Duration, "millis") => self.no_args(m, args, span, Ty::Int),
             (Ty::Duration, "seconds") => self.no_args(m, args, span, Ty::Float),
             (Ty::Option(_), "is_some" | "is_none") | (Ty::Result(..), "is_ok" | "is_err") => {
@@ -348,8 +364,8 @@ impl Checker {
                 "E1003",
                 recv.span,
                 Text::new(
-                    format!("`{method}` changes its list, but this value is temporary"),
-                    format!("`{method}` تعدّل القائمة، لكن هذه القيمة مؤقتة"),
+                    format!("`{method}` changes its collection, but this value is temporary"),
+                    format!("`{method}` تعدّل المجموعة، لكن هذه القيمة مؤقتة"),
                 ),
             );
         }
@@ -454,6 +470,46 @@ impl Checker {
                     );
                 }
                 Ty::Str
+            }
+            _ => return None,
+        })
+    }
+
+    fn map_method(
+        &mut self,
+        recv: &Expr,
+        k: &Ty,
+        v: &Ty,
+        m: &str,
+        args: &mut [Arg],
+        span: Span,
+    ) -> Option<Ty> {
+        let (k, v) = (k.clone(), v.clone());
+        Some(match m {
+            "get" => {
+                self.typed_args(m, args, std::slice::from_ref(&k), span);
+                Ty::option(v)
+            }
+            "contains_key" => {
+                self.typed_args(m, args, std::slice::from_ref(&k), span);
+                Ty::Bool
+            }
+            "remove" => {
+                self.require_place(recv, m);
+                self.typed_args(m, args, std::slice::from_ref(&k), span);
+                Ty::option(v)
+            }
+            "keys" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(k)
+            }
+            "values" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(v)
+            }
+            "is_empty" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::Bool
             }
             _ => return None,
         })

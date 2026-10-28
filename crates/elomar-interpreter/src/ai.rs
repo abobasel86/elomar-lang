@@ -1,6 +1,7 @@
 //! Running `ai.infer<T>(...)`: converting values to and from JSON and
 //! turning provider failures into `Err(AIError)` values (spec §13.3).
 
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use elomar_ai_core::{AiError, AiRequest, AiRuntime, Schema};
@@ -20,13 +21,14 @@ pub struct InferCall {
     pub timeout_ms: Option<i64>,
 }
 
-/// The checker has already expanded aliases, so this is purely structural.
-pub(crate) fn schema_of(t: &TypeExpr) -> Schema {
+/// The checker has already expanded aliases, so this is purely structural;
+/// a remaining name is an enum of plain variants.
+pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>) -> Schema {
     match &t.kind {
         TypeExprKind::Record(fields) => Schema::Record(
             fields
                 .iter()
-                .map(|(n, t)| (n.name.clone(), schema_of(t)))
+                .map(|(n, t)| (n.name.clone(), schema_of(t, unit_enums)))
                 .collect(),
         ),
         TypeExprKind::Named { name, args } => match name.name.as_str() {
@@ -34,9 +36,15 @@ pub(crate) fn schema_of(t: &TypeExpr) -> Schema {
             "Int" => Schema::Int,
             "Float" => Schema::Float,
             "Bool" => Schema::Bool,
-            "List" => Schema::List(Box::new(schema_of(&args[0]))),
-            "Option" => Schema::Option(Box::new(schema_of(&args[0]))),
-            other => unreachable!("checker allows only JSON data types, got `{other}`"),
+            "List" => Schema::List(Box::new(schema_of(&args[0], unit_enums))),
+            "Option" => Schema::Option(Box::new(schema_of(&args[0], unit_enums))),
+            other => match unit_enums.get(other) {
+                Some(variants) => Schema::Enum {
+                    name: other.to_string(),
+                    variants: variants.clone(),
+                },
+                None => unreachable!("checker allows only JSON data types, got `{other}`"),
+            },
         },
     }
 }
@@ -59,12 +67,14 @@ pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
     }
 }
 
-/// `AIError` as a value: `{ kind: String, message: String }`.
+/// `AIError` as a value: the variant named by the error kind, carrying the
+/// message, e.g. `AIError.Timeout("no answer within 10000 ms")`.
 fn ai_error_value(e: &AiError) -> Value {
-    Value::Record(Rc::new(vec![
-        ("kind".into(), Value::str(e.kind.name())),
-        ("message".into(), Value::str(e.message.as_str())),
-    ]))
+    Value::Enum {
+        enum_name: "AIError".into(),
+        variant: e.kind.name().into(),
+        fields: Rc::new(vec![Value::str(e.message.as_str())]),
+    }
 }
 
 pub(crate) fn to_json(v: &Value) -> Json {
@@ -80,6 +90,7 @@ pub(crate) fn to_json(v: &Value) -> Json {
                 .map(|(n, v)| (n.to_string(), to_json(v)))
                 .collect::<Map<_, _>>(),
         ),
+        Value::Enum { variant, .. } => Json::String(variant.to_string()),
         Value::Option(None) => Json::Null,
         Value::Option(Some(v)) => to_json(v),
         // The checker only lets JSON data types reach a model.
@@ -97,6 +108,11 @@ pub(crate) fn from_json(schema: &Schema, json: &Json) -> Value {
         ),
         (Schema::Float, Json::Number(n)) => Value::Float(n.as_f64().unwrap_or(0.0)),
         (Schema::Bool, Json::Bool(b)) => Value::Bool(*b),
+        (Schema::Enum { name, .. }, Json::String(s)) => Value::Enum {
+            enum_name: name.as_str().into(),
+            variant: s.as_str().into(),
+            fields: Rc::new(Vec::new()),
+        },
         (Schema::List(t), Json::Array(items)) => {
             Value::list(items.iter().map(|i| from_json(t, i)).collect())
         }

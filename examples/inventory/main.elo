@@ -1,0 +1,95 @@
+// Phase 3: enums, maps and `?` working together.
+
+enum Category {
+    Fruit
+    Vegetable
+    Dairy
+}
+
+enum Change {
+    Restock(Int)
+    Sell(Int)
+    Discontinue
+}
+
+type Item = { category: Category, quantity: Int, price: Float }
+
+fn label(c: Category) -> String {
+    return match c {
+        Category.Fruit => "fruit"
+        Category.Vegetable => "vegetable"
+        Category.Dairy => "dairy"
+    }
+}
+
+fn find(stock: Map<String, Item>, name: String) -> Result<Item, String> {
+    return match stock.get(name) {
+        Some(item) => Ok(item)
+        None => Err("unknown item: " + name)
+    }
+}
+
+// `?` returns the error to the caller, so the happy path reads straight down.
+fn apply(stock: Map<String, Item>, name: String, change: Change) -> Result<Map<String, Item>, String> {
+    var item = find(stock, name)?
+    var next = stock
+    match change {
+        Change.Restock(n) => {
+            item.quantity += n
+        }
+        Change.Sell(n) => {
+            if n > item.quantity {
+                return Err("not enough " + name + ": have " + to_string(item.quantity) + ", asked " + to_string(n))
+            }
+            item.quantity -= n
+        }
+        Change.Discontinue => {
+            next.remove(name)
+            return Ok(next)
+        }
+    }
+    next[name] = item
+    return Ok(next)
+}
+
+fn total_value(stock: Map<String, Item>) -> Float {
+    var total = 0.0
+    for entry in stock {
+        total += entry.value.quantity * entry.value.price
+    }
+    return total
+}
+
+fn main() {
+    var stock: Map<String, Item> = [
+        "apple": { category: Category.Fruit, quantity: 10, price: 0.5 },
+        "carrot": { category: Category.Vegetable, quantity: 4, price: 0.25 },
+        "milk": { category: Category.Dairy, quantity: 2, price: 1.2 }
+    ]
+    let changes = [
+        { name: "apple", change: Change.Sell(3) },
+        { name: "milk", change: Change.Sell(5) },
+        { name: "banana", change: Change.Restock(6) },
+        { name: "carrot", change: Change.Restock(6) },
+        { name: "milk", change: Change.Discontinue }
+    ]
+    for c in changes {
+        match apply(stock, c.name, c.change) {
+            Ok(next) => {
+                stock = next
+                print("ok:", c.name, c.change)
+            }
+            Err(message) => print("rejected:", message)
+        }
+    }
+
+    print("items:", stock.keys())
+    print("total value:", total_value(stock))
+
+    var counts: Map<String, Int> = [:]
+    for entry in stock {
+        let key = label(entry.value.category)
+        counts[key] = counts.get(key).unwrap_or(0) + 1
+    }
+    print("by category:", counts)
+}

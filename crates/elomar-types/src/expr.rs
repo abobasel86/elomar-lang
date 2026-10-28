@@ -188,6 +188,7 @@ impl Checker {
             Ty::List(t) => *t,
             Ty::Range => Ty::Int,
             Ty::Str => Ty::Str,
+            Ty::Map(k, v) => Ty::record(vec![("key".into(), *k), ("value".into(), *v)]),
             Ty::Error => Ty::Error,
             Ty::Var(_) => {
                 self.cannot_infer(span);
@@ -293,6 +294,9 @@ impl Checker {
             }
             return Ty::Int;
         }
+        if let Some(enum_name) = self.enum_target(&e.kind) {
+            return self.check_variant_expr(e, enum_name);
+        }
         match &mut e.kind {
             ExprKind::Int(_) => unreachable!("handled above"),
             ExprKind::Float(_) => Ty::Float,
@@ -373,6 +377,20 @@ impl Checker {
             } => self.check_call(callee, type_args, args, span, hint_resolved.as_ref()),
             ExprKind::Duration(_) => Ty::Duration,
             ExprKind::Await(inner) => self.check_await(inner, span),
+            ExprKind::Try(inner) => self.check_try(inner, span),
+            ExprKind::Variant { enum_name, .. } => Ty::Enum(enum_name.clone()),
+            ExprKind::Map(entries) => {
+                let (k, v) = match hint_resolved {
+                    Some(Ty::Map(k, v)) => (*k, *v),
+                    _ => (self.subst.fresh(), self.subst.fresh()),
+                };
+                for (key, value) in entries {
+                    self.check_expr_against(key, &k);
+                    self.check_expr_against(value, &v);
+                }
+                self.check_map_key(&k, span);
+                Ty::map(k, v)
+            }
             ExprKind::Field { target, name } => {
                 let name = name.clone();
                 let t = self.check_expr(target, None);
@@ -385,6 +403,10 @@ impl Checker {
                     Ty::List(elem) => {
                         self.check_expr_against(index, &Ty::Int);
                         *elem
+                    }
+                    Ty::Map(k, v) => {
+                        self.check_expr_against(index, &k);
+                        *v
                     }
                     Ty::Error => {
                         self.check_expr(index, None);
@@ -439,6 +461,17 @@ impl Checker {
                 Text::new(
                     format!("`{name}` needs a value, e.g. `{name}(x)`"),
                     format!("`{name}` يحتاج إلى قيمة، مثل `{name}(x)`"),
+                ),
+            );
+            return Ty::Error;
+        }
+        if self.enums.contains_key(name) {
+            self.error(
+                "E2004",
+                span,
+                Text::new(
+                    format!("`{name}` is a type; use one of its variants, e.g. `{name}.Variant`"),
+                    format!("`{name}` نوع؛ استخدم إحدى حالاته، مثل `{name}.Variant`"),
                 ),
             );
             return Ty::Error;
@@ -902,7 +935,7 @@ impl Checker {
                 self.no_field(&resolved, name, suggest(&name.name, &names));
                 Ty::Error
             }
-            Ty::List(_) | Ty::Str if name.name == "length" => Ty::Int,
+            Ty::List(_) | Ty::Str | Ty::Map(..) if name.name == "length" => Ty::Int,
             Ty::Var(_) => {
                 self.cannot_infer(name.span);
                 Ty::Error
@@ -988,7 +1021,7 @@ impl Checker {
         result.unwrap_or(Ty::Unit)
     }
 
-    fn check_pattern(&mut self, p: &Pattern, ty: &Ty) {
+    pub(crate) fn check_pattern(&mut self, p: &Pattern, ty: &Ty) {
         let literal = |t: Ty| Some(t);
         let found = match &p.kind {
             PatternKind::Wildcard => None,
@@ -1053,6 +1086,14 @@ impl Checker {
                 self.check_pattern(&args[0], &inner);
                 None
             }
+            PatternKind::Variant {
+                enum_name,
+                variant,
+                args,
+            } => {
+                self.check_variant_pattern(p, enum_name, variant, args, ty);
+                None
+            }
             PatternKind::Int(_) => literal(Ty::Int),
             PatternKind::Float(_) => literal(Ty::Float),
             PatternKind::Str(_) => literal(Ty::Str),
@@ -1082,24 +1123,25 @@ impl Checker {
             arms.iter()
                 .any(|a| matches!(a.pattern.kind, PatternKind::Bool(x) if x == b))
         };
-        let missing: Vec<&str> = match self.subst.resolve(st) {
+        let missing: Vec<String> = match self.subst.resolve(st) {
             Ty::Option(_) => [("Some(_)", has_ctor("Some")), ("None", has_ctor("None"))]
                 .into_iter()
                 .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n)
+                .map(|(n, _)| n.to_string())
                 .collect(),
             Ty::Result(..) => [("Ok(_)", has_ctor("Ok")), ("Err(_)", has_ctor("Err"))]
                 .into_iter()
                 .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n)
+                .map(|(n, _)| n.to_string())
                 .collect(),
             Ty::Bool => [("true", has_bool(true)), ("false", has_bool(false))]
                 .into_iter()
                 .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n)
+                .map(|(n, _)| n.to_string())
                 .collect(),
             Ty::Error | Ty::Var(_) => return,
-            _ => vec!["_"],
+            Ty::Enum(name) => self.missing_variants(&name, arms),
+            _ => vec!["_".to_string()],
         };
         if missing.is_empty() {
             return;
@@ -1126,11 +1168,106 @@ impl Checker {
     }
 }
 
-fn irrefutable(p: &Pattern) -> bool {
+pub(crate) fn irrefutable(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Wildcard => true,
         PatternKind::Name(n) => !CONSTRUCTORS.contains(&n.as_str()),
         _ => false,
+    }
+}
+
+impl Checker {
+    /// `expr?` (spec §10.6): unwraps `Ok`/`Some`, or returns the `Err`/`None`
+    /// from the current function, whose return type must allow it.
+    pub(crate) fn check_try(&mut self, inner: &mut Expr, span: Span) -> Ty {
+        let t = self.check_expr(inner, None);
+        let ret = self.ret_ty.clone().map(|r| self.subst.shallow(&r));
+        match self.subst.shallow(&t) {
+            Ty::Error => Ty::Error,
+            Ty::Var(_) => {
+                self.cannot_infer(inner.span);
+                Ty::Error
+            }
+            Ty::Result(ok, err) => {
+                match ret {
+                    Some(Ty::Result(_, ret_err)) => {
+                        if !self.subst.unify(&ret_err, &err) {
+                            let (have, want) = (self.subst.show(&err), self.subst.show(&ret_err));
+                            self.push(
+                                Diagnostic::error(
+                                    "E2001",
+                                    span,
+                                    Text::new(
+                                        format!("`?` passes on an error of type `{have}`, but this function returns errors of type `{want}`"),
+                                        format!("`?` يمرّر خطأً من النوع `{have}`، لكن هذه الدالة تُرجع أخطاء من النوع `{want}`"),
+                                    ),
+                                )
+                                .with_hint(Text::new(
+                                    "convert the error with `match` first, or make both error types the same",
+                                    "حوّل الخطأ بـ `match` أولًا، أو اجعل نوعي الخطأ متطابقين",
+                                )),
+                            );
+                        }
+                    }
+                    Some(Ty::Error) => {}
+                    _ => self.try_outside(span, "Result"),
+                }
+                *ok
+            }
+            Ty::Option(inner_ty) => {
+                if !matches!(ret, Some(Ty::Option(_) | Ty::Error)) {
+                    self.try_outside(span, "Option");
+                }
+                *inner_ty
+            }
+            other => {
+                let shown = self.subst.show(&other);
+                self.error(
+                    "E2017",
+                    span,
+                    Text::new(
+                        format!("`?` works on `Result` or `Option`, not on `{shown}`"),
+                        format!("`?` يعمل على `Result` أو `Option` فقط، لا على `{shown}`"),
+                    ),
+                );
+                Ty::Error
+            }
+        }
+    }
+
+    fn try_outside(&mut self, span: Span, what: &str) {
+        self.push(
+            Diagnostic::error(
+                "E2016",
+                span,
+                Text::new(
+                    format!("`?` on a `{what}` can only be used in a function that returns `{what}`"),
+                    format!("لا يُستخدم `?` على `{what}` إلا داخل دالة تُرجع `{what}`"),
+                ),
+            )
+            .with_hint(Text::new(
+                "handle the case with `match` here, or move this code into a function that returns it",
+                "عالج الحالة بـ `match` هنا، أو انقل هذا الكود إلى دالة تُرجع هذا النوع",
+            )),
+        );
+    }
+
+    /// Map keys must be `String` or `Int` (spec §10.2).
+    pub(crate) fn check_map_key(&mut self, k: &Ty, span: Span) {
+        match self.subst.shallow(k) {
+            Ty::Str | Ty::Int | Ty::Var(_) | Ty::Error => {}
+            other => {
+                let shown = self.subst.show(&other);
+                self.error(
+                    "E2018",
+                    span,
+                    Text::new(
+                        format!("`Map` keys must be `String` or `Int`, not `{shown}`"),
+                        format!("مفاتيح `Map` يجب أن تكون `String` أو `Int`، لا `{shown}`"),
+                    ),
+                );
+            }
+        }
     }
 }
 

@@ -1,0 +1,5 @@
+// expect: R0011
+fn main() {
+    let ages = ["Lina": 30]
+    print(ages["Omar"])
+}

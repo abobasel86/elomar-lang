@@ -22,9 +22,9 @@ const INFER_PARAMS: [(&str, bool); 4] = [
     ("timeout", false),
 ];
 
-/// `AIError` is `{ kind: String, message: String }` until enums arrive (v0.2).
+/// `AIError` is a built-in enum; every variant carries a message.
 pub(crate) fn ai_error_ty() -> Ty {
-    Ty::record(vec![("kind".into(), Ty::Str), ("message".into(), Ty::Str)])
+    Ty::Enum(crate::enums::AI_ERROR.into())
 }
 
 impl Checker {
@@ -328,6 +328,8 @@ impl Checker {
             Ty::Str | Ty::Int | Ty::Float | Ty::Bool | Ty::Error => None,
             Ty::List(t) | Ty::Option(t) => self.non_json_part(t),
             Ty::Record(fields) => fields.iter().find_map(|(_, t)| self.non_json_part(t)),
+            // An enum of plain names travels as one of its names (a string).
+            Ty::Enum(name) if self.enums.get(name).is_some_and(|e| e.is_unit_only()) => None,
             other => Some(other.clone()),
         }
     }
@@ -378,6 +380,7 @@ fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {
         Ty::Bool => named("Bool", vec![]),
         Ty::List(t) => named("List", vec![type_expr_of(t, span)]),
         Ty::Option(t) => named("Option", vec![type_expr_of(t, span)]),
+        Ty::Enum(name) => named(name, vec![]),
         Ty::Record(fields) => TypeExpr {
             kind: TypeExprKind::Record(
                 fields

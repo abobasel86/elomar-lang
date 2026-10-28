@@ -17,6 +17,7 @@ pub struct Program {
 pub enum Item {
     Use(UseDecl),
     Type(TypeDecl),
+    Enum(EnumDecl),
     Const(ConstDecl),
     Fn(FnDecl),
 }
@@ -34,6 +35,21 @@ pub struct TypeDecl {
     pub name: Ident,
     pub ty: TypeExpr,
     pub span: Span,
+}
+
+/// `enum Shape { Circle(Float), Square(Float), Empty }`
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumDecl {
+    pub name: Ident,
+    pub variants: Vec<VariantDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct VariantDecl {
+    pub name: Ident,
+    /// Payload types; empty for a unit variant such as `Empty`.
+    pub fields: Vec<TypeExpr>,
 }
 
 /// A file-level `let`.
@@ -257,6 +273,17 @@ pub enum ExprKind {
     },
     /// `await future`
     Await(Box<Expr>),
+    /// `["a": 1, "b": 2]`, or `[:]` when empty.
+    Map(Vec<(Expr, Expr)>),
+    /// `expr?`
+    Try(Box<Expr>),
+    /// `Shape.Circle(1.0)` or `Priority.High`. The parser reads these as a
+    /// field access or method call; the checker rewrites them to this.
+    Variant {
+        enum_name: String,
+        variant: String,
+        args: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -286,6 +313,12 @@ pub enum PatternKind {
     /// `Some(p)`, `Ok(p)`, `Err(p)`.
     Ctor {
         name: Ident,
+        args: Vec<Pattern>,
+    },
+    /// `Shape.Circle(r)`, `Priority.High`.
+    Variant {
+        enum_name: Ident,
+        variant: Ident,
         args: Vec<Pattern>,
     },
     Int(i64),

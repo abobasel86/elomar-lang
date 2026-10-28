@@ -4,6 +4,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -21,6 +22,31 @@ pub enum Thunk {
         span: Span,
     },
     Infer(InferCall),
+}
+
+/// A `Map` key. The checker allows only `String` and `Int` keys; maps
+/// iterate in key order.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MapKey {
+    Int(i64),
+    Str(Rc<str>),
+}
+
+impl MapKey {
+    pub fn from_value(v: &Value) -> MapKey {
+        match v {
+            Value::Int(n) => MapKey::Int(*n),
+            Value::Str(s) => MapKey::Str(s.clone()),
+            other => unreachable!("checker allows only String and Int keys, got {other:?}"),
+        }
+    }
+
+    pub fn to_value(&self) -> Value {
+        match self {
+            MapKey::Int(n) => Value::Int(*n),
+            MapKey::Str(s) => Value::Str(s.clone()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +73,13 @@ pub enum Value {
     },
     /// Milliseconds.
     Duration(i64),
+    /// `Shape.Circle(1.0)`; `fields` is empty for a plain variant.
+    Enum {
+        enum_name: Rc<str>,
+        variant: Rc<str>,
+        fields: Rc<Vec<Value>>,
+    },
+    Map(Rc<BTreeMap<MapKey, Value>>),
     /// Shared handle: copies of a future refer to the same computation.
     Future(Rc<RefCell<FutureState>>),
     Option(Option<Rc<Value>>),
@@ -92,6 +125,21 @@ impl Value {
             (Str(a), Str(b)) => a == b,
             (Unit, Unit) => true,
             (Duration(a), Duration(b)) => a == b,
+            (
+                Enum {
+                    enum_name: e1,
+                    variant: v1,
+                    fields: f1,
+                },
+                Enum {
+                    enum_name: e2,
+                    variant: v2,
+                    fields: f2,
+                },
+            ) => e1 == e2 && v1 == v2 && f1.iter().zip(f2.iter()).all(|(x, y)| x.equals(y)),
+            (Map(a), Map(b)) => {
+                a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| v.equals(w)))
+            }
             (Future(a), Future(b)) => Rc::ptr_eq(a, b),
             (List(a), List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y))
@@ -210,6 +258,39 @@ impl fmt::Display for Value {
                 inclusive,
             } => write!(f, "{start}{}{end}", if *inclusive { "..=" } else { ".." }),
             Value::Duration(ms) => f.write_str(&format_duration(*ms)),
+            Value::Enum {
+                enum_name,
+                variant,
+                fields,
+            } => {
+                write!(f, "{enum_name}.{variant}")?;
+                if !fields.is_empty() {
+                    f.write_str("(")?;
+                    for (i, v) in fields.iter().enumerate() {
+                        if i > 0 {
+                            f.write_str(", ")?;
+                        }
+                        v.fmt_nested(f)?;
+                    }
+                    f.write_str(")")?;
+                }
+                Ok(())
+            }
+            Value::Map(entries) => {
+                if entries.is_empty() {
+                    return f.write_str("[:]");
+                }
+                f.write_str("[")?;
+                for (i, (k, v)) in entries.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    k.to_value().fmt_nested(f)?;
+                    f.write_str(": ")?;
+                    v.fmt_nested(f)?;
+                }
+                f.write_str("]")
+            }
             Value::Future(_) => f.write_str("<future>"),
             Value::Option(None) => f.write_str("None"),
             Value::Option(Some(v)) => {

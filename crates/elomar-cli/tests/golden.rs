@@ -204,7 +204,7 @@ mod fake_openai {
         std::fs::write(
             dir.join("main.elo"),
             format!(
-                "use std.ai\n\ntype Answer = {{ label: String, confidence: Float }}\n\npub async fn label(text: String) -> Result<Answer, AIError> {effects} {{\n    return await ai.infer<Answer>(\"assistant\", \"Label the text.\", text, timeout: 5s)\n}}\n\nasync fn main() {{\n    match await label(\"hello\") {{\n        Ok(a) => print(\"label:\", a.label, a.confidence)\n        Err(e) => print(\"error:\", e.kind)\n    }}\n}}\n"
+                "use std.ai\n\ntype Answer = {{ label: String, confidence: Float }}\n\npub async fn label(text: String) -> Result<Answer, AIError> {effects} {{\n    return await ai.infer<Answer>(\"assistant\", \"Label the text.\", text, timeout: 5s)\n}}\n\nasync fn main() {{\n    match await label(\"hello\") {{\n        Ok(a) => print(\"label:\", a.label, a.confidence)\n        Err(e) => print(\"error:\", e.kind())\n    }}\n}}\n"
             ),
         )
         .unwrap();

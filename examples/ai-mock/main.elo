@@ -19,6 +19,6 @@ async fn main() {
 
     match await ai.infer<Summary>("mock", "Summarize the text", "Elomar-Lang is a language.") {
         Ok(s) => print("title:", s.title, "| points:", s.points.length, "| confidence:", s.confidence)
-        Err(e) => print("failed:", e.kind)
+        Err(e) => print("failed:", e.kind())
     }
 }

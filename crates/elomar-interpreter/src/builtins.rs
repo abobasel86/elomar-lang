@@ -47,6 +47,21 @@ fn conversion(span: Span, x: f64) -> RuntimeError {
     )
 }
 
+pub(crate) fn missing_key(key: &Value, span: Span) -> RuntimeError {
+    let shown = match key {
+        Value::Str(s) => format!("{s:?}"),
+        other => other.to_string(),
+    };
+    RuntimeError::new(
+        "R0011",
+        span,
+        Text::new(
+            format!("the key {shown} is not in the map; use `.get(key)` when it may be missing"),
+            format!("المفتاح {shown} غير موجود في القاموس؛ استخدم `.get(key)` إن كان قد يغيب"),
+        ),
+    )
+}
+
 /// Validates a list index, returning it as `usize`.
 pub(crate) fn check_index(i: i64, len: usize, span: Span) -> R<usize> {
     if i >= 0 && (i as usize) < len {
@@ -250,6 +265,11 @@ pub(crate) fn call_mutating(
     mut args: Vec<Value>,
     span: Span,
 ) -> R<Value> {
+    if let Value::Map(entries) = slot {
+        // The only mutating map method is `remove`.
+        let removed = Rc::make_mut(entries).remove(&crate::MapKey::from_value(&args[0]));
+        return Ok(removed.map_or(Value::none(), Value::some));
+    }
     let Value::List(items) = slot else {
         unreachable!("checked receiver")
     };
@@ -285,6 +305,22 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
     }
     Ok(match (recv, method) {
         (Value::List(items), _) => list_method(&items, method, &args, span)?,
+        (Value::Map(entries), _) => {
+            let key = || crate::MapKey::from_value(&args[0]);
+            match method {
+                "get" => entries
+                    .get(&key())
+                    .cloned()
+                    .map_or(Value::none(), Value::some),
+                "contains_key" => Value::Bool(entries.contains_key(&key())),
+                "keys" => Value::list(entries.keys().map(|k| k.to_value()).collect()),
+                "values" => Value::list(entries.values().cloned().collect()),
+                "is_empty" => Value::Bool(entries.is_empty()),
+                m => unreachable!("checked map method `{m}`"),
+            }
+        }
+        (Value::Enum { variant, .. }, "kind") => Value::Str(variant),
+        (Value::Enum { fields, .. }, "message") => fields.first().cloned().unwrap_or(Value::Unit),
         (Value::Str(s), _) => str_method(&s, method, &args, span)?,
         (Value::Int(n), "to_float") => Value::Float(n as f64),
         (Value::Int(n), "abs") => Value::Int(n.checked_abs().ok_or_else(|| overflow(span))?),

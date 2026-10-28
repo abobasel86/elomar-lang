@@ -53,6 +53,16 @@ document_language: "ar"
 | نموذج `mock` مدمج يعيد قيمة بديلة من النوع المطلوب | 21 (المثال F) |
 | سياسة `max_calls_per_run` ← `BudgetExceeded` | 16.5 |
 | المدد الزمنية `10s` و`500ms` نوع `Duration` | 8.3 |
+
+## سجل التعديلات — بداية المرحلة 3
+
+| التعديل | القسم |
+|---|---|
+| الأنواع المعدودة `enum` (اسمية، تعاودية، بقيم موضعية) مع شمول `match`؛ الإنشاء `Shape.Circle(1.0)` بالنقطة لا بـ `::` | 10.2، grammar §4.7 |
+| `AIError` نوع معدود مدمج: `AIError.Timeout(msg)` مع `e.kind()` و`e.message()` | 13.4 |
+| النوع المعدود ذو الحالات الاسمية يُرسل إلى النموذج كقيمة نصية محصورة ويُتحقق منها | 13.3 |
+| `Map<K, V>` بصياغة `["a": 1]` و`[:]`، ومفاتيح `String`/`Int` | 10.2، grammar §4.8 |
+| المعامل `?` على `Result` و`Option` | 10.6، grammar §4.9 |
 | مزود OpenAI (Chat Completions + Structured Outputs بوضع strict) بمفتاح من متغير بيئة يُقرأ عند الاستدعاء | 14 |
 | `[permissions] network_hosts` بمنع افتراضي يُفحص قبل كل اتصال، وعدم اتباع إعادة التوجيه، وإلزام https | 16.1، 16.3 |
 | `ai.infer` على نموذج سحابي يُحدث `net` إضافة إلى `ai` (يُستنتج من `elomar.toml` وقت الترجمة) | 13.1، 16.2 |
@@ -524,9 +534,9 @@ fn main() {
 | `Result<T,E>` | `Ok(value)` أو `Err(error)` | v0.1 (مع `match`) |
 | `Range` | `a..b` و`a..=b` للتكرار | v0.1 |
 | `Bytes` | بيانات ثنائية | v0.2 |
-| `Map<K,V>` / `Set<T>` | خرائط ومجموعات | v0.2 |
+| `Map<K,V>` / `Set<T>` | خرائط ومجموعات | `Map` **منفذ**؛ `Set` في v0.2 |
 | `Record` / `type X = {...}` | نوع مهيكل بنيوي ذو حقول محددة | v0.1 |
-| `Enum` | نوع مغلق متعدد الحالات | v0.2 |
+| `Enum` | نوع مغلق متعدد الحالات، بقيم اختيارية لكل حالة | **منفذ** (v0.2) |
 | `Duration` / `DateTime` | زمن وفترات | v0.2 |
 | `Decimal` | عدد عشري ملائم لبعض العمليات المالية | v0.3 |
 | `Future<T>` | عملية غير متزامنة | v0.1 للـ AI، ثم تعميم v0.3 |
@@ -582,7 +592,7 @@ fn first<T>(values: List<T>) -> Option<T> {
 
 - الاستثناءات غير المقصودة، مثل فساد حالة المحرك، تختلف عن الأخطاء المتوقعة مثل فشل الشبكة أو رفض السياسة.
 - ينبغي أن تعيد العمليات الخارجية `Result<T,E>` بدل إسقاط الأخطاء أو إرجاع نص غير محدد.
-- سيُحدد `?` لنشر الخطأ في RFC مستقل بعد تثبيت `Result` و`match`.
+- **منفذ:** المعامل `?` ينشر `Err`/`None` إلى الدالة المستدعية (انظر `docs/grammar.md` §4.9).
 
 ## 10.7 دلالة القيمة (Value Semantics)
 
@@ -740,18 +750,20 @@ async fn classify_ticket(message: String)
 ## 13.4 أصناف أخطاء AI المقترحة
 
 ```text
-AIError::Authentication
-AIError::ProviderUnavailable
-AIError::RateLimited
-AIError::Timeout
-AIError::Network
-AIError::UnsupportedCapability
-AIError::InvalidStructuredOutput
-AIError::PolicyDenied
-AIError::BudgetExceeded
-AIError::ContextLimitExceeded
-AIError::Cancelled
+AIError.Authentication(message)
+AIError.ProviderUnavailable(message)
+AIError.RateLimited(message)
+AIError.Timeout(message)
+AIError.Network(message)
+AIError.UnsupportedCapability(message)
+AIError.InvalidStructuredOutput(message)
+AIError.PolicyDenied(message)
+AIError.BudgetExceeded(message)
+AIError.ContextLimitExceeded(message)
+AIError.Cancelled(message)
 ```
+
+**منفذ** نوعًا معدودًا مدمجًا؛ كل حالة تحمل نص الرسالة، و`e.kind()` تُرجع اسم الحالة و`e.message()` الرسالة.
 
 يجب ألا يُحوَّل كل خطأ إلى «حاول مرة أخرى» دون تمييز؛ إعادة المحاولة قد تضاعف التكلفة أو تكرر إجراءً مؤثرًا.
 
@@ -1425,7 +1437,7 @@ RuntimeServices { io, ai, policy, clock, ... }
 
 - [ ] APIs للمكتبات ذات توثيق وأمثلة واختبارات.
 - [ ] جدول توافق بين نسخ المترجم/Runtime/Packages.
-- [ ] CI متعدد أنظمة التشغيل.
+- [x] CI متعدد أنظمة التشغيل. **(GitHub Actions: التنسيق وclippy والاختبارات على Linux وWindows مع كل رفع؛ `.github/workflows/ci.yml`)**
 - [ ] قواعد إصدار ودعم وترقية.
 - [ ] اختبار ثغرات ومراجعة مراجِع ثانٍ عند إدخال FFI أو شبكة/DB حساسة.
 

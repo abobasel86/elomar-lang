@@ -298,7 +298,7 @@ fn ai_infer_is_typed() {
     );
     ok(&src);
     let src = format!(
-        "{TICKET}async fn main() {{\n  match await ai.infer<Ticket>(\"m\", \"i\", \"x\") {{\n    Ok(t) => print(t.priority)\n    Err(e) => print(e.kind, e.message)\n  }}\n}}"
+        "{TICKET}async fn main() {{\n  match await ai.infer<Ticket>(\"m\", \"i\", \"x\") {{\n    Ok(t) => print(t.priority)\n    Err(e) => print(e.kind(), e.message())\n  }}\n}}"
     );
     ok(&src);
 }
@@ -421,4 +421,145 @@ fn cloud_models_add_the_net_effect() {
 fn durations() {
     ok("fn main() {\n  let t = 1s + 500ms\n  print(t > 1s, t.millis(), t.seconds())\n}");
     assert_eq!(codes("fn main() {\n  print(1s + 1)\n}"), vec!["E2005"]);
+}
+
+// ----- Phase 3: enums, Map, `?` --------------------------------------------
+
+const SHAPES: &str = "enum Shape {\n  Circle(Float)\n  Rect(Float, Float)\n  Empty\n}\n";
+
+#[test]
+fn enums_construct_and_match() {
+    ok(&format!(
+        "{SHAPES}fn area(s: Shape) -> Float {{\n  return match s {{\n    Shape.Circle(r) => 3.14 * r * r\n    Shape.Rect(w, h) => w * h\n    Shape.Empty => 0\n  }}\n}}\nfn main() {{\n  print(area(Shape.Circle(1.0)), area(Shape.Empty), Shape.Rect(1, 2) == Shape.Empty)\n}}"
+    ));
+}
+
+#[test]
+fn enum_errors() {
+    assert_eq!(
+        codes(&format!(
+            "{SHAPES}fn main() {{\n  let s = Shape.Circel(1.0)\n}}"
+        )),
+        vec!["E1010"]
+    );
+    assert_eq!(
+        codes(&format!("{SHAPES}fn main() {{\n  let s = Shape.Circle\n}}")),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{SHAPES}fn main() {{\n  let s = Shape.Empty()\n}}"
+        )),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{SHAPES}fn main() {{\n  let s = Shape.Rect(1.0)\n}}"
+        )),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes(&format!("{SHAPES}fn main() {{\n  let s: Shape = 3\n}}")),
+        vec!["E2001"]
+    );
+    assert_eq!(
+        codes(&format!("{SHAPES}fn main() {{\n  let s = Shape\n}}")),
+        vec!["E2004"]
+    );
+    assert_eq!(codes("enum Option { A }"), vec!["E1002"]);
+    assert_eq!(codes("enum E { A, A }"), vec!["E1002"]);
+}
+
+#[test]
+fn enum_matches_must_be_exhaustive() {
+    let d = diags(&format!(
+        "{SHAPES}fn f(s: Shape) -> Int {{\n  return match s {{\n    Shape.Circle(_) => 1\n  }}\n}}"
+    ));
+    assert_eq!(d[0].code, "E2009");
+    assert!(
+        d[0].message.en.contains("`Shape.Rect(_)`, `Shape.Empty`"),
+        "{}",
+        d[0].message.en
+    );
+}
+
+#[test]
+fn enums_are_nominal_and_recursive() {
+    assert_eq!(
+        codes("enum A { X }\nenum B { X }\nfn main() {\n  let a: A = B.X\n}"),
+        vec!["E2001"]
+    );
+    ok(
+        "enum Tree {\n  Leaf\n  Node(Tree, Int, Tree)\n}\nfn sum(t: Tree) -> Int {\n  return match t {\n    Tree.Leaf => 0\n    Tree.Node(l, v, r) => sum(l) + v + sum(r)\n  }\n}",
+    );
+}
+
+#[test]
+fn maps() {
+    ok(
+        "fn main() {\n  var stock = [\"apple\": 3, \"pear\": 0]\n  stock[\"kiwi\"] = 5\n  stock[\"apple\"] += 1\n  print(stock.length, stock.get(\"x\"), stock.keys(), stock.contains_key(\"pear\"))\n  for e in stock { print(e.key, e.value) }\n  var empty: Map<Int, String> = [:]\n  empty[1] = \"one\"\n  print(empty.remove(1))\n}",
+    );
+    assert_eq!(
+        codes("fn main() {\n  let m = [\"a\": 1]\n  m[\"b\"] = 2\n}"),
+        vec!["E1003"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  let m = [\"a\": 1, \"b\": \"x\"]\n}"),
+        vec!["E2001"]
+    );
+    assert_eq!(codes("fn main() {\n  let m = [[1]: 1]\n}"), vec!["E2018"]);
+    assert_eq!(codes("fn f(m: Map<Float, Int>) {}"), vec!["E2018"]);
+}
+
+#[test]
+fn try_operator() {
+    ok(
+        "fn parse(s: String) -> Result<Int, String> {\n  return match parse_int(s) { Some(n) => Ok(n), None => Err(\"bad\") }\n}\nfn sum(a: String, b: String) -> Result<Int, String> {\n  return Ok(parse(a)? + parse(b)?)\n}",
+    );
+    ok(
+        "fn first_even(xs: List<Int>) -> Option<Int> {\n  let f = xs.first()?\n  return Some(f * 2)\n}",
+    );
+    // Not in a Result/Option function.
+    assert_eq!(
+        codes("fn main() {\n  let n = parse_int(\"1\")?\n}"),
+        vec!["E2016"]
+    );
+    // Wrong kind of value.
+    assert_eq!(
+        codes("fn f() -> Option<Int> {\n  let n = 3?\n  return None\n}"),
+        vec!["E2017"]
+    );
+    // Error types differ.
+    assert_eq!(
+        codes(
+            "fn a() -> Result<Int, Int> {\n  return Err(1)\n}\nfn b() -> Result<Int, String> {\n  return Ok(a()?)\n}"
+        ),
+        vec!["E2001"]
+    );
+}
+
+#[test]
+fn ai_error_is_an_enum() {
+    ok(&format!(
+        "{TICKET}async fn main() {{\n  match await ai.infer<Ticket>(\"m\", \"i\", \"x\") {{\n    Ok(t) => print(t.priority)\n    Err(AIError.Timeout(msg)) => print(\"slow:\", msg)\n    Err(e) => print(e.kind(), e.message())\n  }}\n}}"
+    ));
+    assert_eq!(
+        codes(&format!(
+            "{TICKET}async fn main() {{\n  match await ai.infer<Ticket>(\"m\", \"i\", \"x\") {{\n    Ok(t) => print(t.priority)\n    Err(e) => print(e.kind)\n  }}\n}}"
+        )),
+        vec!["E1007"]
+    );
+}
+
+#[test]
+fn unit_enums_can_cross_to_ai() {
+    ok(
+        "use std.ai\nenum Priority { Low, Normal, High }\ntype T = { p: Priority, tags: List<String> }\nasync fn main() {\n  let r = await ai.infer<T>(\"m\", \"i\", Priority.High)\n}",
+    );
+    assert_eq!(
+        codes(&format!(
+            "use std.ai\n{SHAPES}async fn main() {{\n  let r = await ai.infer<Shape>(\"m\", \"i\", \"x\")\n}}"
+        )),
+        vec!["E2015"]
+    );
 }

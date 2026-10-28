@@ -71,6 +71,8 @@ pub enum TokenKind {
     Comma,
     Colon,
     Semi,
+    /// `?`: propagate an `Err` or `None` to the caller.
+    Question,
     LParen,
     RParen,
     LBracket,
@@ -147,6 +149,7 @@ impl TokenKind {
             Comma => ",",
             Colon => ":",
             Semi => ";",
+            Question => "?",
             LParen => "(",
             RParen => ")",
             LBracket => "[",
@@ -183,6 +186,7 @@ impl TokenKind {
                 | RParen
                 | RBracket
                 | RBrace
+                | Question
                 | Return
                 | Break
                 | Continue
@@ -575,6 +579,7 @@ impl<'a> Lexer<'a> {
             (',', _) => (Comma, 1),
             (':', _) => (Colon, 1),
             (';', _) => (Semi, 1),
+            ('?', _) => (Question, 1),
             ('(', _) => (LParen, 1),
             (')', _) => (RParen, 1),
             ('[', _) => (LBracket, 1),

@@ -14,6 +14,11 @@ pub enum Schema {
     Option(Box<Schema>),
     /// Every field is required unless it is an `Option`; no extra fields.
     Record(Vec<(String, Schema)>),
+    /// An enum of plain names, sent as one of the names (a JSON string).
+    Enum {
+        name: String,
+        variants: Vec<String>,
+    },
 }
 
 impl Schema {
@@ -24,6 +29,7 @@ impl Schema {
             Schema::Int => "Int".into(),
             Schema::Float => "Float".into(),
             Schema::Bool => "Bool".into(),
+            Schema::Enum { name, .. } => name.clone(),
             Schema::List(t) => format!("List<{}>", t.describe()),
             Schema::Option(t) => format!("Option<{}>", t.describe()),
             Schema::Record(fields) => {
@@ -44,6 +50,7 @@ impl Schema {
             Schema::Int => json!({ "type": "integer" }),
             Schema::Float => json!({ "type": "number" }),
             Schema::Bool => json!({ "type": "boolean" }),
+            Schema::Enum { variants, .. } => json!({ "type": "string", "enum": variants }),
             Schema::List(t) => json!({ "type": "array", "items": t.json_schema() }),
             Schema::Option(t) => json!({ "anyOf": [t.json_schema(), { "type": "null" }] }),
             Schema::Record(fields) => {
@@ -108,6 +115,16 @@ impl Schema {
             }
             (Schema::Float, Value::Number(_)) => true,
             (Schema::Bool, Value::Bool(_)) => true,
+            (Schema::Enum { variants, .. }, Value::String(s)) => {
+                if variants.contains(s) {
+                    true
+                } else {
+                    return Err(format!(
+                        "{path}: expected one of {}, found {value}",
+                        variants.join(", ")
+                    ));
+                }
+            }
             (Schema::Option(_), Value::Null) => true,
             (Schema::Option(t), v) => return t.validate_at(v, path),
             (Schema::List(t), Value::Array(items)) => {
@@ -170,6 +187,23 @@ mod tests {
         assert_eq!(
             s["properties"]["score"]["anyOf"][1],
             json!({ "type": "null" })
+        );
+    }
+
+    #[test]
+    fn enums_are_string_enums() {
+        let p = Schema::Enum {
+            name: "Priority".into(),
+            variants: vec!["Low".into(), "High".into()],
+        };
+        assert_eq!(
+            p.json_schema(),
+            json!({ "type": "string", "enum": ["Low", "High"] })
+        );
+        assert!(p.validate(&json!("High")).is_ok());
+        assert_eq!(
+            p.validate(&json!("Urgent")).unwrap_err(),
+            "$: expected one of Low, High, found \"Urgent\""
         );
     }
 

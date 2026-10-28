@@ -7,6 +7,7 @@
 
 mod ai;
 mod builtins;
+mod enums;
 mod expr;
 mod ty;
 
@@ -16,6 +17,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use builtins::{BUILTIN_FUNCTIONS, KNOWN_EFFECTS};
+pub use enums::AI_ERROR_KINDS;
 pub use ty::{Subst, Ty};
 
 #[derive(Debug, Clone, Default)]
@@ -65,6 +67,7 @@ struct Checker {
     diags: Vec<Diagnostic>,
     subst: Subst,
     aliases: HashMap<String, Ty>,
+    enums: HashMap<String, enums::EnumInfo>,
     fns: HashMap<String, FnSig>,
     consts: HashMap<String, (Ty, Span)>,
     scopes: Vec<HashMap<String, Local>>,
@@ -80,14 +83,16 @@ struct Checker {
 
 impl Checker {
     fn run(&mut self, program: &mut Program, opts: CheckOptions) {
-        self.aliases.insert("AIError".into(), ai::ai_error_ty());
+        self.register_builtin_enums();
         self.cloud_models = opts.cloud_models.clone();
         for item in &program.items {
             if let Item::Use(u) = item {
                 self.check_use(u);
             }
         }
+        self.declare_enums(program);
         self.collect_types(program);
+        self.resolve_enums(program);
         self.collect_fns(program);
 
         let mut const_usage = Vec::new();
@@ -358,6 +363,17 @@ impl Checker {
                 );
                 continue;
             }
+            if self.enums.contains_key(&t.name.name) {
+                self.error(
+                    "E1002",
+                    t.name.span,
+                    Text::new(
+                        format!("type `{}` is already defined as an enum", t.name.name),
+                        format!("النوع `{}` معرّف مسبقًا كنوع معدود", t.name.name),
+                    ),
+                );
+                continue;
+            }
             if let Some(prev) = seen.insert(t.name.name.clone(), t.name.span) {
                 self.push(
                     Diagnostic::error(
@@ -451,7 +467,14 @@ impl Checker {
                     "Int" | "Float" | "Bool" | "String" | "Unit" | "Range" | "Duration" => 0,
                     "List" | "Option" | "Future" => 1,
                     "Result" => 2,
+                    "Map" => 2,
                     other => {
+                        if self.enums.contains_key(other) {
+                            if !args.is_empty() {
+                                self.wrong_type_args(name, 0, args.len(), t.span);
+                            }
+                            return Ty::Enum(other.to_string());
+                        }
                         if let Some(ty) = alias(self, other) {
                             if !args.is_empty() {
                                 self.wrong_type_args(name, 0, args.len(), t.span);
@@ -496,6 +519,12 @@ impl Checker {
                     "List" => Ty::list(lowered.remove(0)),
                     "Option" => Ty::option(lowered.remove(0)),
                     "Future" => Ty::future(lowered.remove(0)),
+                    "Map" => {
+                        let v = lowered.pop().expect("arity 2");
+                        let k = lowered.pop().expect("arity 2");
+                        self.check_map_key(&k, t.span);
+                        Ty::map(k, v)
+                    }
                     _ => {
                         let e = lowered.pop().expect("arity 2");
                         Ty::result(lowered.pop().expect("arity 2"), e)
