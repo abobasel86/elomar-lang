@@ -49,6 +49,19 @@ impl MapKey {
     }
 }
 
+/// A function value.
+#[derive(Debug)]
+pub enum Function {
+    /// A named function used as a value: `xs.map(double)`.
+    Named(String),
+    /// A closure: `key` identifies its `|...| body` expression, and
+    /// `captured` holds copies of the variables visible where it was made.
+    Closure {
+        key: usize,
+        captured: Vec<(String, Value)>,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub enum FutureState {
     Pending(Thunk),
@@ -86,6 +99,7 @@ pub enum Value {
     Future(Rc<RefCell<FutureState>>),
     Option(Option<Rc<Value>>),
     Result(Result<Rc<Value>, Rc<Value>>),
+    Function(Rc<Function>),
 }
 
 impl Value {
@@ -144,6 +158,7 @@ impl Value {
                 a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| v.equals(w)))
             }
             (Future(a), Future(b)) => Rc::ptr_eq(a, b),
+            (Function(a), Function(b)) => Rc::ptr_eq(a, b),
             (List(a), List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y))
             }
@@ -306,6 +321,7 @@ impl fmt::Display for Value {
                 f.write_str("]")
             }
             Value::Future(_) => f.write_str("<future>"),
+            Value::Function(_) => f.write_str("<function>"),
             Value::Option(None) => f.write_str("None"),
             Value::Option(Some(v)) => {
                 f.write_str("Some(")?;

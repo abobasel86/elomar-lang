@@ -65,6 +65,14 @@ const LIST_METHODS: &[&str] = &[
     "join",
     "sum",
     "slice",
+    "map",
+    "filter",
+    "any",
+    "all",
+    "find",
+    "count",
+    "fold",
+    "sort_by",
     "to_string",
 ];
 const STR_METHODS: &[&str] = &[
@@ -519,6 +527,46 @@ impl Checker {
                     return Some(Ty::Error);
                 }
                 if m == "sorted" { list } else { elem }
+            }
+            "map" => {
+                let out = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(out.clone()));
+                self.typed_args(m, args, &[f], span);
+                Ty::list(out)
+            }
+            "filter" | "any" | "all" | "find" | "count" => {
+                let f = Ty::Fn(vec![elem.clone()], Box::new(Ty::Bool));
+                self.typed_args(m, args, &[f], span);
+                match m {
+                    "filter" => list,
+                    "find" => Ty::option(elem),
+                    "count" => Ty::Int,
+                    _ => Ty::Bool,
+                }
+            }
+            "fold" => {
+                let acc = self.subst.fresh();
+                let f = Ty::Fn(vec![acc.clone(), elem], Box::new(acc.clone()));
+                self.typed_args(m, args, &[acc.clone(), f], span);
+                acc
+            }
+            "sort_by" => {
+                let key = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(key.clone()));
+                self.typed_args(m, args, &[f], span);
+                let k = self.subst.shallow(&key);
+                if !matches!(k, Ty::Int | Ty::Float | Ty::Str | Ty::Error | Ty::Var(_)) {
+                    let shown = self.subst.show(&k);
+                    self.error(
+                        "E2005",
+                        span,
+                        Text::new(
+                            format!("`sort_by` needs a key of type `Int`, `Float` or `String`, not `{shown}`"),
+                            format!("`sort_by` تحتاج مفتاحًا من النوع `Int` أو `Float` أو `String`، لا `{shown}`"),
+                        ),
+                    );
+                }
+                list
             }
             "join" => {
                 self.typed_args(m, args, &[Ty::Str], span);

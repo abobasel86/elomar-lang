@@ -458,6 +458,39 @@ impl Parser {
                     span,
                 })
             }
+            TokenKind::Fn => {
+                let start = self.bump().span;
+                self.expect(TokenKind::LParen)?;
+                let mut params = Vec::new();
+                while !self.at(&TokenKind::RParen) {
+                    params.push(self.type_expr()?);
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RParen)?;
+                let ret = if self.eat(&TokenKind::Arrow) {
+                    self.type_expr()?
+                } else {
+                    TypeExpr {
+                        kind: TypeExprKind::Named {
+                            name: Ident {
+                                name: "Unit".into(),
+                                span: close,
+                            },
+                            args: Vec::new(),
+                        },
+                        span: close,
+                    }
+                };
+                Ok(TypeExpr {
+                    span: start.to(self.prev_span()),
+                    kind: TypeExprKind::Fn {
+                        params,
+                        ret: Box::new(ret),
+                    },
+                })
+            }
             TokenKind::LBrace => {
                 let start = self.bump().span;
                 let mut fields = Vec::new();
@@ -877,6 +910,7 @@ impl Parser {
             }
             TokenKind::LBracket => return self.list_or_map(),
             TokenKind::LBrace => return self.record_literal(),
+            TokenKind::Pipe | TokenKind::OrOr => return self.lambda(),
             TokenKind::Match => return self.match_expr(),
             TokenKind::SelfKw => {
                 return Err(not_yet(span, "`self`", "`self`", "v0.3"));
@@ -949,6 +983,40 @@ impl Parser {
         Ok(Expr {
             kind,
             span: start.to(end),
+        })
+    }
+
+    /// `|x, y: Int| body` or `|| body`; the body is an expression or a block.
+    fn lambda(&mut self) -> PResult<Expr> {
+        let start = self.span();
+        let mut params = Vec::new();
+        if !self.eat(&TokenKind::OrOr) {
+            self.expect(TokenKind::Pipe)?;
+            while !self.at(&TokenKind::Pipe) {
+                let name = self.ident()?;
+                let ty = if self.eat(&TokenKind::Colon) {
+                    Some(self.type_expr()?)
+                } else {
+                    None
+                };
+                params.push(LambdaParam { name, ty });
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Pipe)?;
+        }
+        let body = if self.at(&TokenKind::LBrace) {
+            ArmBody::Block(self.block()?)
+        } else {
+            ArmBody::Expr(self.expr()?)
+        };
+        Ok(Expr {
+            span: start.to(self.prev_span()),
+            kind: ExprKind::Lambda {
+                params,
+                body: Box::new(body),
+            },
         })
     }
 
@@ -1259,6 +1327,18 @@ mod tests {
             ExprKind::Duration(ms) => format!("{ms}ms"),
             ExprKind::Await(e) => format!("(await {})", sexp(e)),
             ExprKind::Try(e) => format!("(? {})", sexp(e)),
+            ExprKind::Lambda { params, body } => format!(
+                "(|{}| {})",
+                params
+                    .iter()
+                    .map(|p| p.name.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                match &**body {
+                    ArmBody::Expr(e) => sexp(e),
+                    ArmBody::Block(_) => "{...}".into(),
+                }
+            ),
             ExprKind::Map(entries) => format!(
                 "[{}]",
                 entries
@@ -1394,6 +1474,26 @@ mod tests {
         let (_, diags) = parse("impl E {}\ntrait T {}");
         let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
         assert_eq!(codes, vec!["E0103", "E0103"]);
+    }
+
+    #[test]
+    fn closures_and_function_types() {
+        assert_eq!(
+            sexp(&first_expr("xs.map(|x| x * 2)")),
+            "(call (. xs map) (|x| (* x 2)))"
+        );
+        assert_eq!(sexp(&first_expr("let f = || 1")), "(|| 1)");
+        assert_eq!(
+            sexp(&first_expr("let f = |a: Int, b| { return a }")),
+            "(|a b| {...})"
+        );
+        let program = parse_ok("fn apply(f: fn(Int) -> Int, g: fn()) {}");
+        let Item::Fn(f) = &program.items[0] else {
+            panic!()
+        };
+        assert!(
+            matches!(&f.params[0].ty.kind, TypeExprKind::Fn { params, .. } if params.len() == 1)
+        );
     }
 
     #[test]

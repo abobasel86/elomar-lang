@@ -27,6 +27,8 @@ pub enum Ty {
     /// A type parameter inside a generic function (`T` in `fn f<T>`):
     /// equal only to itself.
     Param(String),
+    /// A function value: `fn(Int, String) -> Bool`.
+    Fn(Vec<Ty>, Box<Ty>),
     /// An inference variable, index into [`Subst`].
     Var(u32),
     /// Produced after an error has been reported; unifies with anything so
@@ -78,6 +80,7 @@ impl Ty {
             Ty::Set(t) => Ty::set(sub(t)),
             Ty::Result(t, e) => Ty::result(sub(t), sub(e)),
             Ty::Map(k, v) => Ty::map(sub(k), sub(v)),
+            Ty::Fn(ps, r) => Ty::Fn(ps.iter().map(sub).collect(), Box::new(sub(r))),
             Ty::Record(fields) => {
                 Ty::Record(fields.iter().map(|(n, t)| (n.clone(), sub(t))).collect())
             }
@@ -120,6 +123,10 @@ impl Subst {
             Ty::List(t) => Ty::list(self.resolve(&t)),
             Ty::Future(t) => Ty::future(self.resolve(&t)),
             Ty::Set(t) => Ty::set(self.resolve(&t)),
+            Ty::Fn(ps, r) => Ty::Fn(
+                ps.iter().map(|p| self.resolve(p)).collect(),
+                Box::new(self.resolve(&r)),
+            ),
             Ty::Option(t) => Ty::option(self.resolve(&t)),
             Ty::Result(t, e) => Ty::result(self.resolve(&t), self.resolve(&e)),
             Ty::Map(k, v) => Ty::map(self.resolve(&k), self.resolve(&v)),
@@ -139,6 +146,7 @@ impl Subst {
             Ty::List(t) | Ty::Option(t) | Ty::Future(t) | Ty::Set(t) => self.occurs(v, &t),
             Ty::Result(t, e) | Ty::Map(t, e) => self.occurs(v, &t) || self.occurs(v, &e),
             Ty::Record(fields) => fields.iter().any(|(_, t)| self.occurs(v, t)),
+            Ty::Fn(ps, r) => ps.iter().any(|p| self.occurs(v, p)) || self.occurs(v, &r),
             _ => false,
         }
     }
@@ -164,6 +172,16 @@ impl Subst {
             (Ty::Result(t1, e1), Ty::Result(t2, e2)) | (Ty::Map(t1, e1), Ty::Map(t2, e2)) => {
                 let ok = self.unify(t1, t2);
                 self.unify(e1, e2) && ok
+            }
+            (Ty::Fn(p1, r1), Ty::Fn(p2, r2)) => {
+                if p1.len() != p2.len() {
+                    return false;
+                }
+                let mut ok = true;
+                for (a, b) in p1.iter().zip(p2) {
+                    ok &= self.unify(a, b);
+                }
+                self.unify(r1, r2) && ok
             }
             (Ty::Record(f1), Ty::Record(f2)) => {
                 if f1.len() != f2.len() || f1.iter().zip(f2).any(|(a, b)| a.0 != b.0) {
@@ -196,6 +214,17 @@ impl Subst {
             Ty::Range => out.push_str("Range"),
             Ty::Duration => out.push_str("Duration"),
             Ty::Enum(name) | Ty::Param(name) => out.push_str(name),
+            Ty::Fn(ps, r) => {
+                out.push_str("fn(");
+                for (i, p) in ps.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    self.write(out, p);
+                }
+                out.push_str(") -> ");
+                self.write(out, r);
+            }
             Ty::Set(t) => {
                 out.push_str("Set<");
                 self.write(out, t);

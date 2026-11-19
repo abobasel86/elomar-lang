@@ -28,6 +28,8 @@ by the compiler when they are not declared.
   `json.stringify`. See [`examples/files`](examples/files).
 - Sets: `set([1, 2])` with `union`, `intersection`, `difference`, `is_subset`.
 - Generic functions: `fn first<T>(xs: List<T>) -> Option<T>`.
+- Closures and function values: `xs.map(|x| x * 2)`, `filter`, `fold`,
+  `sort_by`, and `fn(Int) -> Int` types. See [`examples/closures`](examples/closures).
 - Multi-file programs: `use app.students` loads `src/students.elo` (or
   `use app.students.{Student, average}` to import names directly); only `pub`
   items are visible to other files. See [`examples/school`](examples/school).

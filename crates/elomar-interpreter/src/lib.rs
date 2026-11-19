@@ -20,7 +20,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use ai::InferCall;
-pub use value::{FutureState, MapKey, Thunk, Value, format_duration, format_float};
+pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
 
 /// Services the running program can use. Implemented by the CLI with real
 /// stdin/stdout and by tests with in-memory buffers.
@@ -229,6 +229,8 @@ struct Interpreter<'p, 'h> {
     fs: FsPolicy,
     /// Enums whose variants are all plain names, for AI answer schemas.
     unit_enums: HashMap<String, Vec<String>>,
+    /// Closure expressions that have been evaluated, by address.
+    lambdas: HashMap<usize, &'p Expr>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -253,6 +255,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             host,
             ai,
             fs,
+            lambdas: HashMap::new(),
             unit_enums: program
                 .items
                 .iter()
@@ -293,6 +296,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         if name == "None" {
             return Ok(Value::none());
         }
+        if self.fns.contains_key(name) {
+            return Ok(Value::Function(Rc::new(Function::Named(name.to_string()))));
+        }
         Err(RuntimeError::new(
             "R0008",
             span,
@@ -302,6 +308,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ),
         )
         .into())
+    }
+
+    /// A local variable or constant called `name`, if there is one.
+    fn find_variable(&self, name: &str) -> Option<Value> {
+        let frame = self.frames.last().expect("frame");
+        for scope in frame.iter().rev() {
+            if let Some((_, v)) = scope.iter().rev().find(|(n, _)| n == name) {
+                return Some(v.clone());
+            }
+        }
+        self.globals.get(name).cloned()
     }
 
     fn lookup_mut(&mut self, name: &str) -> Option<&mut Value> {
@@ -323,7 +340,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
     // ----- statements ------------------------------------------------------
 
-    fn exec_block(&mut self, block: &Block) -> Exec<()> {
+    fn exec_block(&mut self, block: &'p Block) -> Exec<()> {
         self.in_scope(|this| {
             for stmt in &block.stmts {
                 this.exec(stmt)?;
@@ -332,7 +349,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         })
     }
 
-    fn exec(&mut self, stmt: &Stmt) -> Exec<()> {
+    fn exec(&mut self, stmt: &'p Stmt) -> Exec<()> {
         match &stmt.kind {
             StmtKind::Let { name, value, .. } => {
                 let v = self.eval(value)?;
@@ -466,7 +483,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         Ok(())
     }
 
-    fn eval_bool(&mut self, e: &Expr) -> Exec<bool> {
+    fn eval_bool(&mut self, e: &'p Expr) -> Exec<bool> {
         Ok(matches!(self.eval(e)?, Value::Bool(true)))
     }
 
@@ -474,7 +491,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     /// shared lists/records on the way (copy-on-write).
     fn with_place<T>(
         &mut self,
-        target: &Expr,
+        target: &'p Expr,
         insert_missing_key: bool,
         f: impl FnOnce(&mut Value) -> Result<T, RuntimeError>,
     ) -> Exec<T> {
@@ -535,7 +552,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
     // ----- expressions -----------------------------------------------------
 
-    fn eval(&mut self, e: &Expr) -> Exec<Value> {
+    fn eval(&mut self, e: &'p Expr) -> Exec<Value> {
         Ok(match &e.kind {
             ExprKind::Int(n) => Value::Int(*n),
             ExprKind::Float(x) => Value::Float(*x),
@@ -657,6 +674,21 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 _ => unreachable!("checker only allows `?` on Result and Option"),
             },
+            ExprKind::Lambda { .. } => {
+                let key = e as *const Expr as usize;
+                self.lambdas.insert(key, e);
+                // Copies of everything visible here; inner scopes come last
+                // so they shadow outer ones on lookup.
+                let captured = self
+                    .frames
+                    .last()
+                    .expect("frame")
+                    .iter()
+                    .flatten()
+                    .cloned()
+                    .collect();
+                Value::Function(Rc::new(Function::Closure { key, captured }))
+            }
             ExprKind::Match { scrutinee, arms } => {
                 let v = self.eval(scrutinee)?;
                 for arm in arms {
@@ -693,13 +725,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
     fn eval_call(
         &mut self,
-        callee: &Expr,
-        type_args: &[TypeExpr],
-        args: &[Arg],
+        callee: &'p Expr,
+        type_args: &'p [TypeExpr],
+        args: &'p [Arg],
         span: Span,
     ) -> Exec<Value> {
         match &callee.kind {
             ExprKind::Name(name) => {
+                if let Some(Value::Function(func)) = self.find_variable(name) {
+                    let values = self.eval_args(args)?;
+                    return self.call_value(&func, values, callee.span);
+                }
                 if let Some(f) = self.fns.get(name.as_str()).copied() {
                     let mut values: Vec<Option<Value>> = vec![None; f.params.len()];
                     for (i, arg) in args.iter().enumerate() {
@@ -760,10 +796,160 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     });
                 }
                 let recv = self.eval(target)?;
+                if let Value::List(items) = &recv
+                    && HIGHER_ORDER.contains(&method)
+                {
+                    return self.list_higher_order(items, method, values, span);
+                }
                 builtins::call_method(recv, method, values, span).map_err(Flow::from)
             }
-            _ => unreachable!("checked callee"),
+            _ => match self.eval(callee)? {
+                Value::Function(func) => {
+                    let values = self.eval_args(args)?;
+                    self.call_value(&func, values, callee.span)
+                }
+                _ => unreachable!("checked callee"),
+            },
         }
+    }
+
+    fn eval_args(&mut self, args: &'p [Arg]) -> Exec<Vec<Value>> {
+        let mut values = Vec::with_capacity(args.len());
+        for arg in args {
+            values.push(self.eval(&arg.value)?);
+        }
+        Ok(values)
+    }
+
+    /// Calls a function value with positional arguments.
+    fn call_value(&mut self, func: &Function, args: Vec<Value>, span: Span) -> Exec<Value> {
+        match func {
+            Function::Named(name) => {
+                let f = self.fns[name.as_str()];
+                if f.is_async {
+                    return Ok(Value::future(Thunk::Call {
+                        name: name.clone(),
+                        args,
+                        span,
+                    }));
+                }
+                self.call_fn(f, args, span)
+            }
+            Function::Closure { key, captured } => {
+                let ExprKind::Lambda { params, body } = &self.lambdas[key].kind else {
+                    unreachable!("lambda table holds closures");
+                };
+                self.check_depth(span)?;
+                let params = params
+                    .iter()
+                    .map(|p| p.name.name.clone())
+                    .zip(args)
+                    .collect();
+                self.frames.push(vec![captured.clone(), params]);
+                let result = match &**body {
+                    ArmBody::Expr(e) => self.eval(e),
+                    ArmBody::Block(b) => self.exec_block(b).map(|()| Value::Unit),
+                };
+                self.frames.pop();
+                match result {
+                    Ok(v) | Err(Flow::Return(v)) => Ok(v),
+                    Err(Flow::Error(mut err)) => {
+                        if err.trace.len() < 64 {
+                            err.trace.push(("<closure>".into(), span));
+                        }
+                        Err(Flow::Error(err))
+                    }
+                    Err(other) => Err(other),
+                }
+            }
+        }
+    }
+
+    /// `map`, `filter`, `fold` and the other list methods that take a function.
+    fn list_higher_order(
+        &mut self,
+        items: &Rc<Vec<Value>>,
+        method: &str,
+        args: Vec<Value>,
+        span: Span,
+    ) -> Exec<Value> {
+        let mut args = args.into_iter();
+        let (init, f) = if method == "fold" {
+            let init = args.next().expect("checked arity");
+            (Some(init), args.next())
+        } else {
+            (None, args.next())
+        };
+        let Some(Value::Function(f)) = f else {
+            unreachable!("checked function argument");
+        };
+        let test = |this: &mut Self, x: &Value| -> Exec<bool> {
+            Ok(matches!(
+                this.call_value(&f, vec![x.clone()], span)?,
+                Value::Bool(true)
+            ))
+        };
+        Ok(match method {
+            "map" => {
+                let mut out = Vec::with_capacity(items.len());
+                for x in items.iter() {
+                    out.push(self.call_value(&f, vec![x.clone()], span)?);
+                }
+                Value::list(out)
+            }
+            "filter" => {
+                let mut out = Vec::new();
+                for x in items.iter() {
+                    if test(self, x)? {
+                        out.push(x.clone());
+                    }
+                }
+                Value::list(out)
+            }
+            "any" | "all" => {
+                let want = method == "any";
+                for x in items.iter() {
+                    if test(self, x)? == want {
+                        return Ok(Value::Bool(want));
+                    }
+                }
+                Value::Bool(!want)
+            }
+            "find" => {
+                for x in items.iter() {
+                    if test(self, x)? {
+                        return Ok(Value::some(x.clone()));
+                    }
+                }
+                Value::none()
+            }
+            "count" => {
+                let mut n = 0;
+                for x in items.iter() {
+                    if test(self, x)? {
+                        n += 1;
+                    }
+                }
+                Value::Int(n)
+            }
+            "fold" => {
+                let mut acc = init.expect("fold has an initial value");
+                for x in items.iter() {
+                    acc = self.call_value(&f, vec![acc, x.clone()], span)?;
+                }
+                acc
+            }
+            "sort_by" => {
+                let mut keyed = Vec::with_capacity(items.len());
+                for x in items.iter() {
+                    keyed.push((self.call_value(&f, vec![x.clone()], span)?, x.clone()));
+                }
+                // Stable: equal keys keep their order.
+                keyed.sort_by(|(a, _), (b, _)| a.compare(b));
+                Value::list(keyed.into_iter().map(|(_, x)| x).collect())
+            }
+            _ => unreachable!("not a higher-order method: {method}"),
+        })
     }
 
     /// Runs a future the first time it is awaited; later awaits of the same
@@ -799,7 +985,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         Ok(result)
     }
 
-    fn call_fn(&mut self, f: &'p FnDecl, args: Vec<Value>, call_span: Span) -> Exec<Value> {
+    fn check_depth(&self, call_span: Span) -> Exec<()> {
         if self.frames.len() > MAX_CALL_DEPTH {
             return Err(RuntimeError::new(
                 "R0005",
@@ -811,6 +997,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             )
             .into());
         }
+        Ok(())
+    }
+
+    fn call_fn(&mut self, f: &'p FnDecl, args: Vec<Value>, call_span: Span) -> Exec<Value> {
+        self.check_depth(call_span)?;
         let params = f
             .params
             .iter()
@@ -833,6 +1024,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         }
     }
 }
+
+/// List methods that take a function argument.
+const HIGHER_ORDER: &[&str] = &[
+    "map", "filter", "any", "all", "find", "count", "fold", "sort_by",
+];
 
 /// The future for `ai.infer<T>(model, instructions, input[, timeout])`;
 /// the checker put the arguments in this order.

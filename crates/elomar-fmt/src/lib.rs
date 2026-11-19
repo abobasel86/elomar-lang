@@ -110,6 +110,7 @@ fn starts_operand(prev: Option<&TokenKind>) -> bool {
                 || matches!(
                     k,
                     Comma
+                        | Pipe
                         | Colon
                         | Semi
                         | Lt
@@ -200,14 +201,24 @@ impl<'a> Printer<'a> {
         let generic = type_brackets(tokens);
         let mut s = String::new();
         let mut in_effects = false;
+        // Closure parameter bars alternate: the opening `|` has no space
+        // after it, the closing one none before it: `|a, b| a + b`.
+        let mut pipe_open = false;
         for (i, tok) in tokens.iter().enumerate() {
             let prev = i.checked_sub(1).map(|j| tokens[j]);
             let before_prev = i.checked_sub(2).map(|j| &tokens[j].kind);
             let around_type_args = (i > 0 && generic[i - 1], generic[i]);
+            let closing_pipe = tok.kind == TokenKind::Pipe && pipe_open;
+            let after_opening_pipe = prev.is_some_and(|p| p.kind == TokenKind::Pipe) && pipe_open;
             if let Some(p) = prev
+                && !closing_pipe
+                && !after_opening_pipe
                 && self.space_between(p, tok, before_prev, in_effects, around_type_args)
             {
                 s.push(' ');
+            }
+            if tok.kind == TokenKind::Pipe {
+                pipe_open = !pipe_open;
             }
             // `!{ai, net}` and `use app.x.{a, b}` keep their braces tight.
             if tok.kind == TokenKind::LBrace
@@ -257,6 +268,8 @@ impl<'a> Printer<'a> {
             LParen | LBracket | Dot | DotDot | DotDotEq => return false,
             LBrace => return !in_effects,
             Bang if *c == LBrace => return false,
+            // Function types: `fn(Int) -> Int`.
+            Fn if *c == LParen => return false,
             _ => {}
         }
         match c {
@@ -445,6 +458,16 @@ mod tests {
         assert_eq!(
             fmt("let xs = [\n1,\n2\n]\nprint(\nf(1),\n  g(2)\n)\n"),
             "let xs = [\n    1,\n    2\n]\nprint(\n    f(1),\n    g(2)\n)\n"
+        );
+    }
+
+    #[test]
+    fn closures_and_function_types() {
+        assert_eq!(
+            fmt(
+                "fn apply(f:fn ( Int )->Int)->Int{\nreturn f(1)\n}\nlet g = xs.map( | x | x*2 )\nlet n = xs.sort_by(|x|- x)\nlet h = |a,b|a+b\nlet k = || 1\n"
+            ),
+            "fn apply(f: fn(Int) -> Int) -> Int {\n    return f(1)\n}\nlet g = xs.map(|x| x * 2)\nlet n = xs.sort_by(|x| -x)\nlet h = |a, b| a + b\nlet k = || 1\n"
         );
     }
 

@@ -200,6 +200,10 @@
           "match": "&&|\\|\\||!"
         },
         {
+          "name": "punctuation.definition.parameters.closure.elomar",
+          "match": "\\|"
+        },
+        {
           "name": "keyword.operator.assignment.elomar",
           "match": "[+\\-*/]?="
         },

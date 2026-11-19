@@ -1,0 +1,35 @@
+// Closures and functions as values.
+
+type Student = { name: String, score: Int }
+
+fn passed(s: Student) -> Bool {
+    return s.score >= 60
+}
+
+// Returns a function: the closure keeps its own copy of `bonus`.
+fn curve(bonus: Int) -> fn(Student) -> Student {
+    return |s| ({ name: s.name, score: min(s.score + bonus, 100) })
+}
+
+fn apply_all(xs: List<Student>, f: fn(Student) -> Student) -> List<Student> {
+    return xs.map(f)
+}
+
+fn main() {
+    let students = [
+        { name: "Lina", score: 91 },
+        { name: "Omar", score: 55 },
+        { name: "Sara", score: 72 },
+        { name: "Adam", score: 58 }
+    ]
+
+    let curved = apply_all(students, curve(5))
+    print("Passed:", curved.filter(passed).map(|s| s.name))
+    print("Total:", curved.fold(0, |sum, s| sum + s.score))
+    print("Top:", curved.sort_by(|s| -s.score).map(|s| s.name + " " + to_string(s.score)))
+    print("Anyone below 60?", curved.any(|s| s.score < 60))
+    match curved.find(|s| s.name.starts_with("S")) {
+        Some(s) => print("First S:", s.name)
+        None => print("No S")
+    }
+}

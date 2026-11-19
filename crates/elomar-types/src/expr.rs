@@ -238,6 +238,29 @@ impl Checker {
         let Some((name, span)) = place_root(target) else {
             return;
         };
+        let captured = self.closure_scope.is_some_and(|boundary| {
+            self.scopes
+                .iter()
+                .rposition(|s| s.contains_key(name))
+                .is_some_and(|i| i < boundary)
+        });
+        if captured {
+            self.push(
+                Diagnostic::error(
+                    "E1013",
+                    span,
+                    Text::new(
+                        format!("`{name}` cannot be changed inside a closure: closures get a copy of the variables they use"),
+                        format!("لا يمكن تعديل `{name}` داخل دالة مجهولة: الدالة المجهولة تأخذ نسخة من المتغيرات التي تستخدمها"),
+                    ),
+                )
+                .with_hint(Text::new(
+                    "return the new value from the closure instead, or use `fold`",
+                    "أرجع القيمة الجديدة من الدالة المجهولة بدلًا من ذلك، أو استخدم `fold`",
+                )),
+            );
+            return;
+        }
         if let Some(local) = self.lookup_local(name) {
             if local.mutable {
                 return;
@@ -382,6 +405,9 @@ impl Checker {
             ExprKind::Duration(_) => Ty::Duration,
             ExprKind::Await(inner) => self.check_await(inner, span),
             ExprKind::Try(inner) => self.check_try(inner, span),
+            ExprKind::Lambda { params, body } => {
+                self.check_lambda(params, body, hint_resolved.as_ref())
+            }
             ExprKind::Variant { enum_name, .. } => Ty::Enum(enum_name.clone()),
             ExprKind::Map(entries) => {
                 let (k, v) = match hint_resolved {
@@ -502,19 +528,32 @@ impl Checker {
             );
             return Ty::Error;
         }
-        if self.fns.contains_key(name) || crate::BUILTIN_FUNCTIONS.contains(&name) {
+        if let Some(sig) = self.fns.get(name).cloned() {
+            // A named function used as a value. Its effects are charged
+            // here, where it is referred to (see `check_lambda`).
+            self.usage.calls.push((name.to_string(), span));
+            let sig = self.instantiate(name, sig, &[], span);
+            let params = sig.params.iter().map(|(_, t)| t.clone()).collect();
+            let ret = if sig.is_async {
+                Ty::future(sig.ret)
+            } else {
+                sig.ret
+            };
+            return Ty::Fn(params, Box::new(ret));
+        }
+        if crate::BUILTIN_FUNCTIONS.contains(&name) {
             self.push(
                 Diagnostic::error(
                     "E0103",
                     span,
                     Text::new(
-                        "using a function as a value is not supported yet",
-                        "استخدام الدالة كقيمة غير مدعوم بعد",
+                        "a built-in function cannot be used as a value yet",
+                        "لا يمكن استخدام الدوال المدمجة كقيم بعد",
                     ),
                 )
                 .with_hint(Text::new(
-                    format!("planned for v0.3; to call it, write `{name}(...)`"),
-                    format!("مخطط له في v0.3؛ لاستدعائها اكتب `{name}(...)`"),
+                    format!("wrap it in a closure: `|x| {name}(x)`"),
+                    format!("ضعها داخل دالة مجهولة: `|x| {name}(x)`"),
                 )),
             );
             return Ty::Error;
@@ -562,14 +601,10 @@ impl Checker {
             ExprKind::Name(name) => {
                 let name = name.clone();
                 if let Some(local) = self.lookup_local(&name).cloned() {
-                    self.not_callable(&name, &local.ty, callee_span);
-                    self.check_args_loosely(args);
-                    return Ty::Error;
+                    return self.check_value_call(&name, &local.ty, args, callee_span);
                 }
                 if let Some((ty, _)) = self.consts.get(&name).cloned() {
-                    self.not_callable(&name, &ty, callee_span);
-                    self.check_args_loosely(args);
-                    return Ty::Error;
+                    return self.check_value_call(&name, &ty, args, callee_span);
                 }
                 if let Some(sig) = self.fns.get(&name).cloned() {
                     let sig = self.instantiate(&name, sig, type_args, span);
@@ -600,19 +635,108 @@ impl Checker {
             }
             _ => {
                 let t = self.check_expr(callee, None);
-                let shown = self.subst.show(&t);
-                self.error(
-                    "E2004",
-                    callee_span,
-                    Text::new(
-                        format!("a value of type `{shown}` cannot be called"),
-                        format!("لا يمكن استدعاء قيمة من النوع `{shown}`"),
-                    ),
-                );
+                self.check_value_call("this value", &t, args, callee_span)
+            }
+        }
+    }
+
+    /// Calling a value of function type: a closure, a function stored in a
+    /// variable, or one returned by another call.
+    fn check_value_call(&mut self, what: &str, ty: &Ty, args: &mut [Arg], span: Span) -> Ty {
+        let mut fty = self.subst.shallow(ty);
+        if let Ty::Var(_) = fty {
+            // Called before its type is known: it is a function of these arguments.
+            let guess = Ty::Fn(
+                args.iter().map(|_| self.subst.fresh()).collect(),
+                Box::new(self.subst.fresh()),
+            );
+            self.subst.unify(ty, &guess);
+            fty = guess;
+        }
+        match fty {
+            Ty::Fn(params, ret) => {
+                self.reject_named_args(args);
+                if args.len() != params.len() {
+                    self.wrong_arg_count(what, &params.len().to_string(), args.len(), span);
+                    self.check_args_loosely(args);
+                } else {
+                    for (arg, p) in args.iter_mut().zip(&params) {
+                        self.check_expr_against(&mut arg.value, p);
+                    }
+                }
+                *ret
+            }
+            Ty::Error => {
+                self.check_args_loosely(args);
+                Ty::Error
+            }
+            other => {
+                self.not_callable(what, &other, span);
                 self.check_args_loosely(args);
                 Ty::Error
             }
         }
+    }
+
+    /// `|x, y| body`. Parameter types come from annotations, from the type
+    /// the context expects (e.g. `xs.map(...)` on a `List<Int>`), or are
+    /// inferred from the body.
+    ///
+    /// Effects: the body's effects are charged to the function that creates
+    /// the closure, as if the body ran there; calling a function value is
+    /// effect-free. Captured variables are copies and cannot be changed.
+    fn check_lambda(
+        &mut self,
+        params: &[LambdaParam],
+        body: &mut ArmBody,
+        hint: Option<&Ty>,
+    ) -> Ty {
+        let (hint_params, hint_ret) = match hint {
+            Some(Ty::Fn(ps, r)) if ps.len() == params.len() => (ps.clone(), Some((**r).clone())),
+            _ => (Vec::new(), None),
+        };
+        let mut types = Vec::with_capacity(params.len());
+        for (i, p) in params.iter().enumerate() {
+            let expected = hint_params.get(i).cloned();
+            let ty = match (&p.ty, expected) {
+                (Some(t), expected) => {
+                    let ty = self.lower_type(t);
+                    if let Some(e) = expected
+                        && !self.subst.unify(&e, &ty)
+                    {
+                        self.mismatch(&e, &ty, t.span);
+                    }
+                    ty
+                }
+                (None, Some(e)) => e,
+                (None, None) => self.subst.fresh(),
+            };
+            types.push(ty);
+        }
+        let ret = hint_ret.unwrap_or_else(|| self.subst.fresh());
+
+        let saved_ret = self.ret_ty.replace(ret.clone());
+        let saved = (self.loop_depth, self.in_async, self.closure_scope);
+        self.loop_depth = 0;
+        self.in_async = false;
+        self.push_scope();
+        self.closure_scope = Some(self.scopes.len() - 1);
+        for (p, t) in params.iter().zip(&types) {
+            self.declare(&p.name, t.clone(), false, true);
+        }
+        match body {
+            ArmBody::Expr(e) => self.check_expr_against(e, &ret),
+            ArmBody::Block(b) => {
+                self.check_block(b);
+                if !block_diverges(b) && !self.subst.unify(&ret, &Ty::Unit) {
+                    self.mismatch(&ret, &Ty::Unit, b.span);
+                }
+            }
+        }
+        self.pop_scope();
+        self.ret_ty = saved_ret;
+        (self.loop_depth, self.in_async, self.closure_scope) = saved;
+        Ty::Fn(types, Box::new(ret))
     }
 
     fn not_callable(&mut self, name: &str, ty: &Ty, span: Span) {

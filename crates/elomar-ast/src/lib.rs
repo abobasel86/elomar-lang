@@ -113,6 +113,11 @@ pub enum TypeExprKind {
     Named { name: Ident, args: Vec<TypeExpr> },
     /// `{ name: String, age: Int }`
     Record(Vec<(Ident, TypeExpr)>),
+    /// `fn(Int, String) -> Bool`
+    Fn {
+        params: Vec<TypeExpr>,
+        ret: Box<TypeExpr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -291,6 +296,12 @@ pub enum ExprKind {
     Map(Vec<(Expr, Expr)>),
     /// `expr?`
     Try(Box<Expr>),
+    /// A closure: `|x| x * 2`, `|a: Int, b: Int| { return a + b }`, `|| 1`.
+    /// It captures the variables it uses by value when it is created.
+    Lambda {
+        params: Vec<LambdaParam>,
+        body: Box<ArmBody>,
+    },
     /// `Shape.Circle(1.0)` or `Priority.High`. The parser reads these as a
     /// field access or method call; the checker rewrites them to this.
     Variant {
@@ -298,6 +309,12 @@ pub enum ExprKind {
         variant: String,
         args: Vec<Expr>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LambdaParam {
+    pub name: Ident,
+    pub ty: Option<TypeExpr>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

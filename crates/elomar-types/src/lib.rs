@@ -83,6 +83,9 @@ struct Checker {
     scopes_mod: modules::ModuleScopes,
     /// Type parameters in scope while checking a generic function.
     type_params: Vec<String>,
+    /// Inside a closure: the index of its parameter scope. Variables in
+    /// scopes below it were captured by value and cannot be changed.
+    closure_scope: Option<usize>,
     cloud_models: Vec<String>,
     usage: Usage,
 }
@@ -471,6 +474,14 @@ impl Checker {
         alias: &mut dyn FnMut(&mut Checker, &str) -> Option<Ty>,
     ) -> Ty {
         match &t.kind {
+            TypeExprKind::Fn { params, ret } => {
+                let params = params
+                    .iter()
+                    .map(|p| self.lower_type_with(p, alias))
+                    .collect();
+                let ret = self.lower_type_with(ret, alias);
+                Ty::Fn(params, Box::new(ret))
+            }
             TypeExprKind::Record(fields) => {
                 let mut out: Vec<(String, Ty)> = Vec::new();
                 for (name, fty) in fields {

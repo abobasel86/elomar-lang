@@ -73,6 +73,8 @@ pub enum TokenKind {
     Semi,
     /// `?`: propagate an `Err` or `None` to the caller.
     Question,
+    /// `|`: around closure parameters, `|x| x * 2`.
+    Pipe,
     LParen,
     RParen,
     LBracket,
@@ -153,6 +155,7 @@ impl TokenKind {
             Colon => ":",
             Semi => ";",
             Question => "?",
+            Pipe => "|",
             LParen => "(",
             RParen => ")",
             LBracket => "[",
@@ -602,6 +605,7 @@ impl<'a> Lexer<'a> {
             (':', _) => (Colon, 1),
             (';', _) => (Semi, 1),
             ('?', _) => (Question, 1),
+            ('|', _) => (Pipe, 1),
             ('(', _) => (LParen, 1),
             (')', _) => (RParen, 1),
             ('[', _) => (LBracket, 1),

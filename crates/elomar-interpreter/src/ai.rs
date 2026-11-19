@@ -25,6 +25,7 @@ pub struct InferCall {
 /// a remaining name is an enum of plain variants.
 pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>) -> Schema {
     match &t.kind {
+        TypeExprKind::Fn { .. } => unreachable!("checker rejects functions in AI answers"),
         TypeExprKind::Record(fields) => Schema::Record(
             fields
                 .iter()

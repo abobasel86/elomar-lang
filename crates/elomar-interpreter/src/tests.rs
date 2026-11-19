@@ -488,3 +488,18 @@ fn generic_functions_at_runtime() {
     let src = "fn first<T>(xs: List<T>) -> Option<T> {\n  if xs.is_empty() { return None }\n  return Some(xs[0])\n}\nfn reversed<T>(xs: List<T>) -> List<T> {\n  var out: List<T> = []\n  for x in xs { out.insert(0, x) }\n  return out\n}\nfn main() {\n  print(first([3, 4]), first<String>([]), reversed([\"a\", \"b\", \"c\"]))\n}";
     assert_eq!(out(src), "Some(3) None [\"c\", \"b\", \"a\"]\n");
 }
+
+#[test]
+fn closures_at_runtime() {
+    let src = "fn double(x: Int) -> Int {\n  return x * 2\n}\nfn adder(n: Int) -> fn(Int) -> Int {\n  return |x| x + n\n}\nfn main() {\n  let xs = [3, 1, 2]\n  print(xs.map(|x| x * 10), xs.map(double), xs.filter(|x| x > 1))\n  print(xs.any(|x| x == 2), xs.all(|x| x > 1), xs.find(|x| x > 5), xs.count(|x| x != 1))\n  print(xs.fold(0, |acc, x| acc + x), [\"bb\", \"a\", \"ccc\"].sort_by(|s| s.length))\n  var total = 0\n  let f = || total + 1\n  total = 100\n  let add5 = adder(5)\n  print(f(), add5(1), adder(1)(1), f)\n}";
+    assert_eq!(
+        out(src),
+        "[30, 10, 20] [6, 2, 4] [3, 2]\ntrue false None 2\n6 [\"a\", \"bb\", \"ccc\"]\n1 6 2 <function>\n"
+    );
+}
+
+#[test]
+fn closures_return_and_recurse() {
+    let src = "fn fact(n: Int) -> Int {\n  if n <= 1 { return 1 }\n  return n * fact(n - 1)\n}\nfn main() {\n  let f = |n: Int| {\n    if n < 0 {\n      return 0\n    }\n    return fact(n)\n  }\n  print(f(5), f(-1), [1, 2, 3].map(fact))\n}";
+    assert_eq!(out(src), "120 0 [1, 2, 6]\n");
+}

@@ -691,3 +691,50 @@ fn generic_misuse() {
     );
     assert_eq!(codes("fn f<T, T>(x: T) {}"), vec!["E1002"]);
 }
+
+// ----- v0.3: closures and function values -----------------------------------
+
+#[test]
+fn closures_and_function_values() {
+    ok(
+        "fn double(x: Int) -> Int {\n  return x * 2\n}\nfn apply(f: fn(Int) -> Int, x: Int) -> Int {\n  return f(x)\n}\nfn adder(n: Int) -> fn(Int) -> Int {\n  return |x| x + n\n}\nfn main() {\n  let xs = [1, 2, 3]\n  let a: List<Int> = xs.map(double)\n  let b: List<String> = xs.map(|x| to_string(x))\n  let c: Int = xs.fold(0, |acc, x| acc + x)\n  let d: Option<Int> = xs.find(|x| x > 1)\n  let e = xs.filter(|x| x % 2 == 1).sort_by(|x| -x)\n  let f = adder(2)\n  print(apply(f, 1), apply(|x: Int| { return x - 1 }, 3), xs.any(|x| x == 2), xs.count(|x| x > 1))\n}",
+    );
+}
+
+#[test]
+fn closure_errors() {
+    // Captured variables are copies.
+    assert_eq!(
+        codes("fn main() {\n  var n = 0\n  let f = || { n += 1 }\n}"),
+        vec!["E1013"]
+    );
+    // A closure's own variables can change.
+    ok(
+        "fn main() {\n  let f = |x: Int| {\n    var y = x\n    y += 1\n    return y\n  }\n  print(f(1))\n}",
+    );
+    // Built-ins are not values yet.
+    assert_eq!(codes("fn main() {\n  let p = print\n}"), vec!["E0103"]);
+    // Wrong arity and argument types.
+    assert_eq!(
+        codes("fn main() {\n  let f = |a: Int, b: Int| a + b\n  print(f(1))\n}"),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  [1].map(|x| x + \"a\")\n}"),
+        vec!["E2005"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  [1].sort_by(|x| [x])\n}"),
+        vec!["E2005"]
+    );
+    assert_eq!(codes("fn main() {\n  let x = 1\n  x(2)\n}"), vec!["E2004"]);
+}
+
+#[test]
+fn closure_effects_belong_to_their_creator() {
+    assert_eq!(
+        codes("pub fn shout(xs: List<Int>) {\n  xs.map(|x| { print(x)\n    return x })\n}"),
+        vec!["E3002"]
+    );
+    ok("pub fn shout(xs: List<Int>) !{io} {\n  xs.map(|x| { print(x)\n    return x })\n}");
+}
