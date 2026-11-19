@@ -28,6 +28,9 @@ by the compiler when they are not declared.
   `json.stringify`. See [`examples/files`](examples/files).
 - Multi-file programs: `use app.students` loads `src/students.elo`; only `pub`
   items are visible to other files. See [`examples/school`](examples/school).
+- **VS Code support** in [`editor/vscode`](editor/vscode): highlighting
+  (Arabic names included), errors while typing in English or Arabic, a Run
+  button and snippets.
 - Effect inference with mandatory declarations on `pub` functions.
 - `async fn` / `await` (sequential, lazy futures).
 - **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>` (`AIError` is an enum, e.g. `AIError.Timeout(msg)`); answers are
@@ -113,6 +116,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar check FILE` | Report errors and warnings without running |
 | `--lang en\|ar` | Diagnostic language (or set `ELOMAR_LANG`) |
 | `--no-color` | Plain output (also honors `NO_COLOR`) |
+| `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |
 
 ## Repository layout
 
@@ -130,6 +134,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-ai-provider-mock` | Deterministic offline model provider |
 | `crates/elomar-ai-provider-openai` | OpenAI Chat Completions provider over HTTPS |
 | `crates/elomar-cli` | The `elomar` command |
+| `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
 | `tests/fail/` | Programs that must fail with specific error codes |
 | `docs/grammar.md` | Authoritative grammar, semantics and error codes |
@@ -148,7 +153,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, CI; ⏳ `Set`, formatter, package tooling.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, CI; ⏳ `Set`, formatter, package tooling, language server.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

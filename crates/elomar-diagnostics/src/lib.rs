@@ -173,6 +173,18 @@ impl SourceFile {
         (line + 1, col)
     }
 
+    /// 0-based line and UTF-16 column of a byte offset, as editors using
+    /// the Language Server Protocol (e.g. VS Code) count them.
+    pub fn position_utf16(&self, offset: usize) -> (usize, usize) {
+        let offset = offset.min(self.text.len());
+        let line = match self.line_starts.binary_search(&offset) {
+            Ok(i) => i,
+            Err(i) => i - 1,
+        };
+        let start = self.line_starts[line];
+        (line, self.text[start..offset].encode_utf16().count())
+    }
+
     /// The text of a 1-based line, without its line terminator.
     pub fn line_text(&self, line: usize) -> &str {
         let start = self.line_starts[line - 1];
@@ -238,6 +250,14 @@ impl SourceMap {
         let base = self.next_base();
         self.files.push((base, file));
         base
+    }
+
+    /// The position (in adding order) of the file a global offset points into.
+    pub fn index_at(&self, offset: usize) -> usize {
+        self.files
+            .iter()
+            .rposition(|(base, _)| *base <= offset)
+            .unwrap_or(0)
     }
 
     /// The file a global offset points into, and that file's base.
@@ -371,6 +391,14 @@ fn caret_width(file: &SourceFile, span: Span, line_text: &str, col: usize) -> us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn utf16_positions_for_editors() {
+        let f = SourceFile::new("t.elo", "let a = 1\nlet 😀 = \"é\"");
+        let off = f.text.rfind('"').unwrap();
+        // The emoji is two UTF-16 units; é is one.
+        assert_eq!(f.position_utf16(off), (1, 11));
+    }
 
     #[test]
     fn line_col_counts_characters_not_bytes() {

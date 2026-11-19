@@ -418,3 +418,74 @@ fn module_errors() {
     assert_eq!(codes, vec!["E1008", "E1012"], "{stderr}");
     assert!(stderr.contains("did you mean `lib.shout`?"), "{stderr}");
 }
+
+// ----- Editor support: `check --format json` ----------------------------------
+
+fn check_json(main: &Path, stdin_text: &str, lang: &str) -> serde_json::Value {
+    use std::io::Write as _;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_elomar"))
+        .args(["--lang", lang, "check", "--format", "json", "--stdin"])
+        .arg(main)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin_text.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    serde_json::from_slice(&out.stdout).expect("valid JSON")
+}
+
+#[test]
+fn json_diagnostics_for_editors() {
+    let main = module_project(
+        "editor-json",
+        &[
+            ("elomar.toml", ""),
+            ("src/lib.elo", "pub fn f() -> Int {\n    return \"x\"\n}\n"),
+            ("src/main.elo", "fn main() {}\n"),
+        ],
+    );
+    // The unsaved buffer (stdin) is checked, not the file on disk.
+    // The emoji is two UTF-16 units wide, as editors count: `"😀"` spans 17..21.
+    let result = check_json(
+        &main,
+        "use app.lib\nfn main() {\n    let ok = 1\n    let x: Int = \"😀\"\n}\n",
+        "en",
+    );
+    let diags = result["diagnostics"].as_array().unwrap();
+    let codes: Vec<&str> = diags.iter().map(|d| d["code"].as_str().unwrap()).collect();
+    assert!(codes.contains(&"E2001"), "{result}");
+    let in_main = diags
+        .iter()
+        .find(|d| d["file"].as_str().unwrap().ends_with("main.elo") && d["code"] == "E2001")
+        .unwrap();
+    assert_eq!(
+        in_main["range"]["start"],
+        serde_json::json!({ "line": 3, "character": 17 })
+    );
+    assert_eq!(
+        in_main["range"]["end"],
+        serde_json::json!({ "line": 3, "character": 21 })
+    );
+    // Errors inside an imported module carry that module's path.
+    assert!(
+        diags
+            .iter()
+            .any(|d| d["file"].as_str().unwrap().ends_with("lib.elo")),
+        "{result}"
+    );
+
+    // A module file can be checked on its own: no `main` needed.
+    let lib = main.parent().unwrap().join("lib.elo");
+    let result = check_json(&lib, "pub fn g() -> Int {\n    return 1\n}\n", "ar");
+    assert_eq!(result["diagnostics"], serde_json::json!([]), "{result}");
+
+    // Messages follow `--lang`.
+    let result = check_json(&main, "fn main() {\n    print(nope)\n}\n", "ar");
+    assert_eq!(result["diagnostics"][0]["message"], "اسم غير معروف `nope`");
+}

@@ -1,0 +1,165 @@
+{
+  "name": "elomar-lang",
+  "displayName": "Elomar-Lang",
+  "description": "Syntax highlighting, snippets and live diagnostics (Arabic/English) for Elomar-Lang",
+  "version": "0.0.1",
+  "publisher": "abobasel86",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:**/*.elo",
+    "onDebugResolve:elomar",
+    "onDebugInitialConfigurations"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "elomar",
+        "aliases": [
+          "Elomar-Lang",
+          "elomar"
+        ],
+        "extensions": [
+          ".elo"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "elomar",
+        "scopeName": "source.elomar",
+        "path": "./syntaxes/elomar.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "elomar",
+        "path": "./snippets/elomar.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "elomar.run",
+        "title": "Run File",
+        "category": "Elomar",
+        "icon": "$(play)"
+      },
+      {
+        "command": "elomar.check",
+        "title": "Check File",
+        "category": "Elomar"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "elomar.run",
+          "when": "editorLangId == elomar"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "elomar.run",
+          "when": "editorLangId == elomar"
+        },
+        {
+          "command": "elomar.check",
+          "when": "editorLangId == elomar"
+        }
+      ]
+    },
+    "debuggers": [
+      {
+        "type": "elomar",
+        "label": "Elomar-Lang",
+        "languages": [
+          "elomar"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .elo file to run.",
+                "default": "${file}"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "elomar",
+            "request": "launch",
+            "name": "Run Elomar file",
+            "program": "${file}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Elomar-Lang: Run file",
+            "description": "Run an .elo file with F5 (no breakpoints yet)",
+            "body": {
+              "type": "elomar",
+              "request": "launch",
+              "name": "Run Elomar file",
+              "program": "^\"\\${file}\""
+            }
+          }
+        ]
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "elomar",
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The .elo file to run"
+          }
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Elomar-Lang",
+      "properties": {
+        "elomar.path": {
+          "type": "string",
+          "default": "elomar",
+          "description": "Path to the `elomar` executable (install it with `cargo install --path crates/elomar-cli`)."
+        },
+        "elomar.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ar"
+          ],
+          "enumDescriptions": [
+            "Follow VS Code's display language",
+            "English",
+            "العربية"
+          ],
+          "default": "auto",
+          "description": "Language of error messages."
+        },
+        "elomar.checkOnType": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check while typing (otherwise only when a file is opened or saved)."
+        }
+      }
+    }
+  }
+}

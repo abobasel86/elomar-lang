@@ -17,6 +17,10 @@ elomar-loader.workspace = true
 elomar-types.workspace = true
 elomar-interpreter.workspace = true
 clap.workspace = true
+serde_json.workspace = true
 elomar-ai-core.workspace = true
 elomar-ai-provider-mock.workspace = true
 elomar-ai-provider-openai.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -41,6 +41,12 @@ enum Command {
     Check {
         /// Path to a `.elo` source file
         file: PathBuf,
+        /// Output format: `text`, or `json` for editors (does not require `main`)
+        #[arg(long, default_value = "text", value_name = "FORMAT")]
+        format: String,
+        /// Read the file's text from standard input (an unsaved editor buffer)
+        #[arg(long)]
+        stdin: bool,
     },
 }
 
@@ -105,7 +111,25 @@ fn main() -> ExitCode {
 
     let (path, execute) = match &cli.command {
         Command::Run { file } => (file.as_path(), true),
-        Command::Check { file } => (file.as_path(), false),
+        Command::Check {
+            file,
+            format,
+            stdin,
+        } => {
+            match format.as_str() {
+                "text" if !stdin => {}
+                "text" => {
+                    eprintln!("error: `--stdin` is only supported with `--format json`");
+                    return ExitCode::from(2);
+                }
+                "json" => return editor::check_json(file, *stdin, lang),
+                other => {
+                    eprintln!("error: unknown format `{other}`; use `text` or `json`");
+                    return ExitCode::from(2);
+                }
+            }
+            (file.as_path(), false)
+        }
     };
     run_file(path, execute, &reporter)
 }
@@ -190,9 +214,11 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
     }
 }
 
+mod editor;
+
 /// The project folder: where `elomar.toml` is, else the program's folder.
 /// Relative paths and modules (`src/`) are looked up from here.
-fn project_root(source: &Path) -> PathBuf {
+pub(crate) fn project_root(source: &Path) -> PathBuf {
     find_config(source)
         .as_deref()
         .or(Some(source))
@@ -211,10 +237,10 @@ fn find_config(source: &Path) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-struct LoadedAi {
-    runtime: AiRuntime,
+pub(crate) struct LoadedAi {
+    pub(crate) runtime: AiRuntime,
     /// Models whose provider uses the network (they need the `net` effect).
-    cloud_models: Vec<String>,
+    pub(crate) cloud_models: Vec<String>,
     /// What `std.fs` may read and write.
     fs: FsPolicy,
 }
@@ -222,7 +248,7 @@ struct LoadedAi {
 /// Builds the models, policy and network permissions for `ai.infer` from
 /// `elomar.toml`. The built-in model `mock` (placeholder answers) is always
 /// available.
-fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
+pub(crate) fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
     let mut config = ProjectConfig::default();
     let config_path = find_config(source);
     if let Some(p) = &config_path {

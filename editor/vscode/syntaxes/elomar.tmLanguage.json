@@ -1,0 +1,213 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Elomar-Lang",
+  "scopeName": "source.elomar",
+  "fileTypes": ["elo"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#effects" },
+    { "include": "#use" },
+    { "include": "#declarations" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#types" },
+    { "include": "#calls" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.elomar",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.elomar",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.elomar",
+      "begin": "\"",
+      "end": "\"|$",
+      "patterns": [
+        {
+          "name": "constant.character.escape.elomar",
+          "match": "\\\\(?:[ntr0\"\\\\]|u\\{[0-9A-Fa-f]{1,6}\\})"
+        },
+        {
+          "name": "invalid.illegal.escape.elomar",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.duration.elomar",
+          "match": "\\b[0-9][0-9_]*(?:ms|s|m|h)\\b"
+        },
+        {
+          "name": "constant.numeric.float.elomar",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*(?:[eE][+-]?[0-9]+)?\\b|\\b[0-9][0-9_]*[eE][+-]?[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.elomar",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+    "effects": {
+      "comment": "Effect sets such as !{ai, net}",
+      "begin": "(!)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.operator.effect.elomar" },
+        "2": { "name": "punctuation.definition.effects.begin.elomar" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.effects.end.elomar" }
+      },
+      "patterns": [
+        {
+          "name": "storage.modifier.effect.elomar",
+          "match": "\\b(?:io|fs|net|ai|db|py)\\b"
+        },
+        {
+          "name": "invalid.illegal.effect.elomar",
+          "match": "[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*"
+        }
+      ]
+    },
+    "use": {
+      "match": "\\b(use)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)*)",
+      "captures": {
+        "1": { "name": "keyword.other.import.elomar" },
+        "2": { "name": "entity.name.namespace.elomar" }
+      }
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(fn)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.function.elomar" },
+            "2": { "name": "entity.name.function.elomar" }
+          }
+        },
+        {
+          "match": "\\b(type|enum)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
+          "captures": {
+            "1": { "name": "storage.type.elomar" },
+            "2": { "name": "entity.name.type.elomar" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.elomar",
+          "match": "\\b(?:if|else|while|for|in|break|continue|return|match|await)\\b"
+        },
+        {
+          "name": "storage.type.elomar",
+          "match": "\\b(?:let|var|fn|type|enum)\\b"
+        },
+        {
+          "name": "storage.modifier.elomar",
+          "match": "\\b(?:pub|async)\\b"
+        },
+        {
+          "name": "keyword.other.import.elomar",
+          "match": "\\buse\\b"
+        },
+        {
+          "name": "keyword.operator.word.elomar",
+          "match": "\\bdiv\\b"
+        },
+        {
+          "name": "keyword.other.reserved.elomar",
+          "match": "\\b(?:trait|impl|self|as)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.elomar",
+          "match": "\\b(?:true|false)\\b"
+        },
+        {
+          "name": "constant.language.none.elomar",
+          "match": "\\bNone\\b"
+        },
+        {
+          "name": "support.function.constructor.elomar",
+          "match": "\\b(?:Some|Ok|Err)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.builtin.elomar",
+          "match": "\\b(?:Int|Float|Bool|String|Unit|Range|Duration|List|Map|Option|Result|Future|AIError|FsError|JsonError)\\b"
+        },
+        {
+          "comment": "Capitalized names are types, enums or their variants",
+          "name": "entity.name.type.elomar",
+          "match": "\\b\\p{Lu}[\\p{L}\\p{N}\\p{M}_]*\\b"
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.elomar",
+          "match": "\\b(?:print|input|to_float|to_int|to_string|parse_int|parse_float|assert|min|max|abs)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "entity.name.function.call.elomar",
+          "match": "[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*(?=\\s*(?:<[^<>()]*>)?\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.elomar",
+          "match": "=>|->"
+        },
+        {
+          "name": "keyword.operator.range.elomar",
+          "match": "\\.\\.=?"
+        },
+        {
+          "name": "keyword.operator.try.elomar",
+          "match": "\\?"
+        },
+        {
+          "name": "keyword.operator.comparison.elomar",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.elomar",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.assignment.elomar",
+          "match": "[+\\-*/]?="
+        },
+        {
+          "name": "keyword.operator.arithmetic.elomar",
+          "match": "[+\\-*/%]"
+        }
+      ]
+    }
+  }
+}

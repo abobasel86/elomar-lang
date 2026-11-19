@@ -1116,6 +1116,7 @@ fn main() {
 | `elomar --version` | إصدار الأداة والمحرك | v0.1 |
 | `elomar run src/main.elo` | تنفيذ برنامج | v0.1 |
 | `elomar check src/main.elo` | فحص نحوي ونوعي دون تنفيذ | v0.1 |
+| `elomar check --format json --stdin FILE` | تشخيصات بصيغة JSON للمحررات (النص غير المحفوظ من stdin، ومواضع UTF-16) | **منفذ** |
 | `elomar --lang ar run ...` | رسائل الأخطاء بالعربية (أو `ELOMAR_LANG=ar`) | v0.1 |
 | `elomar test` | تشغيل مجموعة اختبارات | v0.1/v0.2 |
 | `elomar fmt` | تنسيق الشيفرة | v0.2 |
@@ -1139,7 +1140,7 @@ fn main() {
 
 ## 20.3 تجربة VS Code وLSP
 
-- Syntax Highlighting مبدئي.
+- **منفذ** في `editor/vscode`: تلوين الكود (يشمل الأسماء العربية)، وعرض الأخطاء أثناء الكتابة بالعربية أو الإنجليزية في الملف الذي وقعت فيه (ومنها ملفات الوحدات)، وزر تشغيل، ومقتطفات جاهزة. يعتمد على `elomar check --format json` دون خادم LSP بعد.
 - Diagnostics مع Source Span واضح.
 - Go to Definition وRename وHover Types بعد تنظيم Symbol Table.
 - Formatter رسمي يحدد نمطًا واحدًا متسقًا.

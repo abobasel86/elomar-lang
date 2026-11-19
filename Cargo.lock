@@ -193,6 +193,7 @@ dependencies = [
  "elomar-loader",
  "elomar-parser",
  "elomar-types",
+ "serde_json",
 ]
 
 [[package]]

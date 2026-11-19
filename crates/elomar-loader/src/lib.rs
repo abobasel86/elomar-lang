@@ -17,6 +17,8 @@ use elomar_diagnostics::{Diagnostic, SourceFile, SourceMap};
 pub struct Loaded {
     pub program: Program,
     pub sources: SourceMap,
+    /// The absolute path of each file in `sources`, in the same order.
+    pub paths: Vec<PathBuf>,
     /// Lexical and syntax errors from every file.
     pub diagnostics: Vec<Diagnostic>,
 }
@@ -59,6 +61,16 @@ fn display_name(path: &Path, entry_display: &str, entry: &Path) -> String {
 /// that use them, so file-level constants are initialized in order); the
 /// main file's items come last.
 pub fn load(entry: &Path, project_root: &Path) -> std::io::Result<Loaded> {
+    load_with(entry, project_root, None)
+}
+
+/// Like [`load`], with the main file's text given instead of read from
+/// disk (an editor's unsaved buffer).
+pub fn load_with(
+    entry: &Path,
+    project_root: &Path,
+    entry_text: Option<String>,
+) -> std::io::Result<Loaded> {
     let entry_display = entry.display().to_string();
     let entry_abs = std::path::absolute(entry)?;
     let dir = module_dir(&std::path::absolute(project_root)?);
@@ -66,10 +78,14 @@ pub fn load(entry: &Path, project_root: &Path) -> std::io::Result<Loaded> {
     let mut sources = SourceMap::default();
     let mut diagnostics = Vec::new();
 
-    let text = std::fs::read_to_string(entry)?;
+    let text = match entry_text {
+        Some(t) => t,
+        None => std::fs::read_to_string(entry)?,
+    };
     let base = sources.next_base();
     let (main, diags) = elomar_parser::parse_at(&text, base);
     sources.add(SourceFile::new(entry_display.clone(), text));
+    let mut paths = vec![entry_abs.clone()];
     diagnostics.extend(diags);
 
     let mut queue: VecDeque<String> = imports(&main.items).into();
@@ -91,6 +107,7 @@ pub fn load(entry: &Path, project_root: &Path) -> std::io::Result<Loaded> {
             display_name(&file, &entry_display, &entry_abs),
             text,
         ));
+        paths.push(file.clone());
         diagnostics.extend(diags);
         let mut items = parsed.items;
         for item in &mut items {
@@ -111,6 +128,7 @@ pub fn load(entry: &Path, project_root: &Path) -> std::io::Result<Loaded> {
     Ok(Loaded {
         program,
         sources,
+        paths,
         diagnostics,
     })
 }
