@@ -148,6 +148,7 @@ impl Checker {
                 continue;
             }
             seen.push((name.clone(), e.name.span));
+            self.type_spans.insert(name.clone(), e.name.span);
             let params = self.type_param_names(&e.type_params);
             self.enums.insert(
                 name.clone(),
@@ -292,6 +293,9 @@ impl Checker {
             .iter()
             .find(|(n, _)| n == &variant.name)
             .map(|(_, f)| f.clone());
+        if let Some(def) = self.type_spans.get(&enum_name).copied() {
+            self.note_def(variant.span, def);
+        }
         let (enum_ty, map) = self.enum_instance(&enum_name);
         let fields: Option<Vec<Ty>> =
             fields.map(|f| f.iter().map(|t| t.substitute(&map)).collect());

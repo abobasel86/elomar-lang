@@ -132,7 +132,7 @@ const SET_METHODS: &[&str] = &[
 ];
 const OTHER_METHODS: &[&str] = &["to_string"];
 
-fn methods_of(ty: &Ty) -> &'static [&'static str] {
+pub(crate) fn methods_of(ty: &Ty) -> &'static [&'static str] {
     match ty {
         Ty::List(_) => LIST_METHODS,
         Ty::Str => STR_METHODS,

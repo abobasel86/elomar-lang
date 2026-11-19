@@ -44,8 +44,10 @@ by the compiler when they are not declared.
   `use app.students.{Student, average}` to import names directly); only `pub`
   items are visible to other files. See [`examples/school`](examples/school).
 - **VS Code support** in [`editor/vscode`](editor/vscode): highlighting
-  (Arabic names included), errors while typing in English or Arabic, a Run
-  button and snippets.
+  (Arabic names included), errors while typing in English or Arabic, hover
+  types, go to definition, outline, completion, a Run button and snippets.
+- **Language server** `elomar lsp` (LSP over stdio) for any editor; see
+  [Editors](#editors).
 - Effect inference with mandatory declarations on `pub` functions.
 - `async fn` / `await` (sequential, lazy futures).
 - **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>` (`AIError` is an enum, e.g. `AIError.Timeout(msg)`); answers are
@@ -193,8 +195,37 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`); ⏳ agents and MCP, package manager, language server.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`); ⏳ agents and MCP, package manager.
 5. Bytecode VM, performance work and stable releases.
+
+## Editors
+
+`elomar lsp` speaks the Language Server Protocol on standard input/output:
+diagnostics (English or Arabic with `--lang ar`), hover, go to definition,
+document symbols, completion and formatting.
+
+- **VS Code:** the extension in [`editor/vscode`](editor/vscode) starts it.
+- **Neovim** (0.11+):
+
+  ```lua
+  vim.filetype.add({ extension = { elo = "elomar" } })
+  vim.lsp.config("elomar", { cmd = { "elomar", "lsp" }, filetypes = { "elomar" } })
+  vim.lsp.enable("elomar")
+  ```
+
+- **Helix** (`languages.toml`):
+
+  ```toml
+  [language-server.elomar]
+  command = "elomar"
+  args = ["lsp"]
+
+  [[language]]
+  name = "elomar"
+  scope = "source.elomar"
+  file-types = ["elo"]
+  language-servers = ["elomar"]
+  ```
 
 ## License
 

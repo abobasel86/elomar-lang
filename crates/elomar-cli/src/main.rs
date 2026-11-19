@@ -74,6 +74,8 @@ enum Command {
         /// Name of the project (and its folder)
         name: String,
     },
+    /// Run the language server (LSP) on standard input/output, for editors
+    Lsp,
 }
 
 /// Real terminal input/output for running programs.
@@ -152,6 +154,7 @@ fn main() -> ExitCode {
             return testing::run_tests(path, filter.as_deref(), &reporter);
         }
         Command::New { name } => return scaffold::new_project(name, &reporter),
+        Command::Lsp => return lsp::serve(lang),
         Command::Fmt {
             paths,
             check,
@@ -262,6 +265,7 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
 
 mod editor;
 mod fmt;
+mod lsp;
 mod scaffold;
 mod testing;
 

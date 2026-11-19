@@ -429,7 +429,9 @@ impl Checker {
             ExprKind::Field { target, name } => {
                 let name = name.clone();
                 let t = self.check_expr(target, None);
-                self.field_type(&t, &name)
+                let ty = self.field_type(&t, &name);
+                self.note_typed(name.span, format!("{}: ", name.name), &ty);
+                ty
             }
             ExprKind::Index { target, index } => {
                 let t = self.check_expr(target, None);
@@ -480,11 +482,18 @@ impl Checker {
     }
 
     fn check_name(&mut self, name: &str, span: Span) -> Ty {
-        if let Some(local) = self.lookup_local(name) {
-            return local.ty.clone();
+        if let Some(local) = self.lookup_local(name).cloned() {
+            self.note_local(name, &local, span);
+            return local.ty;
         }
-        if let Some((ty, _)) = self.consts.get(name) {
-            return ty.clone();
+        if let Some((ty, def)) = self.consts.get(name).cloned() {
+            self.note_typed(
+                span,
+                format!("let {}: ", crate::modules::base_name(name)),
+                &ty,
+            );
+            self.note_def(span, def);
+            return ty;
         }
         if name == "None" {
             return Ty::option(self.subst.fresh());
@@ -552,6 +561,8 @@ impl Checker {
             return Ty::Error;
         }
         if let Some(sig) = self.fns.get(name).cloned() {
+            self.note_fn(span, name);
+            self.note_def(span, sig.name_span);
             // A named function used as a value. Its effects are charged
             // here, where it is referred to (see `check_lambda`).
             self.usage.calls.push((name.to_string(), span));
@@ -624,12 +635,21 @@ impl Checker {
             ExprKind::Name(name) => {
                 let name = name.clone();
                 if let Some(local) = self.lookup_local(&name).cloned() {
+                    self.note_local(&name, &local, callee_span);
                     return self.check_value_call(&name, &local.ty, args, callee_span);
                 }
-                if let Some((ty, _)) = self.consts.get(&name).cloned() {
+                if let Some((ty, def)) = self.consts.get(&name).cloned() {
+                    self.note_typed(
+                        callee_span,
+                        format!("let {}: ", crate::modules::base_name(&name)),
+                        &ty,
+                    );
+                    self.note_def(callee_span, def);
                     return self.check_value_call(&name, &ty, args, callee_span);
                 }
                 if let Some(sig) = self.fns.get(&name).cloned() {
+                    self.note_fn(callee_span, &name);
+                    self.note_def(callee_span, sig.name_span);
                     let bounds = sig.bounds.clone();
                     let (sig, map) = self.instantiate_with_map(&name, sig, type_args, span);
                     let ty = self.check_user_call(&name, &sig, args, span, callee_span);
@@ -869,6 +889,19 @@ impl Checker {
             ..sig
         };
         (sig, map)
+    }
+
+    /// Hover and definition for a use of a local variable.
+    fn note_local(&mut self, name: &str, local: &crate::Local, span: Span) {
+        let kind = if local.is_param {
+            "param"
+        } else if local.mutable {
+            "var"
+        } else {
+            "let"
+        };
+        self.note_typed(span, format!("{kind} {name}: "), &local.ty);
+        self.note_def(span, local.span);
     }
 
     pub(crate) fn check_user_call(

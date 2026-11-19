@@ -978,3 +978,45 @@ fn py_module() {
         vec!["E1008"]
     );
 }
+
+// ----- editor information (elomar lsp) ------------------------------------------------
+
+#[test]
+fn analyze_records_hovers_and_definitions() {
+    let src = "trait Describe {\n  fn describe(self) -> String\n}\ntype P = { x: Int }\nimpl Describe for P {\n  fn describe(self) -> String {\n    return to_string(self.x)\n  }\n}\nfn twice(n: Int) -> Int {\n  return n * 2\n}\nfn main() {\n  var count = twice(3)\n  let p: P = { x: count }\n  print(p.describe(), p.x)\n}";
+    let (mut program, diags) = elomar_parser::parse(src);
+    assert!(diags.is_empty());
+    let (diags, info) = crate::analyze(&mut program, CheckOptions::default());
+    assert!(diags.is_empty(), "{diags:#?}");
+    let hover_at = |needle: &str, nth: usize| -> String {
+        let at = src.match_indices(needle).nth(nth).unwrap().0 as u32;
+        info.hovers
+            .iter()
+            .filter(|h| h.span.start <= at && at < h.span.end)
+            .min_by_key(|h| h.span.end - h.span.start)
+            .map(|h| h.text.clone())
+            .unwrap_or_default()
+    };
+    assert_eq!(hover_at("twice(3)", 0), "fn twice(n: Int) -> Int");
+    assert_eq!(hover_at("count", 1), "var count: Int");
+    assert_eq!(hover_at("describe()", 0), "fn P::describe(self) -> String");
+    assert_eq!(hover_at("P = ", 0), "type P = { x: Int }");
+    assert_eq!(hover_at("main", 0), "fn main() !{io}");
+    // `p.` offers the field and the method.
+    let p_use = src.rfind("p.x").unwrap() as u32;
+    let members = &info
+        .hovers
+        .iter()
+        .find(|h| h.span.start == p_use)
+        .unwrap()
+        .members;
+    assert!(members.contains(&"x".to_string()) && members.contains(&"describe".to_string()));
+    // `twice(3)` leads to `fn twice`.
+    let use_at = src.find("twice(3)").unwrap() as u32;
+    let def_at = src.find("twice(n").unwrap() as u32;
+    assert!(
+        info.definitions
+            .iter()
+            .any(|(u, d)| u.start == use_at && d.start == def_at)
+    );
+}

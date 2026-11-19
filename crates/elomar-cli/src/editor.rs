@@ -110,7 +110,7 @@ fn text_in(t: &Text, lang: Lang) -> String {
     t.get(lang).to_string()
 }
 
-fn diagnostic_json(
+pub(crate) fn diagnostic_json(
     d: &Diagnostic,
     sources: &SourceMap,
     paths: &[std::path::PathBuf],

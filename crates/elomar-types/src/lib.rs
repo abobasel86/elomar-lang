@@ -9,6 +9,7 @@ mod ai;
 mod builtins;
 mod enums;
 mod expr;
+mod ide;
 mod modules;
 mod stdlib;
 mod traits;
@@ -21,6 +22,7 @@ use elomar_diagnostics::{Diagnostic, Text};
 
 pub use builtins::{BUILTIN_FUNCTIONS, KNOWN_EFFECTS};
 pub use enums::{AI_ERROR_KINDS, FS_ERROR_KINDS, JSON_ERROR_KINDS};
+pub use ide::{Hover, IdeInfo};
 pub use ty::{Subst, Ty};
 
 #[derive(Debug, Clone, Default)]
@@ -37,6 +39,31 @@ pub fn check(program: &mut Program, opts: CheckOptions) -> Vec<Diagnostic> {
     let mut checker = Checker::default();
     checker.run(program, opts);
     checker.diags
+}
+
+/// Functions of a standard module by its short name (`fs`, `json`, ...),
+/// for editors' completion.
+pub fn module_functions(short: &str) -> &'static [&'static str] {
+    match short {
+        "ai" => &["infer", "run"],
+        "fs" => &stdlib::FS_FUNCTIONS,
+        "json" => &stdlib::JSON_FUNCTIONS,
+        "http" => &stdlib::HTTP_FUNCTIONS,
+        "db" => &stdlib::DB_FUNCTIONS,
+        "py" => &stdlib::PY_FUNCTIONS,
+        _ => &[],
+    }
+}
+
+/// Like [`check`], also returning hover texts and definitions for editors.
+pub fn analyze(program: &mut Program, opts: CheckOptions) -> (Vec<Diagnostic>, IdeInfo) {
+    let mut checker = Checker {
+        ide: Some(ide::Recorder::default()),
+        ..Checker::default()
+    };
+    checker.run(program, opts);
+    let info = checker.ide_info();
+    (checker.diags, info)
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +129,14 @@ struct Checker {
     trait_impls: Vec<(String, Ty, usize)>,
     /// Bounds of the function being checked.
     bounds: Vec<(String, String)>,
+    /// Editor information, when recording (see `ide.rs`).
+    ide: Option<ide::Recorder>,
+    /// Effects of every function, once inferred.
+    inferred_effects: HashMap<String, BTreeSet<String>>,
+    /// Bounds of all functions, for completing methods on `T`.
+    all_bounds: Vec<(String, String)>,
+    /// Where each type, enum and trait is declared.
+    type_spans: HashMap<String, Span>,
 }
 
 impl Checker {
@@ -146,6 +181,9 @@ impl Checker {
         let effects = infer_effects(&fn_usage);
         self.check_fn_effects(&fn_usage, &effects);
         self.check_const_effects(&const_usage, &effects);
+        if self.ide.is_some() {
+            self.inferred_effects = effects;
+        }
 
         match self.fns.get("main").cloned() {
             Some(main) => {
@@ -317,6 +355,14 @@ impl Checker {
                 ),
             );
         }
+        let kind = if is_param {
+            "param"
+        } else if mutable {
+            "var"
+        } else {
+            "let"
+        };
+        self.note_typed(name.span, format!("{kind} {}: ", name.name), &ty);
         self.scopes.last_mut().expect("scope").insert(
             name.name.clone(),
             Local {
@@ -441,6 +487,9 @@ impl Checker {
             }
             let mut stack = Vec::new();
             let ty = self.resolve_alias(&t.name.name, &decls, &mut stack);
+            self.type_spans.insert(t.name.name.clone(), t.name.span);
+            let base = modules::base_name(&t.name.name).to_string();
+            self.note_typed(t.name.span, format!("type {base} = "), &ty);
             self.aliases.insert(t.name.name.clone(), ty);
         }
     }
@@ -569,12 +618,17 @@ impl Checker {
                             return Ty::Error;
                         };
                         let other = resolved.as_str();
+                        if let Some(def) = self.type_spans.get(other).copied() {
+                            self.note_def(name.span, def);
+                        }
                         if let Some(info) = self.enums.get(other) {
                             let want = info.params.len();
                             if lowered.len() != want {
                                 self.wrong_type_args(name, want, args.len(), t.span);
                                 return Ty::Error;
                             }
+                            let base = modules::base_name(other).to_string();
+                            self.note_text(name.span, format!("enum {base}"));
                             return Ty::Enum(other.to_string(), lowered);
                         }
                         if let Some(ty) = alias(self, other) {
@@ -584,7 +638,10 @@ impl Checker {
                                 return Ty::Error;
                             }
                             let map: Vec<(String, Ty)> = params.into_iter().zip(lowered).collect();
-                            return ty.substitute(&map);
+                            let ty = ty.substitute(&map);
+                            let base = modules::base_name(other).to_string();
+                            self.note_typed(name.span, format!("type {base} = "), &ty);
+                            return ty;
                         }
                         let mut diag = Diagnostic::error(
                             "E1006",
@@ -815,6 +872,8 @@ impl Checker {
         self.in_async = sig.is_async;
         self.type_params = sig.type_params.clone();
         self.bounds = sig.bounds.clone();
+        self.all_bounds.extend(sig.bounds.iter().cloned());
+        self.note_fn(f.name.span, &f.name.name);
         self.loop_depth = 0;
         self.push_scope();
         for (p, (_, ty)) in f.params.iter().zip(&sig.params) {

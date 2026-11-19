@@ -1141,11 +1141,9 @@ fn main() {
 
 ## 20.3 تجربة VS Code وLSP
 
-- **منفذ** في `editor/vscode`: تلوين الكود (يشمل الأسماء العربية)، وعرض الأخطاء أثناء الكتابة بالعربية أو الإنجليزية في الملف الذي وقعت فيه (ومنها ملفات الوحدات)، وزر تشغيل، ومقتطفات جاهزة. يعتمد على `elomar check --format json` دون خادم LSP بعد.
-- Diagnostics مع Source Span واضح.
-- Go to Definition وRename وHover Types بعد تنظيم Symbol Table.
-- Formatter رسمي يحدد نمطًا واحدًا متسقًا.
-- Language Server Protocol (LSP) بعد ثبات النموذج البنيوي.
+- **منفذ:** خادم اللغة `elomar lsp` (LSP عبر stdin/stdout) لأي محرر: أخطاء أثناء الكتابة بالعربية أو الإنجليزية (ومنها ملفات الوحدات)، وHover للأنواع وتواقيع الدوال مع تأثيراتها، وGo to Definition (ومنه إلى الوحدات المستوردة)، وOutline، وإكمال للأسماء وللحقول والدوال بعد `.`، وتنسيق.
+- **منفذ** في `editor/vscode`: تلوين الكود (يشمل الأسماء العربية)، وعميل LSP مدمج بلا اعتماديات، وزر تشغيل وF5، ومقتطفات جاهزة.
+- لاحقًا: Rename وFind References وSignature Help، وتحليل تدريجي أسرع للمشاريع الكبيرة.
 - Debugger لاحقًا: Breakpoints وStack Frames وInspection مع احترام خصوصية القيم الحساسة.
 
 مرجع: [VS Code Language Server Extension Guide](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide).

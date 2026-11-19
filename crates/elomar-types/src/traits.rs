@@ -196,6 +196,8 @@ impl Checker {
                 });
             }
             self.type_params = saved;
+            self.type_spans.insert(name.clone(), t.name.span);
+            self.note_text(t.name.span, format!("trait {}", modules::base_name(name)));
             self.traits.insert(name.clone(), TraitInfo { methods });
         }
     }
@@ -209,6 +211,9 @@ impl Checker {
             None => self.local_item(&id.name),
         };
         if self.traits.contains_key(&full) {
+            if let Some(def) = self.type_spans.get(&full).copied() {
+                self.note_def(id.span, def);
+            }
             return Some(full);
         }
         let mut diag = Diagnostic::error(
@@ -496,6 +501,8 @@ impl Checker {
                     .find(|e| e.name == method.name && self.ty_matches(&e.target, &recv))
                     .cloned()?;
                 self.subst.unify(&recv, &entry.target);
+                self.note_fn(method.span, &entry.fn_name);
+                self.note_def(method.span, entry.span);
                 let mut sig = self.fns.get(&entry.fn_name)?.clone();
                 sig.params.remove(0);
                 let ty = self.check_user_call(&entry.fn_name, &sig, args, span, method.span);
