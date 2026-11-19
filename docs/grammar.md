@@ -530,6 +530,32 @@ fn main() {
 - `DbError`: `PolicyDenied` و`Open` و`Sql` و`Constraint` (مثل `UNIQUE`) و`TypeMismatch`. نوع الصف أو المعاملات غير المناسب `E2021`، ونسيان نوع الصف `E2008`.
 - قيمة `Db` مقبض: نسخها يشير إلى الاتصال نفسه. للمعاملات المتعددة: `db.execute(conn, "BEGIN")` ثم `"COMMIT"` أو `"ROLLBACK"`.
 
+## 4.11.3 Python: `std.py`
+
+```elomar
+use std.py
+
+type Stats = { mean: Float, median: Float }
+
+fn main() {
+    // python/grades.py: def describe(grades, course): ...
+    print(py.call<Stats>("grades", "describe", { grades: [91, 72], course: "Math" }))
+    print(py.call<Float>("math", "sqrt", 2.0))          // قيمة واحدة = معامل موضعي
+    print(py.call<Float>("statistics", "mean", [1, 2, 3], 10s))
+}
+```
+
+| الدالة | النوع |
+|---|---|
+| `py.call<T>(module, function, args[, timeout])` | `Result<T, PyError>` |
+
+- يحتاج `python = true` تحت `[permissions]` في `elomar.toml` (وإلا `PyError.PolicyDenied`)، لأن كود Python يعمل بصلاحيات المستخدم كاملة: أذونات Elomar للملفات والشبكة **لا تنطبق** داخله.
+- كل استدعاء هو تأثير `py`، ويعمل في عملية Python مستقلة (`python3`، أو `python` على Windows، أو `ELOMAR_PYTHON`) تنتهي بعده؛ فلا حالة مشتركة بين الاستدعاءات.
+- الوحدات تُبحث في `<project>/python` ثم مجلد المشروع ثم المكتبات المثبتة (`math` و`statistics` و`numpy`...).
+- `args`: السجل يصبح معاملات مسماة (`f(grades=..., course=...)`)، وأي قيمة أخرى معامل موضعي واحد. القيم تعبر بصيغة JSON، والنتيجة يُتحقق منها مقابل `T` كما في `json.parse`.
+- ما تطبعه الدالة يظهر بعد الاستدعاء. المهلة الافتراضية 60 ثانية.
+- `PyError`: `PolicyDenied` و`Unavailable` (لا يوجد Python) و`Exception` (استثناء Python، مثل `"ValueError: ..."`) و`TypeMismatch` و`Timeout`.
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text

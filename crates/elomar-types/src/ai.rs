@@ -12,13 +12,14 @@ use crate::{Checker, Ty, suggest};
 
 /// Modules that `use` accepts, with the short name they bind (if any).
 /// `std.io` is accepted for compatibility; its functions are in the prelude.
-const KNOWN_MODULES: [(&str, Option<&str>); 6] = [
+const KNOWN_MODULES: [(&str, Option<&str>); 7] = [
     ("std.io", None),
     ("std.ai", Some("ai")),
     ("std.fs", Some("fs")),
     ("std.json", Some("json")),
     ("std.http", Some("http")),
     ("std.db", Some("db")),
+    ("std.py", Some("py")),
 ];
 
 /// Where a value crosses into JSON, for error messages.
@@ -179,6 +180,7 @@ impl Checker {
             "std.json" => self.check_json_call(func, type_args, args, span),
             "std.http" => self.check_http_call(func, type_args, args, span),
             "std.db" => self.check_db_call(func, type_args, args, span),
+            "std.py" => self.check_py_call(func, type_args, args, span),
             _ if func.name == "infer" || func.name == "run" => {
                 let name = func.name.clone();
                 self.check_ai_call(&name, func.span, type_args, args, span)

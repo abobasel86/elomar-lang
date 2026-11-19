@@ -20,6 +20,7 @@ pub(crate) const FS_FUNCTIONS: [&str; 5] = [
 pub(crate) const JSON_FUNCTIONS: [&str; 3] = ["parse", "stringify", "pretty"];
 pub(crate) const HTTP_FUNCTIONS: [&str; 2] = ["get", "post"];
 pub(crate) const DB_FUNCTIONS: [&str; 4] = ["open", "execute", "query", "query_one"];
+pub(crate) const PY_FUNCTIONS: [&str; 1] = ["call"];
 
 /// A value that maps to one SQLite column: `Int`, `Float`, `String`,
 /// `Bool`, or an `Option` of one (NULL).
@@ -263,6 +264,63 @@ impl Checker {
                 );
             }
         }
+    }
+
+    /// `py.call<T>(module, function, args[, timeout])`: the `py` effect,
+    /// `Result<T, PyError>`. `args` and `T` are JSON data.
+    pub(crate) fn check_py_call(
+        &mut self,
+        func: &Ident,
+        type_args: &mut [TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        if !PY_FUNCTIONS.contains(&func.name.as_str()) {
+            return self.unknown_module_function("py", func, &PY_FUNCTIONS, args);
+        }
+        self.usage.direct.push(("py".into(), func.span));
+        self.reject_named_args(args);
+        let out = match type_args {
+            [t] => {
+                let ty = self.lower_type(t);
+                let resolved = self.subst.resolve(&ty);
+                if let Some(bad) = self.non_json_part(&resolved, true) {
+                    self.not_json_data(&resolved, &bad, t.span, DataRole::JsonParse);
+                    Ty::Error
+                } else {
+                    *t = type_expr_of(&resolved, t.span);
+                    resolved
+                }
+            }
+            [] => {
+                self.push(Diagnostic::error(
+                    "E2008",
+                    func.span,
+                    Text::new(
+                        "`py.call` needs the type of the result, e.g. `py.call<Float>(\"statistics\", \"mean\", { data: xs })`",
+                        "تحتاج `py.call` إلى نوع النتيجة، مثل `py.call<Float>(\"statistics\", \"mean\", { data: xs })`",
+                    ),
+                ));
+                Ty::Error
+            }
+            _ => {
+                self.wrong_arg_count("py.call", "1 type", type_args.len(), span);
+                Ty::Error
+            }
+        };
+        if self.arity("py.call", args, 3, 4, span) {
+            self.check_expr_against(&mut args[0].value, &Ty::Str);
+            self.check_expr_against(&mut args[1].value, &Ty::Str);
+            let t = self.check_expr(&mut args[2].value, None);
+            let resolved = self.subst.resolve(&t);
+            if let Some(bad) = self.non_json_part(&resolved, true) {
+                self.not_json_data(&resolved, &bad, args[2].value.span, DataRole::JsonValue);
+            }
+            if let Some(timeout) = args.get_mut(3) {
+                self.check_expr_against(&mut timeout.value, &Ty::Duration);
+            }
+        }
+        Ty::result(out, Ty::Enum(crate::enums::PY_ERROR.into(), Vec::new()))
     }
 
     /// `json.parse<T>(text)`, `json.stringify(value)`, `json.pretty(value)`.

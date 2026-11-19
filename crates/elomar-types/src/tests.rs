@@ -950,3 +950,31 @@ fn ai_run_tools() {
         vec!["E2015"]
     );
 }
+
+// ----- std.py --------------------------------------------------------------------------
+
+#[test]
+fn py_module() {
+    ok(
+        "use std.py\ntype S = { mean: Float, tags: Map<String, Int> }\nfn main() {\n  let a: Result<S, PyError> = py.call<S>(\"m\", \"f\", { xs: [1, 2] })\n  let b = py.call<Float>(\"math\", \"sqrt\", 2.0, 5s)\n  match b {\n    Ok(x) => print(x)\n    Err(PyError.Exception(m)) => print(m)\n    Err(e) => print(e.kind())\n  }\n}",
+    );
+    assert_eq!(
+        codes(
+            "use std.py\npub fn f() -> Bool {\n  return py.call<Int>(\"m\", \"f\", 1).is_ok()\n}"
+        ),
+        vec!["E3002"]
+    );
+    ok("use std.py\npub fn f() -> Bool !{py} {\n  return py.call<Int>(\"m\", \"f\", 1).is_ok()\n}");
+    assert_eq!(
+        codes("use std.py\nfn f() {\n  print(py.call(\"m\", \"f\", 1))\n}"),
+        vec!["E2008"]
+    );
+    assert_eq!(
+        codes("use std.py\nfn f() {\n  print(py.call<Duration>(\"m\", \"f\", 1))\n}"),
+        vec!["E2015"]
+    );
+    assert_eq!(
+        codes("use std.py\nfn f() {\n  print(py.run(\"x\"))\n}"),
+        vec!["E1008"]
+    );
+}

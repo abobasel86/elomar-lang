@@ -25,7 +25,7 @@ pub(crate) fn base_name(name: &str) -> &str {
 }
 
 /// Names `use std.*` binds; an app module cannot reuse them as an alias.
-const STD_SHORT_NAMES: [&str; 5] = ["ai", "fs", "json", "http", "db"];
+const STD_SHORT_NAMES: [&str; 6] = ["ai", "fs", "json", "http", "db", "py"];
 
 #[derive(Default)]
 pub(crate) struct ModuleScopes {

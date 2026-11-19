@@ -55,6 +55,10 @@ by the compiler when they are not declared.
   lets the model call only the functions you list; results go back to the
   model and the final answer is validated against `Answer`. Tools' effects
   count for the caller. See [`examples/ai-tools`](examples/ai-tools).
+- **Python bridge:** `py.call<Stats>("grades", "describe", { grades: xs })` runs a
+  function from `python/grades.py` (or any installed package) in a
+  subprocess, with typed results, the `py` effect and an explicit
+  `python = true` permission. See [`examples/python`](examples/python).
 - An offline **mock provider** configured in `elomar.toml`: canned answers,
   simulated errors and latency, call budgets — deterministic and free.
 - An **OpenAI provider** (structured outputs) with the key read from an
@@ -189,7 +193,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`); ⏳ Python bridge, agents and MCP.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`); ⏳ agents and MCP, package manager, language server.
 5. Bytecode VM, performance work and stable releases.
 
 ## License

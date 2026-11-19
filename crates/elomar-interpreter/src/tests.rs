@@ -677,3 +677,44 @@ fn ai_run_reports_bad_tool_calls_to_the_model_and_limits_steps() {
             .contains("AIError.BudgetExceeded(\"this run may make at most 1")
     );
 }
+
+// ----- std.py --------------------------------------------------------------------------
+
+fn run_py(src: &str, allow: bool) -> String {
+    let dir = temp_project(if allow { "py-allowed" } else { "py-denied" });
+    std::fs::create_dir_all(dir.join("python")).unwrap();
+    std::fs::write(
+        dir.join("python/helpers.py"),
+        "def stats(xs, label):\n    print('working on', label)\n    return {'label': label, 'total': sum(xs), 'top': max(xs)}\n\ndef boom(x):\n    raise KeyError(x)\n",
+    )
+    .unwrap();
+    let (mut program, diags) = elomar_parser::parse(src);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let diags = elomar_types::check(&mut program, elomar_types::CheckOptions::default());
+    assert!(diags.iter().all(|d| !d.is_error()), "{diags:#?}");
+    let permissions = elomar_ai_core::Permissions {
+        python: allow,
+        ..Default::default()
+    };
+    with_large_stack(|| {
+        let mut host = BufferHost::default();
+        let mut ai = AiRuntime::default().with_permissions(permissions);
+        run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(&dir)).expect("run");
+        host.output
+    })
+}
+
+const PY_SRC: &str = "use std.py\nfn main() {\n  print(py.call<{ label: String, total: Int, top: Int }>(\"helpers\", \"stats\", { xs: [3, 9, 4], label: \"مجموعة\" }))\n  print(py.call<Float>(\"math\", \"sqrt\", 2.25))\n  match py.call<Int>(\"helpers\", \"boom\", \"k\") {\n    Ok(_) => print(\"?\")\n    Err(e) => print(e.kind(), e.message())\n  }\n  print(py.call<Int>(\"math\", \"sqrt\", 2.25).is_err())\n}";
+
+#[test]
+fn python_calls() {
+    assert_eq!(
+        run_py(PY_SRC, true),
+        "working on مجموعة\nOk({ label: \"مجموعة\", top: 9, total: 16 })\nOk(1.5)\nException KeyError: 'k'\ntrue\n"
+    );
+}
+
+#[test]
+fn python_needs_permission() {
+    assert!(run_py(PY_SRC, false).starts_with("Err(PyError.PolicyDenied("));
+}

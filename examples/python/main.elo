@@ -1,0 +1,28 @@
+// Calling Python from Elomar with `std.py`: values cross as JSON and the
+// result is checked against the requested type.
+
+use std.py
+
+type Stats = { course: String, mean: Float, median: Float, stdev: Float }
+
+fn main() {
+    let grades = [91, 55, 72, 88, 64]
+
+    // A record becomes keyword arguments: describe(grades=..., course=...).
+    match py.call<Stats>("grades", "describe", { grades: grades, course: "Math" }) {
+        Ok(s) => print(s.course, "mean", s.mean, "median", s.median, "stdev", s.stdev)
+        Err(e) => print("failed:", e.kind(), e.message())
+    }
+
+    // Any other value is one positional argument: letter(91).
+    for g in [91, 72, 140] {
+        match py.call<String>("grades", "letter", g) {
+            Ok(l) => print(g, "->", l)
+            Err(PyError.Exception(m)) => print(g, "-> error:", m)
+            Err(e) => print(e.kind())
+        }
+    }
+
+    // The standard library works too.
+    print(py.call<Float>("math", "sqrt", 2.0))
+}

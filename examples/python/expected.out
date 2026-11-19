@@ -1,0 +1,5 @@
+Math mean 74.0 median 72.0 stdev 15.41
+91 -> A
+72 -> C
+140 -> error: ValueError: grade out of range: 140
+Ok(1.4142135623730951)

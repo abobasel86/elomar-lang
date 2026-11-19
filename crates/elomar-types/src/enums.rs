@@ -31,13 +31,14 @@ pub(crate) const FS_ERROR: &str = "FsError";
 pub(crate) const JSON_ERROR: &str = "JsonError";
 pub(crate) const HTTP_ERROR: &str = "HttpError";
 pub(crate) const DB_ERROR: &str = "DbError";
+pub(crate) const PY_ERROR: &str = "PyError";
 
 /// Built-in error enums: every variant carries a message, and values have
 /// `kind()` and `message()` methods.
 pub(crate) fn is_error_enum(name: &str) -> bool {
     matches!(
         name,
-        AI_ERROR | FS_ERROR | JSON_ERROR | HTTP_ERROR | DB_ERROR
+        AI_ERROR | FS_ERROR | JSON_ERROR | HTTP_ERROR | DB_ERROR | PY_ERROR
     )
 }
 
@@ -66,6 +67,15 @@ pub const HTTP_ERROR_KINDS: [&str; 5] = [
 /// The variants of `DbError` (`std.db`).
 pub const DB_ERROR_KINDS: [&str; 5] = ["PolicyDenied", "Open", "Sql", "Constraint", "TypeMismatch"];
 
+/// The variants of `PyError` (`std.py`).
+pub const PY_ERROR_KINDS: [&str; 5] = [
+    "PolicyDenied",
+    "Unavailable",
+    "Exception",
+    "TypeMismatch",
+    "Timeout",
+];
+
 /// The variants of `AIError` (spec §13.4); each carries a message.
 pub const AI_ERROR_KINDS: [&str; 11] = [
     "Authentication",
@@ -89,6 +99,7 @@ impl Checker {
             (JSON_ERROR, &JSON_ERROR_KINDS[..]),
             (HTTP_ERROR, &HTTP_ERROR_KINDS[..]),
             (DB_ERROR, &DB_ERROR_KINDS[..]),
+            (PY_ERROR, &PY_ERROR_KINDS[..]),
         ] {
             self.enums.insert(
                 name.into(),

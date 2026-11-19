@@ -48,6 +48,8 @@ entry = "src/main.elo"
 filesystem_read = []
 filesystem_write = []
 network_hosts = []
+# `std.py` runs Python, which is not sandboxed; enable only if needed.
+python = false
 
 # AI models for `use std.ai`. The built-in model "mock" needs no setup.
 # [ai.models."assistant"]

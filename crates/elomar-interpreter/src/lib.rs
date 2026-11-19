@@ -8,6 +8,7 @@ mod ai;
 mod builtins;
 mod db;
 mod http;
+mod py;
 mod stdlib;
 mod value;
 
@@ -791,6 +792,19 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                                 &values,
                                 &self.unit_enums,
                             ));
+                        }
+                        "std.py" => {
+                            let (value, printed) = py::call(
+                                self.ai.permissions(),
+                                self.fs.base(),
+                                type_args,
+                                &values,
+                                &self.unit_enums,
+                            );
+                            if !printed.is_empty() {
+                                self.host.print(&printed);
+                            }
+                            return Ok(value);
                         }
                         "std.http" => {
                             return Ok(http::call(self.ai.permissions(), &name.name, &values));

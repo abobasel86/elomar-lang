@@ -1,0 +1,7 @@
+[package]
+name = "python-bridge"
+
+[permissions]
+# Python runs with your user's rights: Elomar's file and network
+# permissions do not apply inside it, so it must be enabled explicitly.
+python = true

@@ -25,6 +25,9 @@ pub struct Permissions {
     /// Files or folders `std.fs` may create, overwrite or append to.
     #[serde(default)]
     pub filesystem_write: Vec<String>,
+    /// Whether `std.py` may run Python (which is not sandboxed).
+    #[serde(default)]
+    pub python: bool,
 }
 
 impl Permissions {
