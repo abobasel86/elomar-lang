@@ -489,3 +489,111 @@ fn json_diagnostics_for_editors() {
     let result = check_json(&main, "fn main() {\n    print(nope)\n}\n", "ar");
     assert_eq!(result["diagnostics"][0]["message"], "اسم غير معروف `nope`");
 }
+
+// ----- elomar new / elomar test --------------------------------------------
+
+fn elomar_in(dir: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_elomar"))
+        .args(["--no-color", "--lang", "en"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn new_project_runs_and_passes_its_tests() {
+    let base = Path::new(env!("CARGO_TARGET_TMPDIR")).join("new-project");
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).unwrap();
+
+    let out = elomar_in(&base, &["new", "myapp"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let app = base.join("myapp");
+    for f in [
+        "elomar.toml",
+        "src/main.elo",
+        "src/greeting.elo",
+        "tests/greeting_test.elo",
+    ] {
+        assert!(app.join(f).is_file(), "missing {f}");
+    }
+    let run = elomar_in(&app, &["run", "src/main.elo"]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&run.stdout)),
+        "Hello, world!\n"
+    );
+    let test = elomar_in(&app, &["test"]);
+    let stdout = String::from_utf8_lossy(&test.stdout);
+    assert!(test.status.success(), "{stdout}");
+    assert!(
+        stdout.contains("test result: ok. 2 passed; 0 failed"),
+        "{stdout}"
+    );
+
+    // An existing, non-empty folder is never overwritten.
+    let again = elomar_in(&base, &["new", "myapp"]);
+    assert_eq!(again.status.code(), Some(2));
+    let bad = elomar_in(&base, &["new", "../escape"]);
+    assert_eq!(bad.status.code(), Some(2));
+}
+
+#[test]
+fn test_command_reports_failures() {
+    let main = module_project(
+        "test-failures",
+        &[
+            ("elomar.toml", ""),
+            (
+                "src/lib.elo",
+                "pub fn double(x: Int) -> Int {\n    return x * 2\n}\n",
+            ),
+            ("src/main.elo", "fn main() {}\n"),
+            (
+                "tests/lib_test.elo",
+                "use app.lib\n\nfn test_ok() {\n    assert_eq(lib.double(2), 4)\n}\n\nfn test_wrong() {\n    print(\"about to fail\")\n    assert_eq(lib.double(2), 5)\n}\n\nfn test_err() -> Result<Int, String> {\n    return Err(\"nope\")\n}\n\nfn not_a_test() {}\n",
+            ),
+        ],
+    );
+    let project = main.parent().unwrap().parent().unwrap();
+    let out = elomar_in(project, &["test"]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1), "{stdout}");
+    assert!(stdout.contains("test test_ok ... ok"), "{stdout}");
+    assert!(stdout.contains("test test_wrong ... FAILED"), "{stdout}");
+    assert!(
+        stdout.contains("about to fail"),
+        "output of failed tests is shown: {stdout}"
+    );
+    assert!(
+        stdout.contains("actual:   4") && stdout.contains("expected: 5"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("the test returned Err(\"nope\")"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("test result: FAILED. 1 passed; 2 failed"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("not_a_test"), "{stdout}");
+
+    let filtered = elomar_in(project, &["test", "--filter", "ok"]);
+    assert!(filtered.status.success());
+    assert!(
+        String::from_utf8_lossy(&filtered.stdout).contains("1 passed; 0 failed; 2 filtered out")
+    );
+}
+
+#[test]
+fn example_project_tests_pass() {
+    let out = elomar(&["test", root().join("examples/school").to_str().unwrap()]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{stdout}");
+    assert!(stdout.contains("4 passed; 0 failed"), "{stdout}");
+}

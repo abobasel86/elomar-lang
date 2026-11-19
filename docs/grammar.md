@@ -468,6 +468,34 @@ fn main() {
 - الوحدة غير الموجودة `E1011` مع المسار المتوقع.
 - ثوابت `let` في الوحدات تُقيَّم قبل ثوابت الملف الرئيسي.
 
+## 4.13 المشاريع والاختبارات
+
+`elomar new myapp` ينشئ مشروعًا يعمل وتنجح اختباراته:
+
+```text
+myapp/
+├── elomar.toml               ← [package] و[permissions] (كلها مغلقة افتراضيًا)
+├── src/main.elo              ← elomar run src/main.elo
+├── src/greeting.elo          ← وحدة: use app.greeting
+└── tests/greeting_test.elo   ← elomar test
+```
+
+```elomar
+// tests/greeting_test.elo
+use app.greeting
+
+fn test_greets_by_name() {
+    assert_eq(greeting.greet("Lina"), "Hello, Lina!")
+}
+```
+
+- **الاكتشاف:** كل ملف `.elo` داخل `tests/` (ومجلداته الفرعية) ملف اختبار؛ وكل دالة فيه اسمها يبدأ بـ `test_` وبلا معاملات اختبار.
+- **النجاح والفشل:** يفشل الاختبار إن وقع خطأ تنفيذ (مثل فشل `assert` أو `assert_eq`) أو أرجع `Err(...)`؛ ويجوز أن يكون `async`.
+- **العزل:** كل اختبار يعمل في مفسّر جديد بميزانية AI جديدة، ولا تُعرض مخرجاته إلا إن فشل.
+- **الوصول للكود:** ملفات الاختبار تستخدم عناصر المشروع المعلّمة بـ `pub` عبر `use app.<module>`، وتنطبق عليها صلاحيات `elomar.toml` ونماذجه.
+- `elomar test [PATH] [--filter TEXT]`: المسار مجلد المشروع (الافتراضي المجلد الحالي) أو ملف اختبار واحد؛ ورمز الخروج 1 عند أي فشل.
+- `elomar new` لا يكتب فوق مجلد موجود غير فارغ.
+
 ## 5. التأثيرات (Effects)
 
 التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
@@ -505,6 +533,7 @@ fn main() {
 | `to_string(x)` | أي قيمة → `String` | |
 | `parse_int(s)` / `parse_float(s)` | `String` → `Option<Int>` / `Option<Float>` | |
 | `assert(cond)` / `assert(cond, msg)` | `Bool`, `String` → `Unit` (`R0004`) | |
+| `assert_eq(actual, expected)` | قيمتان من النوع نفسه → `Unit` (`R0004` مع عرض القيمتين) | |
 | `min(a, b)` / `max(a, b)` | عددان → `Int` إن كانا صحيحين وإلا `Float` | |
 | `abs(x)` | `Int\|Float` → النوع نفسه | |
 

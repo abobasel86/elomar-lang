@@ -1,0 +1,22 @@
+// Run from examples/school with `elomar test`.
+use app.students
+use app.grading
+
+fn test_average_rounds_to_one_decimal() {
+    let s = students.new_student("Lina", [95, 88, 92])
+    assert_eq(students.average(s), 91.7)
+}
+
+fn test_empty_grades_average_zero() {
+    assert_eq(students.average(students.new_student("New", [])), 0.0)
+}
+
+fn test_levels() {
+    assert(students.level(students.new_student("A", [95])) == grading.Level.Excellent)
+    assert(students.level(students.new_student("B", [60])) == grading.Level.Good)
+    assert(students.level(students.new_student("C", [10])) == grading.Level.Weak, "10 is below the pass mark")
+}
+
+fn test_labels() {
+    assert_eq(grading.label(grading.Level.Good), "good")
+}

@@ -131,6 +131,19 @@ pub fn run_with(
     ai: &mut AiRuntime,
     fs: FsPolicy,
 ) -> Result<(), RuntimeError> {
+    run_function(program, "main", host, ai, fs).map(|_| ())
+}
+
+/// Evaluates file-level constants, then calls the parameterless function
+/// `name` (awaiting it if it is `async`) and returns its value. Used for
+/// `main` and for each `test_*` function of `elomar test`.
+pub fn run_function(
+    program: &Program,
+    name: &str,
+    host: &mut dyn Host,
+    ai: &mut AiRuntime,
+    fs: FsPolicy,
+) -> Result<Value, RuntimeError> {
     let mut interp = Interpreter::new(program, host, ai, fs);
     for item in &program.items {
         if let Item::Const(c) = item {
@@ -138,25 +151,27 @@ pub fn run_with(
             interp.globals.insert(c.name.name.clone(), v);
         }
     }
-    let Some(main) = interp.fns.get("main").copied() else {
+    let Some(f) = interp.fns.get(name).copied() else {
         return Err(RuntimeError::new(
             "E1005",
             Span::default(),
-            Text::new("no `main` function found", "لا توجد دالة `main`"),
+            Text::new(
+                format!("no `{name}` function found"),
+                format!("لا توجد دالة `{name}`"),
+            ),
         ));
     };
     interp
-        .call_fn(main, Vec::new(), main.name.span)
+        .call_fn(f, Vec::new(), f.name.span)
         .and_then(|v| match v {
-            // `async fn main` returns a future; the runtime awaits it.
-            Value::Future(state) => interp.force(&state, main.name.span),
+            // An `async fn` returns a future; the runtime awaits it.
+            Value::Future(state) => interp.force(&state, f.name.span),
             v => Ok(v),
         })
-        .map(|_| ())
         .map_err(|flow| {
             let mut err = flow.into_error();
-            // The runtime's own call to `main` has no call site in the source.
-            if err.trace.last().is_some_and(|(name, _)| name == "main") {
+            // The runtime's own call has no call site in the source.
+            if err.trace.last().is_some_and(|(n, _)| n == name) {
                 err.trace.pop();
             }
             err

@@ -625,3 +625,14 @@ fn json_parse_and_stringify() {
         vec!["E2015"]
     );
 }
+
+#[test]
+fn assert_eq_needs_matching_types() {
+    ok(
+        "fn main() {\n  assert_eq(1 + 1, 2)\n  assert_eq(0.5 * 2, 1)\n  assert_eq([\"a\"], [\"a\"])\n}",
+    );
+    assert_eq!(
+        codes("fn main() {\n  assert_eq(1, \"1\")\n}"),
+        vec!["E2001"]
+    );
+}

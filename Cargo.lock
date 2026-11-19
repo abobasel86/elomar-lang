@@ -188,6 +188,7 @@ dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
  "elomar-ai-provider-openai",
+ "elomar-ast",
  "elomar-diagnostics",
  "elomar-interpreter",
  "elomar-loader",

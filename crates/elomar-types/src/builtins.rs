@@ -11,7 +11,7 @@ use crate::{Checker, Ty, suggest};
 pub const KNOWN_EFFECTS: [&str; 6] = ["io", "fs", "net", "ai", "db", "py"];
 
 /// Functions available without `use`.
-pub const BUILTIN_FUNCTIONS: [&str; 11] = [
+pub const BUILTIN_FUNCTIONS: [&str; 12] = [
     "print",
     "input",
     "to_float",
@@ -20,6 +20,7 @@ pub const BUILTIN_FUNCTIONS: [&str; 11] = [
     "parse_int",
     "parse_float",
     "assert",
+    "assert_eq",
     "min",
     "max",
     "abs",
@@ -258,6 +259,18 @@ impl Checker {
                     self.check_expr_against(&mut args[0].value, &Ty::Bool);
                     if let Some(msg) = args.get_mut(1) {
                         self.check_expr_against(&mut msg.value, &Ty::Str);
+                    }
+                }
+                Ty::Unit
+            }
+            "assert_eq" => {
+                if self.arity(name, args, 2, 2, span) {
+                    let actual = self.check_expr(&mut args[0].value, None);
+                    let expected = self.check_expr(&mut args[1].value, Some(&actual));
+                    let (a, e) = (self.subst.shallow(&actual), self.subst.shallow(&expected));
+                    let both_numeric = a.is_numeric() && e.is_numeric();
+                    if !both_numeric && !self.subst.unify(&actual, &expected) {
+                        self.mismatch(&actual, &expected, args[1].value.span);
                     }
                 }
                 Ty::Unit

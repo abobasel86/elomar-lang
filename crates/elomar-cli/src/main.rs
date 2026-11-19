@@ -48,6 +48,20 @@ enum Command {
         #[arg(long)]
         stdin: bool,
     },
+    /// Run the `test_*` functions in the project's `tests/` folder
+    Test {
+        /// Project folder, or a single test file
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        /// Only run tests whose name contains this text
+        #[arg(long, value_name = "TEXT")]
+        filter: Option<String>,
+    },
+    /// Create a new project folder with a program, a module and a test
+    New {
+        /// Name of the project (and its folder)
+        name: String,
+    },
 }
 
 /// Real terminal input/output for running programs.
@@ -81,8 +95,19 @@ impl Reporter {
         eprintln!("{}", render_in(diag, sources, self.opts));
     }
 
+    /// Renders to standard output (for `elomar test` failures).
+    fn emit_out(&self, diag: &Diagnostic, sources: &SourceMap) {
+        print!("{}", render_in(diag, sources, self.opts));
+    }
+
+    /// A message on standard error, in the chosen language.
     fn say(&self, en: &str, ar: &str) {
         eprintln!("{}", if self.opts.lang == Lang::Ar { ar } else { en });
+    }
+
+    /// A message on standard output, in the chosen language.
+    fn out(&self, en: &str, ar: &str) {
+        println!("{}", if self.opts.lang == Lang::Ar { ar } else { en });
     }
 }
 
@@ -111,6 +136,10 @@ fn main() -> ExitCode {
 
     let (path, execute) = match &cli.command {
         Command::Run { file } => (file.as_path(), true),
+        Command::Test { path, filter } => {
+            return testing::run_tests(path, filter.as_deref(), &reporter);
+        }
+        Command::New { name } => return scaffold::new_project(name, &reporter),
         Command::Check {
             file,
             format,
@@ -215,6 +244,8 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
 }
 
 mod editor;
+mod scaffold;
+mod testing;
 
 /// The project folder: where `elomar.toml` is, else the program's folder.
 /// Relative paths and modules (`src/`) are looked up from here.

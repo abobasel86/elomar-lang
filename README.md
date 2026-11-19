@@ -96,11 +96,23 @@ invalid answers and rate limits simulated by the mock.
 
 ## Getting started
 
-Requires a recent stable Rust toolchain.
+Requires a recent stable Rust toolchain. Install the `elomar` command:
 
 ```bash
-cargo build --release
+cargo install --path crates/elomar-cli --locked
 ```
+
+Create a project, run it and test it:
+
+```bash
+elomar new myapp
+```
+
+```bash
+cd myapp && elomar run src/main.elo && elomar test
+```
+
+Or try the examples from a checkout:
 
 ```bash
 cargo run -p elomar-cli -- run examples/hello/main.elo
@@ -117,6 +129,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `--lang en\|ar` | Diagnostic language (or set `ELOMAR_LANG`) |
 | `--no-color` | Plain output (also honors `NO_COLOR`) |
 | `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |
+| `elomar new NAME` | Create a project with a program, a module and a passing test |
+| `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
 
 ## Repository layout
 
@@ -153,7 +167,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, CI; ⏳ `Set`, formatter, package tooling, language server.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, `elomar new`, `elomar test`, CI; ⏳ `Set`, formatter, package tooling, language server.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

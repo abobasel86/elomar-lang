@@ -217,6 +217,24 @@ pub(crate) fn call_function(
             }
             Value::Unit
         }
+        "assert_eq" => {
+            if !args[0].equals(&args[1]) {
+                let (actual, expected) = (repr(&args[0]), repr(&args[1]));
+                return Err(RuntimeError::new(
+                    "R0004",
+                    span,
+                    Text::new(
+                        format!(
+                            "assertion failed: values differ\n    actual:   {actual}\n    expected: {expected}"
+                        ),
+                        format!(
+                            "فشل التحقق: القيمتان مختلفتان\n    الفعلية:   {actual}\n    المتوقعة: {expected}"
+                        ),
+                    ),
+                ));
+            }
+            Value::Unit
+        }
         "min" | "max" => {
             let (a, b) = (&args[0], &args[1]);
             let pick_a = if name == "min" {
@@ -238,6 +256,14 @@ pub(crate) fn call_function(
         },
         _ => unreachable!("unknown builtin `{name}`"),
     })
+}
+
+/// A value as it would appear inside a list: strings are quoted.
+fn repr(v: &Value) -> String {
+    match v {
+        Value::Str(s) => format!("{s:?}"),
+        other => other.to_string(),
+    }
 }
 
 fn parse_int(s: &str) -> Value {

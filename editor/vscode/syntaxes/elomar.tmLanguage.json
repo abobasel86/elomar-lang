@@ -169,7 +169,7 @@
       "patterns": [
         {
           "name": "support.function.builtin.elomar",
-          "match": "\\b(?:print|input|to_float|to_int|to_string|parse_int|parse_float|assert|min|max|abs)\\b(?=\\s*\\()"
+          "match": "\\b(?:print|input|to_float|to_int|to_string|parse_int|parse_float|assert_eq|assert|min|max|abs)\\b(?=\\s*\\()"
         },
         {
           "name": "entity.name.function.call.elomar",

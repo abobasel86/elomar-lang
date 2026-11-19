@@ -1118,9 +1118,9 @@ fn main() {
 | `elomar check src/main.elo` | فحص نحوي ونوعي دون تنفيذ | v0.1 |
 | `elomar check --format json --stdin FILE` | تشخيصات بصيغة JSON للمحررات (النص غير المحفوظ من stdin، ومواضع UTF-16) | **منفذ** |
 | `elomar --lang ar run ...` | رسائل الأخطاء بالعربية (أو `ELOMAR_LANG=ar`) | v0.1 |
-| `elomar test` | تشغيل مجموعة اختبارات | v0.1/v0.2 |
+| `elomar test` | تشغيل دوال `test_*` في `tests/` | **منفذ** (مع `--filter`) |
 | `elomar fmt` | تنسيق الشيفرة | v0.2 |
-| `elomar new myapp` | إنشاء هيكل مشروع | v0.2 |
+| `elomar new myapp` | إنشاء هيكل مشروع | **منفذ**: برنامج ووحدة واختبار ناجح |
 | `elomar add package` | إضافة حزمة | v0.3 |
 | `elomar build` | تجهيز مخرجات توزيع بحسب Target | v0.3 |
 | `elomar doc` | استخراج توثيق API | v0.3 |

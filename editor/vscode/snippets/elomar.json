@@ -39,6 +39,11 @@
     "body": ["match ${1:option} {", "\tSome(${2:value}) => $3", "\tNone => $0", "}"],
     "description": "Match on an Option"
   },
+  "test": {
+    "prefix": "test",
+    "body": ["fn test_${1:name}() {", "\tassert_eq(${2:actual}, ${3:expected})", "}"],
+    "description": "Test function (in a file under tests/, run with `elomar test`)"
+  },
   "for": {
     "prefix": "for",
     "body": ["for ${1:item} in ${2:items} {", "\t$0", "}"],
