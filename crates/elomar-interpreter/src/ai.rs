@@ -21,6 +21,41 @@ pub struct InferCall {
     pub timeout_ms: Option<i64>,
 }
 
+/// One tool of an `ai.run` call.
+#[derive(Debug, Clone)]
+pub struct RunTool {
+    /// The name the model sees (the function's own name).
+    pub name: String,
+    /// The function to call (with its module prefix).
+    pub fn_name: String,
+    /// Parameters in declaration order.
+    pub params: Vec<(String, Schema)>,
+    /// `None` for a function that returns nothing.
+    pub ret: Option<Schema>,
+}
+
+/// A pending `ai.run` call.
+#[derive(Debug, Clone)]
+pub struct RunCall {
+    pub infer: InferCall,
+    pub tools: Vec<RunTool>,
+    pub max_steps: i64,
+}
+
+impl InferCall {
+    pub(crate) fn request(&self, ai: &AiRuntime) -> AiRequest {
+        AiRequest {
+            model: self.model.clone(),
+            instructions: self.instructions.clone(),
+            input: to_json(&self.input),
+            schema: self.schema.clone(),
+            timeout_ms: self
+                .timeout_ms
+                .map_or_else(|| ai.default_timeout_ms(), |ms| ms.max(0) as u64),
+        }
+    }
+}
+
 /// The checker has already expanded aliases, so this is purely structural;
 /// a remaining name is an enum of plain variants.
 pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>) -> Schema {
@@ -55,15 +90,7 @@ pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>)
 /// Performs the call. Never fails at the interpreter level: every problem
 /// becomes an `Err(AIError)` value the program can `match` on.
 pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
-    let request = AiRequest {
-        model: call.model.clone(),
-        instructions: call.instructions.clone(),
-        input: to_json(&call.input),
-        schema: call.schema.clone(),
-        timeout_ms: call
-            .timeout_ms
-            .map_or_else(|| ai.default_timeout_ms(), |ms| ms.max(0) as u64),
-    };
+    let request = call.request(ai);
     match ai.infer(&request) {
         Ok(json) => Value::Result(Ok(Rc::new(from_json(&call.schema, &json)))),
         Err(e) => Value::Result(Err(Rc::new(ai_error_value(&e)))),
@@ -72,7 +99,7 @@ pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
 
 /// `AIError` as a value: the variant named by the error kind, carrying the
 /// message, e.g. `AIError.Timeout("no answer within 10000 ms")`.
-fn ai_error_value(e: &AiError) -> Value {
+pub(crate) fn ai_error_value(e: &AiError) -> Value {
     Value::Enum {
         enum_name: "AIError".into(),
         variant: e.kind.name().into(),

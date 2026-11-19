@@ -1,0 +1,44 @@
+// AI with tools: the model may call the functions listed in `tools`, and
+// nothing else. The runtime runs each call, sends back the result, and
+// checks the final answer against `Answer`.
+
+use std.ai
+
+type Student = { name: String, grade: Int }
+type Answer = { answer: String, used_tools: Bool }
+
+let STUDENTS = [
+    { name: "Lina", grade: 91 },
+    { name: "Omar", grade: 55 },
+    { name: "Sara", grade: 72 }
+]
+
+// Tools are ordinary functions; their parameter and result types become
+// the schemas the model sees.
+fn find_student(name: String) -> Option<Student> {
+    print("  [tool] find_student:", name)
+    return STUDENTS.find(|s| s.name == name)
+}
+
+fn class_average() -> Float {
+    print("  [tool] class_average")
+    return STUDENTS.fold(0, |sum, s| sum + s.grade) / STUDENTS.length
+}
+
+async fn ask(question: String) -> Result<Answer, AIError> !{ai, io} {
+    return await ai.run<Answer>(
+        model: "assistant",
+        instructions: "Answer questions about the class. Use the tools for facts.",
+        input: question,
+        tools: [find_student, class_average],
+        max_steps: 5
+    )
+}
+
+async fn main() {
+    print("Q: How is Lina doing compared to the class?")
+    match await ask("How is Lina doing compared to the class?") {
+        Ok(a) => print("A:", a.answer)
+        Err(e) => print("failed:", e.kind(), e.message())
+    }
+}

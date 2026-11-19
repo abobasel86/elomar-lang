@@ -38,6 +38,16 @@ const INFER_PARAMS: [(&str, bool); 4] = [
     ("timeout", false),
 ];
 
+/// Parameters of `ai.run`: (name, required).
+const RUN_PARAMS: [(&str, bool); 6] = [
+    ("model", true),
+    ("instructions", true),
+    ("input", true),
+    ("tools", true),
+    ("max_steps", false),
+    ("timeout", false),
+];
+
 /// `AIError` is a built-in enum; every variant carries a message.
 pub(crate) fn ai_error_ty() -> Ty {
     Ty::Enum(crate::enums::AI_ERROR.into(), Vec::new())
@@ -135,7 +145,7 @@ impl Checker {
         &mut self,
         module: &mut String,
         func: &Ident,
-        type_args: &mut [TypeExpr],
+        type_args: &mut Vec<TypeExpr>,
         args: &mut Vec<Arg>,
         span: Span,
     ) -> Option<Ty> {
@@ -169,21 +179,38 @@ impl Checker {
             "std.json" => self.check_json_call(func, type_args, args, span),
             "std.http" => self.check_http_call(func, type_args, args, span),
             "std.db" => self.check_db_call(func, type_args, args, span),
-            _ if func.name != "infer" => self.unknown_module_function("ai", func, &["infer"], args),
-            _ => self.check_ai_infer(func.span, type_args, args, span),
+            _ if func.name == "infer" || func.name == "run" => {
+                let name = func.name.clone();
+                self.check_ai_call(&name, func.span, type_args, args, span)
+            }
+            _ => self.unknown_module_function("ai", func, &["infer", "run"], args),
         })
     }
 
-    fn check_ai_infer(
+    /// `ai.infer<T>(model, instructions, input[, timeout])` and
+    /// `ai.run<T>(model, instructions, input, tools[, max_steps][, timeout])`.
+    ///
+    /// Arguments are reordered into the full parameter list with names
+    /// removed; for `ai.run` missing optional ones are filled in
+    /// (`max_steps: 5`, and `false` for "no timeout"), and the parameter and
+    /// result types of each tool are appended to the type arguments.
+    fn check_ai_call(
         &mut self,
+        func: &str,
         callee_span: Span,
-        type_args: &mut [TypeExpr],
+        type_args: &mut Vec<TypeExpr>,
         args: &mut Vec<Arg>,
         span: Span,
     ) -> Ty {
+        let what = format!("ai.{func}");
+        let params: &[(&str, bool)] = if func == "run" {
+            &RUN_PARAMS
+        } else {
+            &INFER_PARAMS
+        };
         self.usage.direct.push(("ai".into(), callee_span));
 
-        let out = match type_args {
+        let out = match type_args.as_mut_slice() {
             [t] => {
                 let ty = self.lower_type(t);
                 let resolved = self.subst.resolve(&ty);
@@ -201,24 +228,24 @@ impl Checker {
                         "E2008",
                         callee_span,
                         Text::new(
-                            "`ai.infer` needs the type of the answer",
-                            "تحتاج `ai.infer` إلى نوع الإجابة المطلوبة",
+                            format!("`{what}` needs the type of the answer"),
+                            format!("تحتاج `{what}` إلى نوع الإجابة المطلوبة"),
                         ),
                     )
                     .with_hint(Text::new(
-                        "write it in angle brackets, e.g. `ai.infer<Ticket>(...)` or `ai.infer<String>(...)`",
-                        "اكتبه بين قوسين زاويين، مثل `ai.infer<Ticket>(...)` أو `ai.infer<String>(...)`",
+                        format!("write it in angle brackets, e.g. `{what}<Ticket>(...)` or `{what}<String>(...)`"),
+                        format!("اكتبه بين قوسين زاويين، مثل `{what}<Ticket>(...)` أو `{what}<String>(...)`"),
                     )),
                 );
                 Ty::Error
             }
             _ => {
-                self.wrong_arg_count("ai.infer", "1 type", type_args.len(), span);
+                self.wrong_arg_count(&what, "1 type", type_args.len(), span);
                 Ty::Error
             }
         };
 
-        let slots = self.bind_infer_args(args, span);
+        let slots = self.bind_named_args(&what, params, args, span);
         // A cloud model also sends data over the network (spec §13.1). If the
         // model name is not a literal, assume the worst when any cloud model
         // is configured.
@@ -231,36 +258,182 @@ impl Checker {
             let site = model_arg.map_or(callee_span, |e| e.span);
             self.usage.direct.push(("net".into(), site));
         }
+        let mut tools = Vec::new();
         for (i, arg) in args.iter_mut().enumerate() {
-            match slots.iter().position(|s| *s == Some(i)) {
-                Some(0 | 1) => self.check_expr_against(&mut arg.value, &Ty::Str),
-                Some(2) => {
+            let param = slots
+                .iter()
+                .position(|s| *s == Some(i))
+                .map(|j| params[j].0);
+            match param {
+                Some("model" | "instructions") => self.check_expr_against(&mut arg.value, &Ty::Str),
+                Some("input") => {
                     let t = self.check_expr(&mut arg.value, None);
                     let resolved = self.subst.resolve(&t);
                     if let Some(bad) = self.non_json_part(&resolved, false) {
                         self.not_json_data(&resolved, &bad, arg.value.span, DataRole::AiInput);
                     }
                 }
+                Some("tools") => tools = self.check_tools(&mut arg.value),
+                Some("max_steps") => self.check_expr_against(&mut arg.value, &Ty::Int),
                 Some(_) => self.check_expr_against(&mut arg.value, &Ty::Duration),
                 None => {
                     self.check_expr(&mut arg.value, None);
                 }
             }
         }
-        if slots[..3].iter().all(Option::is_some) {
+        let required = params.iter().filter(|(_, r)| *r).count();
+        if slots[..required].iter().all(Option::is_some) {
             let mut old: Vec<Option<Arg>> = std::mem::take(args).into_iter().map(Some).collect();
-            for slot in slots.iter().flatten() {
-                let mut arg = old[*slot].take().expect("each argument fills one slot");
-                arg.name = None;
+            for (j, slot) in slots.iter().enumerate() {
+                let arg = match slot {
+                    Some(i) => {
+                        let mut arg = old[*i].take().expect("each argument fills one slot");
+                        arg.name = None;
+                        arg
+                    }
+                    // `ai.infer` keeps its old shape: no placeholders.
+                    None if func != "run" => continue,
+                    None => Arg {
+                        name: None,
+                        value: Expr {
+                            kind: if params[j].0 == "max_steps" {
+                                ExprKind::Int(5)
+                            } else {
+                                ExprKind::Bool(false)
+                            },
+                            span: callee_span,
+                        },
+                    },
+                };
                 args.push(arg);
+            }
+        }
+        if func == "run" && type_args.len() == 1 {
+            for (params, ret) in tools {
+                let unit = TypeExpr {
+                    kind: TypeExprKind::Named {
+                        name: Ident {
+                            name: "Unit".into(),
+                            span: callee_span,
+                        },
+                        args: Vec::new(),
+                    },
+                    span: callee_span,
+                };
+                type_args.push(type_expr_of(&Ty::record(params), callee_span));
+                type_args.push(if ret == Ty::Unit {
+                    unit
+                } else {
+                    type_expr_of(&ret, callee_span)
+                });
             }
         }
         Ty::future(Ty::result(out, ai_error_ty()))
     }
 
-    /// Maps each parameter of `ai.infer` to the index of its argument.
-    fn bind_infer_args(&mut self, args: &[Arg], span: Span) -> [Option<usize>; 4] {
-        let mut slots = [None; 4];
+    /// `tools: [find_student, average]`: names of plain functions whose
+    /// parameters and result are JSON data. Returns each tool's parameter
+    /// types and result type. Using a function here charges its effects to
+    /// the caller, as for any function value.
+    fn check_tools(&mut self, e: &mut Expr) -> Vec<(Vec<(String, Ty)>, Ty)> {
+        let ExprKind::List(items) = &mut e.kind else {
+            self.check_expr(e, None);
+            self.push(Diagnostic::error(
+                "E2022",
+                e.span,
+                Text::new(
+                    "`tools` must be a list of function names, e.g. `tools: [find_student]`",
+                    "يجب أن تكون `tools` قائمة بأسماء دوال، مثل `tools: [find_student]`",
+                ),
+            ));
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let mut names: Vec<String> = Vec::new();
+        for item in items.iter_mut() {
+            self.check_expr(item, None);
+            let fn_name = match &item.kind {
+                ExprKind::Name(n) if self.lookup_local(n).is_none() && self.fns.contains_key(n) => {
+                    n.clone()
+                }
+                _ => {
+                    self.error(
+                        "E2022",
+                        item.span,
+                        Text::new(
+                            "each tool must be the name of a function declared with `fn`",
+                            "كل أداة يجب أن تكون اسم دالة معرّفة بـ `fn`",
+                        ),
+                    );
+                    continue;
+                }
+            };
+            let sig = self.fns[&fn_name].clone();
+            let tool = crate::modules::base_name(&fn_name).to_string();
+            let problem = if !sig.type_params.is_empty() {
+                Some((
+                    "a generic function cannot be a tool".to_string(),
+                    "لا يمكن أن تكون الدالة العامة أداة".to_string(),
+                ))
+            } else if sig.is_async {
+                Some((
+                    "an `async fn` cannot be a tool yet".into(),
+                    "لا يمكن بعد أن تكون `async fn` أداة".into(),
+                ))
+            } else if tool.is_empty()
+                || !tool.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                Some((
+                    format!(
+                        "tool `{tool}`: model APIs accept only ASCII letters, digits and `_` in tool names"
+                    ),
+                    format!(
+                        "الأداة `{tool}`: واجهات النماذج تقبل في أسماء الأدوات الحروف اللاتينية والأرقام و`_` فقط"
+                    ),
+                ))
+            } else if names.contains(&tool) {
+                Some((
+                    format!("tool `{tool}` is listed twice"),
+                    format!("الأداة `{tool}` مذكورة مرتين"),
+                ))
+            } else {
+                None
+            };
+            if let Some((en, ar)) = problem {
+                self.error("E2022", item.span, Text::new(en, ar));
+                continue;
+            }
+            let mut bad = false;
+            for (_, t) in &sig.params {
+                if let Some(part) = self.non_json_part(t, false) {
+                    self.not_json_data(t, &part, item.span, DataRole::AiInput);
+                    bad = true;
+                }
+            }
+            if sig.ret != Ty::Unit
+                && let Some(part) = self.non_json_part(&sig.ret, false)
+            {
+                self.not_json_data(&sig.ret, &part, item.span, DataRole::AiInput);
+                bad = true;
+            }
+            if bad {
+                continue;
+            }
+            names.push(tool);
+            out.push((sig.params.clone(), sig.ret.clone()));
+        }
+        out
+    }
+
+    /// Maps each parameter of `what` to the index of its argument.
+    fn bind_named_args(
+        &mut self,
+        what: &str,
+        params: &[(&str, bool)],
+        args: &[Arg],
+        span: Span,
+    ) -> Vec<Option<usize>> {
+        let mut slots = vec![None; params.len()];
         let mut seen_named = false;
         for (i, arg) in args.iter().enumerate() {
             match &arg.name {
@@ -278,7 +451,7 @@ impl Checker {
                 None => {}
                 Some(id) => {
                     seen_named = true;
-                    match INFER_PARAMS.iter().position(|(n, _)| *n == id.name) {
+                    match params.iter().position(|(n, _)| *n == id.name) {
                         Some(j) if slots[j].is_some() => self.error(
                             "E2010",
                             id.span,
@@ -290,13 +463,13 @@ impl Checker {
                         Some(j) => slots[j] = Some(i),
                         None => {
                             let names: Vec<String> =
-                                INFER_PARAMS.iter().map(|(n, _)| n.to_string()).collect();
+                                params.iter().map(|(n, _)| n.to_string()).collect();
                             let mut diag = Diagnostic::error(
                                 "E2010",
                                 id.span,
                                 Text::new(
-                                    format!("`ai.infer` has no parameter named `{}`", id.name),
-                                    format!("`ai.infer` ليس لها معامل باسم `{}`", id.name),
+                                    format!("`{what}` has no parameter named `{}`", id.name),
+                                    format!("`{what}` ليس لها معامل باسم `{}`", id.name),
                                 ),
                             );
                             diag = match suggest(&id.name, &names) {
@@ -315,17 +488,23 @@ impl Checker {
                 }
             }
         }
-        if args.len() > INFER_PARAMS.len() {
-            self.wrong_arg_count("ai.infer", "3–4", args.len(), span);
+        if args.len() > params.len() {
+            let required = params.iter().filter(|(_, r)| *r).count();
+            self.wrong_arg_count(
+                what,
+                &format!("{required}–{}", params.len()),
+                args.len(),
+                span,
+            );
         }
-        for (j, (name, required)) in INFER_PARAMS.iter().enumerate() {
+        for (j, (name, required)) in params.iter().enumerate() {
             if *required && slots[j].is_none() {
                 self.error(
                     "E2002",
                     span,
                     Text::new(
-                        format!("`ai.infer` is missing the argument `{name}`"),
-                        format!("ينقص `ai.infer` المعامل `{name}`"),
+                        format!("`{what}` is missing the argument `{name}`"),
+                        format!("ينقص `{what}` المعامل `{name}`"),
                     ),
                 );
             }

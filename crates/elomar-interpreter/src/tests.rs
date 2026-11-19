@@ -609,3 +609,71 @@ fn sqlite_file_needs_write_permission() {
     assert_eq!(run_fs(src, policy), "Ok(1)\nOk([7])\nPolicyDenied\n");
     assert!(dir.join("out/app.db").exists());
 }
+
+// ----- ai.run with tools ----------------------------------------------------------
+
+fn tool_rule(tool: &str, arguments: serde_json::Value) -> MockRule {
+    MockRule {
+        tool: Some(tool.into()),
+        arguments: Some(arguments),
+        ..Default::default()
+    }
+}
+
+const AGENT: &str = "use std.ai
+type Student = { name: String, grade: Int }
+let STUDENTS = [{ name: \"Lina\", grade: 91 }, { name: \"Omar\", grade: 55 }]
+fn find_student(name: String) -> Option<Student> {
+  print(\"tool:\", name)
+  return STUDENTS.find(|s| s.name == name)
+}
+fn class_average() -> Float {
+  return STUDENTS.fold(0, |acc, s| acc + s.grade) / STUDENTS.length
+}
+async fn main() {
+  print(await ai.run<{ answer: String }>(model: \"support\", instructions: \"i\", input: \"q\", tools: [find_student, class_average], max_steps: 4))
+}";
+
+#[test]
+fn ai_run_calls_tools_until_an_answer() {
+    let rules = vec![
+        tool_rule("find_student", serde_json::json!({ "name": "Lina" })),
+        tool_rule("class_average", serde_json::json!({})),
+        rule(
+            None,
+            Some("{\"answer\": \"average {{last_tool_result}}\"}"),
+            None,
+        ),
+    ];
+    assert_eq!(
+        run_ai(AGENT, rules, AiPolicy::default()),
+        "tool: Lina\nOk({ answer: \"average 73.0\" })\n"
+    );
+}
+
+#[test]
+fn ai_run_reports_bad_tool_calls_to_the_model_and_limits_steps() {
+    // Invalid arguments and unknown tools are sent back as errors; the mock
+    // then keeps asking until `max_steps` runs out.
+    let rules = vec![
+        tool_rule("find_student", serde_json::json!({ "name": 3 })),
+        tool_rule("find_student", serde_json::json!({ "name": "Omar" })),
+        tool_rule("class_average", serde_json::json!({})),
+        tool_rule("class_average", serde_json::json!({})),
+    ];
+    let out = run_ai(AGENT, rules, AiPolicy::default());
+    assert_eq!(
+        out,
+        "tool: Omar\nErr(AIError.BudgetExceeded(\"the model did not finish within 4 step(s) (`max_steps`)\"))\n"
+    );
+    // Every step counts against `max_calls_per_run`.
+    let rules = vec![tool_rule("class_average", serde_json::json!({}))];
+    let policy = AiPolicy {
+        max_calls_per_run: Some(1),
+        ..Default::default()
+    };
+    assert!(
+        run_ai(AGENT, rules, policy)
+            .contains("AIError.BudgetExceeded(\"this run may make at most 1")
+    );
+}

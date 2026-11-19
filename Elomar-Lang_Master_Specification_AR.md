@@ -782,7 +782,7 @@ AIError.Cancelled(message)
 | Embeddings | `ai.embed()` | v0.3 |
 | Classification | قالب مبني على `infer<T>` | v0.2 |
 | Model Selection | `ai.registry` | v0.3 |
-| Tool Calling | `ai.tools` | v0.4 |
+| Tool Calling | `ai.run<T>(..., tools: [f, g], max_steps: n)` | **منفذ** (mock وOpenAI) |
 | Agents | `agent` أو مكتبة `std.agent` | v0.4 |
 | Multimodal | صور/صوت/ملفات حسب قدرات الموصل | v0.5+ |
 | Local Models | موصلات محلية مناسبة لكل نوع نموذج | v0.4+ |
@@ -1013,7 +1013,7 @@ async fn ask_model(text: String)
 | CLI | `std.cli` | Args, env, process exit | v0.2 |
 | Async | `std.async` | Tasks, cancel, timers, channels | v0.3 |
 | AI | `std.ai` | infer, generate, structured output | v0.1/v0.2 |
-| AI Tools | `std.agent` | Agent runtime, tool permission, steps | v0.4 |
+| AI Tools | `std.ai` (`ai.run`) ثم `std.agent` | Agent runtime, tool permission, steps | **الأدوات منفذة**: قائمة صريحة وحد للخطوات وتأثيرات الأدوات على المستدعي؛ الوكلاء الكاملون وMCP في v0.4 |
 | Data | `std.data` | CSV, table interfaces, external analytics | v0.4 |
 | Testing | `std.test` | Assert, mock, coverage hooks | v0.1/v0.2 |
 | Security | `std.security` | Secret values, policy interfaces | v0.2/v0.4 |

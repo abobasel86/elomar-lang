@@ -588,7 +588,7 @@ impl Checker {
     fn check_call(
         &mut self,
         callee: &mut Expr,
-        type_args: &mut [TypeExpr],
+        type_args: &mut Vec<TypeExpr>,
         args: &mut Vec<Arg>,
         span: Span,
         hint: Option<&Ty>,

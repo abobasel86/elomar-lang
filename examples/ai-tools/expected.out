@@ -1,0 +1,4 @@
+Q: How is Lina doing compared to the class?
+  [tool] find_student: Lina
+  [tool] class_average
+A: Lina scored 91, above the class average of 72.66666666666667.

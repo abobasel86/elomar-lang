@@ -901,3 +901,52 @@ fn db_module() {
         vec!["E2001"]
     );
 }
+
+// ----- ai.run with tools ----------------------------------------------------------
+
+const TOOLS: &str = "use std.ai
+fn lookup(name: String) -> Option<Int> {
+  return None
+}
+fn log_it(msg: String) {
+  print(msg)
+}
+";
+
+#[test]
+fn ai_run_tools() {
+    ok(&format!(
+        "{TOOLS}async fn main() {{\n  let r: Result<String, AIError> = await ai.run<String>(model: \"m\", instructions: \"i\", input: \"q\", tools: [lookup, log_it], max_steps: 3, timeout: 5s)\n  let s = await ai.run<{{ n: Int }}>(\"m\", \"i\", 1, [])\n}}"
+    ));
+    // The tools' effects belong to the caller of `ai.run`.
+    assert_eq!(
+        codes(&format!(
+            "{TOOLS}pub async fn ask() -> Result<String, AIError> !{{ai}} {{\n  return await ai.run<String>(\"m\", \"i\", \"q\", [log_it])\n}}"
+        )),
+        vec!["E3001"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{TOOLS}async fn main() {{\n  let f = |x: Int| x\n  let r = await ai.run<String>(\"m\", \"i\", \"q\", [f])\n}}"
+        )),
+        vec!["E2022"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{TOOLS}async fn main() {{\n  let r = await ai.run<String>(\"m\", \"i\", \"q\", lookup)\n}}"
+        )),
+        vec!["E2022"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{TOOLS}async fn main() {{\n  let r = await ai.run<String>(\"m\", \"i\", \"q\")\n}}"
+        )),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes(
+            "use std.ai\nfn f(m: Map<String, Int>) -> Int {\n  return 1\n}\nasync fn main() {\n  let r = await ai.run<String>(\"m\", \"i\", \"q\", [f])\n}"
+        ),
+        vec!["E2015"]
+    );
+}

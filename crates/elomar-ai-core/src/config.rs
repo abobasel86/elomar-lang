@@ -85,6 +85,12 @@ pub struct MockRule {
     /// Simulated latency; above the call's timeout it yields `Timeout`.
     #[serde(default)]
     pub delay_ms: Option<u64>,
+    /// For `ai.run`: instead of answering, ask to call this tool.
+    #[serde(default)]
+    pub tool: Option<String>,
+    /// The tool's arguments, e.g. `{ name = "Lina" }`.
+    #[serde(default)]
+    pub arguments: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

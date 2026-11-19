@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 use elomar_ast::Span;
 
-use crate::ai::InferCall;
+use crate::ai::{InferCall, RunCall};
 
 /// Work deferred until a future is awaited.
 #[derive(Debug, Clone)]
@@ -22,6 +22,8 @@ pub enum Thunk {
         span: Span,
     },
     Infer(InferCall),
+    /// `ai.run` with tools.
+    Run(Box<RunCall>),
 }
 
 /// A `Map` key. The checker allows only `String` and `Int` keys; maps

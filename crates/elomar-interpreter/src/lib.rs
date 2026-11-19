@@ -15,13 +15,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use elomar_ai_core::AiRuntime;
+use elomar_ai_core::{AiRuntime, Schema};
 pub use elomar_policy::FsPolicy;
 
 use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
-pub use ai::InferCall;
+pub use ai::{InferCall, RunCall, RunTool};
 pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
 
 /// Services the running program can use. Implemented by the CLI with real
@@ -778,6 +778,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 if let ExprKind::Name(module) = &target.kind {
                     match module.as_str() {
+                        "std.ai" if name.name == "run" => {
+                            return Ok(self.run_future(type_args, values));
+                        }
                         "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
                         "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
                         "std.db" => {
@@ -994,9 +997,159 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 self.call_fn(f, args, span)?
             }
             Thunk::Infer(call) => ai::run_infer(self.ai, &call),
+            Thunk::Run(call) => self.run_agent(&call, span)?,
         };
         *state.borrow_mut() = FutureState::Done(result.clone());
         Ok(result)
+    }
+
+    /// The future for `ai.run<T>(model, instructions, input, tools,
+    /// max_steps, timeout)`; the checker put the arguments in this order
+    /// and appended each tool's parameter and result types to `type_args`.
+    fn run_future(&self, type_args: &[TypeExpr], args: Vec<Value>) -> Value {
+        let mut args = args.into_iter();
+        let mut text = || match args.next() {
+            Some(Value::Str(s)) => s.to_string(),
+            _ => String::new(),
+        };
+        let model = text();
+        let instructions = text();
+        let input = args.next().unwrap_or(Value::Unit);
+        let tool_values = match args.next() {
+            Some(Value::List(items)) => items,
+            _ => Rc::new(Vec::new()),
+        };
+        let max_steps = match args.next() {
+            Some(Value::Int(n)) => n,
+            _ => 5,
+        };
+        let timeout_ms = match args.next() {
+            Some(Value::Duration(ms)) => Some(ms),
+            _ => None,
+        };
+        let mut tools = Vec::new();
+        for (i, v) in tool_values.iter().enumerate() {
+            let Value::Function(func) = v else { continue };
+            let Function::Named(fn_name) = &**func else {
+                continue;
+            };
+            let f = self.fns[fn_name.as_str()];
+            let param_schema = ai::schema_of(&type_args[1 + 2 * i], &self.unit_enums);
+            let Schema::Record(fields) = param_schema else {
+                continue;
+            };
+            let params = f
+                .params
+                .iter()
+                .filter_map(|p| {
+                    fields
+                        .iter()
+                        .find(|(n, _)| *n == p.name.name)
+                        .map(|(n, s)| (n.clone(), s.clone()))
+                })
+                .collect();
+            let ret_expr = &type_args[2 + 2 * i];
+            let ret = match &ret_expr.kind {
+                TypeExprKind::Named { name, .. } if name.name == "Unit" => None,
+                _ => Some(ai::schema_of(ret_expr, &self.unit_enums)),
+            };
+            let name = fn_name
+                .rsplit_once('.')
+                .map_or(fn_name.as_str(), |(_, n)| n);
+            tools.push(RunTool {
+                name: name.to_string(),
+                fn_name: fn_name.clone(),
+                params,
+                ret,
+            });
+        }
+        Value::future(Thunk::Run(Box::new(RunCall {
+            infer: InferCall {
+                schema: ai::schema_of(&type_args[0], &self.unit_enums),
+                model,
+                instructions,
+                input,
+                timeout_ms,
+            },
+            tools,
+            max_steps,
+        })))
+    }
+
+    /// The `ai.run` loop: ask the model, run the tools it asks for, send
+    /// back their results, until it answers or `max_steps` is reached.
+    fn run_agent(&mut self, call: &RunCall, span: Span) -> Exec<Value> {
+        use elomar_ai_core::{Message, Step, ToolSpec};
+        let request = call.infer.request(self.ai);
+        let specs: Vec<ToolSpec> = call
+            .tools
+            .iter()
+            .map(|t| ToolSpec {
+                name: t.name.clone(),
+                params: Schema::Record(t.params.clone()),
+            })
+            .collect();
+        let mut history = Vec::new();
+        for _ in 0..call.max_steps.max(1) {
+            match self.ai.step(&request, &specs, &history) {
+                Err(e) => return Ok(Value::Result(Err(Rc::new(ai::ai_error_value(&e))))),
+                Ok(Step::Final(json)) => {
+                    return Ok(Value::Result(Ok(Rc::new(ai::from_json(
+                        &call.infer.schema,
+                        &json,
+                    )))));
+                }
+                Ok(Step::ToolCalls(calls)) => {
+                    history.push(Message::ToolCalls(calls.clone()));
+                    for c in calls {
+                        let content = self.run_tool(call, &c, span)?;
+                        history.push(Message::ToolResult { id: c.id, content });
+                    }
+                }
+            }
+        }
+        Ok(Value::Result(Err(Rc::new(ai::ai_error_value(
+            &elomar_ai_core::AiError::new(
+                elomar_ai_core::AiErrorKind::BudgetExceeded,
+                format!(
+                    "the model did not finish within {} step(s) (`max_steps`)",
+                    call.max_steps.max(1)
+                ),
+            ),
+        )))))
+    }
+
+    /// Runs one tool call and returns its result as JSON text. Unknown
+    /// tools and invalid arguments are reported back to the model.
+    fn run_tool(
+        &mut self,
+        call: &RunCall,
+        c: &elomar_ai_core::ToolCall,
+        span: Span,
+    ) -> Exec<String> {
+        let Some(tool) = call.tools.iter().find(|t| t.name == c.name) else {
+            return Ok(
+                serde_json::json!({ "error": format!("unknown tool `{}`", c.name) }).to_string(),
+            );
+        };
+        let schema = Schema::Record(tool.params.clone());
+        if let Err(problem) = schema.validate(&c.arguments) {
+            return Ok(
+                serde_json::json!({ "error": format!("invalid arguments: {problem}") }).to_string(),
+            );
+        }
+        let null = serde_json::Value::Null;
+        let args = tool
+            .params
+            .iter()
+            .map(|(n, s)| ai::from_json(s, c.arguments.get(n).unwrap_or(&null)))
+            .collect();
+        let f = self.fns[tool.fn_name.as_str()];
+        let result = self.call_fn(f, args, span)?;
+        Ok(match tool.ret {
+            None => "null".into(),
+            Some(_) => ai::to_json(&result).to_string(),
+        })
     }
 
     fn check_depth(&self, call_span: Span) -> Exec<()> {

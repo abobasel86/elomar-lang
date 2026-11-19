@@ -12,7 +12,8 @@
 use std::time::Duration;
 
 use elomar_ai_core::{
-    AiError, AiErrorKind, AiRequest, Capabilities, ModelConfig, ModelProvider, Schema,
+    AiError, AiErrorKind, AiRequest, Capabilities, Message, ModelConfig, ModelProvider, Schema,
+    ToolCall, ToolSpec, Turn,
 };
 use serde_json::{Value, json};
 use url::Url;
@@ -134,6 +135,102 @@ impl OpenAiProvider {
         }
         body
     }
+
+    /// The request body for one step of `ai.run`: the plain request plus
+    /// the tools and the conversation so far.
+    pub fn step_body(&self, request: &AiRequest, tools: &[ToolSpec], history: &[Message]) -> Value {
+        let mut body = self.request_body(request);
+        body["tools"] = tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "parameters": t.params.json_schema_strict(),
+                        "strict": true,
+                    },
+                })
+            })
+            .collect();
+        let messages = body["messages"].as_array_mut().expect("messages");
+        for m in history {
+            messages.push(match m {
+                Message::ToolCalls(calls) => json!({
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": calls.iter().map(|c| json!({
+                        "id": c.id,
+                        "type": "function",
+                        "function": { "name": c.name, "arguments": c.arguments.to_string() },
+                    })).collect::<Vec<_>>(),
+                }),
+                Message::ToolResult { id, content } => json!({
+                    "role": "tool",
+                    "tool_call_id": id,
+                    "content": content,
+                }),
+            });
+        }
+        body
+    }
+
+    /// Sends a request body and returns the response text.
+    fn send(&self, body: &Value, timeout_ms: u64) -> Result<String, AiError> {
+        let Some(key) = (self.key)() else {
+            return Err(AiError::new(
+                AiErrorKind::Authentication,
+                format!(
+                    "the environment variable `{}` with the API key is not set",
+                    self.key_env
+                ),
+            ));
+        };
+        let response = self
+            .agent
+            .post(self.completions_url.as_str())
+            .timeout(Duration::from_millis(timeout_ms.max(1)))
+            .set("Authorization", &format!("Bearer {key}"))
+            .set("Content-Type", "application/json")
+            .send_string(&body.to_string());
+        match response {
+            Ok(resp) => resp
+                .into_string()
+                .map_err(|e| transport_error(&e, timeout_ms)),
+            Err(ureq::Error::Status(code, resp)) => {
+                let text = resp.into_string().unwrap_or_default();
+                Err(status_error(code, &text))
+            }
+            Err(ureq::Error::Transport(t)) => Err(transport_error(&t, timeout_ms)),
+        }
+    }
+}
+
+/// Tool calls in a Chat Completions response, if the model made any.
+pub fn tool_calls(body: &str) -> Option<Vec<ToolCall>> {
+    let json: Value = serde_json::from_str(body).ok()?;
+    let calls = json["choices"][0]["message"]["tool_calls"].as_array()?;
+    if calls.is_empty() {
+        return None;
+    }
+    Some(
+        calls
+            .iter()
+            .map(|c| ToolCall {
+                id: c["id"].as_str().unwrap_or_default().to_string(),
+                name: c["function"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                // Invalid JSON arguments become `null`, which fails
+                // validation and is reported back to the model.
+                arguments: c["function"]["arguments"]
+                    .as_str()
+                    .and_then(|a| serde_json::from_str(a).ok())
+                    .unwrap_or(Value::Null),
+            })
+            .collect(),
+    )
 }
 
 /// The JSON Schema to request, or `None` for free text (`String`).
@@ -173,36 +270,21 @@ impl ModelProvider for OpenAiProvider {
     }
 
     fn infer(&mut self, request: &AiRequest) -> Result<String, AiError> {
-        let Some(key) = (self.key)() else {
-            return Err(AiError::new(
-                AiErrorKind::Authentication,
-                format!(
-                    "the environment variable `{}` with the API key is not set",
-                    self.key_env
-                ),
-            ));
-        };
-        let body = self.request_body(request).to_string();
-        let response = self
-            .agent
-            .post(self.completions_url.as_str())
-            .timeout(Duration::from_millis(request.timeout_ms.max(1)))
-            .set("Authorization", &format!("Bearer {key}"))
-            .set("Content-Type", "application/json")
-            .send_string(&body);
-        let text = match response {
-            Ok(resp) => resp
-                .into_string()
-                .map_err(|e| transport_error(&e, request))?,
-            Err(ureq::Error::Status(code, resp)) => {
-                let text = resp.into_string().unwrap_or_default();
-                return Err(status_error(code, &text));
-            }
-            Err(ureq::Error::Transport(t)) => {
-                return Err(transport_error(&t, request));
-            }
-        };
+        let text = self.send(&self.request_body(request), request.timeout_ms)?;
         answer_text(&text, &request.schema)
+    }
+
+    fn step(
+        &mut self,
+        request: &AiRequest,
+        tools: &[ToolSpec],
+        history: &[Message],
+    ) -> Result<Turn, AiError> {
+        let text = self.send(&self.step_body(request, tools, history), request.timeout_ms)?;
+        if let Some(calls) = tool_calls(&text) {
+            return Ok(Turn::ToolCalls(calls));
+        }
+        answer_text(&text, &request.schema).map(Turn::Final)
     }
 }
 
@@ -266,7 +348,7 @@ fn status_error(code: u16, body: &str) -> AiError {
     AiError::new(kind, format!("OpenAI returned HTTP {code}: {message}"))
 }
 
-fn transport_error(e: &(dyn std::error::Error + 'static), request: &AiRequest) -> AiError {
+fn transport_error(e: &(dyn std::error::Error + 'static), timeout_ms: u64) -> AiError {
     let mut source: Option<&(dyn std::error::Error + 'static)> = Some(e);
     while let Some(err) = source {
         if let Some(io) = err.downcast_ref::<std::io::Error>()
@@ -277,7 +359,7 @@ fn transport_error(e: &(dyn std::error::Error + 'static), request: &AiRequest) -
         {
             return AiError::new(
                 AiErrorKind::Timeout,
-                format!("no answer within {} ms", request.timeout_ms),
+                format!("no answer within {timeout_ms} ms"),
             );
         }
         source = err.source();

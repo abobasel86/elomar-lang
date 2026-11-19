@@ -273,3 +273,50 @@ fn runtime_enforces_permissions_and_validates() {
     assert_eq!(e.kind, AiErrorKind::InvalidStructuredOutput);
     assert!(e.message.contains("$.category"), "{}", e.message);
 }
+
+#[test]
+fn tool_calling_steps() {
+    let tools = [ToolSpec {
+        name: "find_student".into(),
+        params: Schema::Record(vec![("name".into(), Schema::String)]),
+    }];
+    // The model asks for a tool call.
+    let reply = json!({
+        "choices": [{ "message": { "role": "assistant", "content": null, "tool_calls": [
+            { "id": "call_1", "type": "function", "function": { "name": "find_student", "arguments": "{\"name\": \"Lina\"}" } }
+        ] }, "finish_reason": "tool_calls" }]
+    })
+    .to_string();
+    let (url, rx) = fake_openai(200, reply, Duration::ZERO);
+    let turn = provider(&url, Some("k"))
+        .step(&request(Schema::String, 5_000), &tools, &[])
+        .unwrap();
+    let Turn::ToolCalls(calls) = turn else {
+        panic!("expected tool calls")
+    };
+    assert_eq!(calls[0].name, "find_student");
+    assert_eq!(calls[0].arguments, json!({"name": "Lina"}));
+    let raw = rx.recv().unwrap();
+    let body: Value = serde_json::from_str(&raw[raw.find("\r\n\r\n").unwrap() + 4..]).unwrap();
+    assert_eq!(body["tools"][0]["function"]["name"], "find_student");
+    assert_eq!(body["tools"][0]["function"]["strict"], true);
+
+    // Then it answers, after seeing the result.
+    let (url, rx) = fake_openai(200, completion("Lina has 91"), Duration::ZERO);
+    let history = [
+        Message::ToolCalls(calls),
+        Message::ToolResult {
+            id: "call_1".into(),
+            content: "91".into(),
+        },
+    ];
+    let turn = provider(&url, Some("k"))
+        .step(&request(Schema::String, 5_000), &tools, &history)
+        .unwrap();
+    assert_eq!(turn, Turn::Final("Lina has 91".into()));
+    let raw = rx.recv().unwrap();
+    let body: Value = serde_json::from_str(&raw[raw.find("\r\n\r\n").unwrap() + 4..]).unwrap();
+    assert_eq!(body["messages"][2]["tool_calls"][0]["id"], "call_1");
+    assert_eq!(body["messages"][3]["role"], "tool");
+    assert_eq!(body["messages"][3]["content"], "91");
+}

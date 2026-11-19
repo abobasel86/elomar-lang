@@ -1,0 +1,24 @@
+[package]
+name = "ai-tools"
+
+# An offline mock model with a scripted conversation: it asks for two tool
+# calls, then answers. Swap in `provider = "openai"` (see examples/ai-openai)
+# to let a real model decide which tools to call.
+[ai.models.assistant]
+provider = "mock"
+
+[[ai.models.assistant.mock]]
+input_contains = "Lina"
+tool = "find_student"
+arguments = { name = "Lina" }
+
+[[ai.models.assistant.mock]]
+input_contains = "Lina"
+tool = "class_average"
+
+[[ai.models.assistant.mock]]
+input_contains = "Lina"
+response = '{"answer": "Lina scored 91, above the class average of {{last_tool_result}}.", "used_tools": true}'
+
+[ai.policy]
+max_calls_per_run = 10

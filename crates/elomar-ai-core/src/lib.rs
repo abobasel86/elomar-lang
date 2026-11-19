@@ -108,6 +108,48 @@ impl AiRequest {
     }
 }
 
+/// A function the model may ask to call during `ai.run`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolSpec {
+    pub name: String,
+    /// Always a record: the tool's parameters by name.
+    pub params: Schema,
+}
+
+/// The model's request to call a tool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolCall {
+    /// Pairs the call with its result.
+    pub id: String,
+    pub name: String,
+    pub arguments: serde_json::Value,
+}
+
+/// Earlier turns of an `ai.run` conversation, after the first request.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Message {
+    /// The model asked for these calls.
+    ToolCalls(Vec<ToolCall>),
+    /// What a call returned, as JSON text.
+    ToolResult { id: String, content: String },
+}
+
+/// One answer of the model in a tool conversation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Turn {
+    /// The final answer, as raw text (validated by [`AiRuntime`]).
+    Final(String),
+    ToolCalls(Vec<ToolCall>),
+}
+
+/// One step of `ai.run`, after validation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Step {
+    /// The answer, guaranteed to match the request's schema.
+    Final(serde_json::Value),
+    ToolCalls(Vec<ToolCall>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Capabilities {
     /// Can be asked to answer in a given JSON Schema.
@@ -127,6 +169,20 @@ pub trait ModelProvider: Send {
         None
     }
     fn infer(&mut self, request: &AiRequest) -> Result<String, AiError>;
+
+    /// One step of a conversation with tools: the model either answers or
+    /// asks for tool calls. `history` holds the earlier calls and results.
+    fn step(
+        &mut self,
+        _request: &AiRequest,
+        _tools: &[ToolSpec],
+        _history: &[Message],
+    ) -> Result<Turn, AiError> {
+        Err(AiError::new(
+            AiErrorKind::UnsupportedCapability,
+            format!("provider `{}` does not support tools", self.provider_name()),
+        ))
+    }
 }
 
 /// Stands in for a provider named in `elomar.toml` that this build does not
@@ -207,10 +263,26 @@ impl AiRuntime {
         self.policy.default_timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS)
     }
 
-    /// Runs one inference: budget → model lookup → network permission →
-    /// provider → parse → validate.
-    /// On success the JSON is guaranteed to match `request.schema`.
-    pub fn infer(&mut self, request: &AiRequest) -> Result<serde_json::Value, AiError> {
+    /// One step of `ai.run`; checked like [`AiRuntime::infer`], and every
+    /// step counts as a call against `max_calls_per_run`.
+    pub fn step(
+        &mut self,
+        request: &AiRequest,
+        tools: &[ToolSpec],
+        history: &[Message],
+    ) -> Result<Step, AiError> {
+        let provider = self.checked_provider(request)?;
+        match provider.step(request, tools, history)? {
+            Turn::Final(text) => parse_response(&text, &request.schema).map(Step::Final),
+            Turn::ToolCalls(calls) => Ok(Step::ToolCalls(calls)),
+        }
+    }
+
+    /// Budget → model lookup → network permission; counts the call.
+    fn checked_provider(
+        &mut self,
+        request: &AiRequest,
+    ) -> Result<&mut Box<dyn ModelProvider>, AiError> {
         if let Some(max) = self.policy.max_calls_per_run
             && self.calls >= max
         {
@@ -239,6 +311,14 @@ impl AiRuntime {
             ));
         }
         self.calls += 1;
+        Ok(provider)
+    }
+
+    /// Runs one inference: budget → model lookup → network permission →
+    /// provider → parse → validate.
+    /// On success the JSON is guaranteed to match `request.schema`.
+    pub fn infer(&mut self, request: &AiRequest) -> Result<serde_json::Value, AiError> {
+        let provider = self.checked_provider(request)?;
         let text = provider.infer(request)?;
         parse_response(&text, &request.schema)
     }
