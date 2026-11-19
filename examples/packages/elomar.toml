@@ -1,0 +1,8 @@
+[package]
+name = "packages-demo"
+
+# Packages this project uses. A local folder here; a git repository works
+# the same way:  textkit = { git = "https://github.com/user/textkit", tag = "v1.0" }
+# Add and remove them with `elomar add` / `elomar remove`.
+[dependencies]
+geometry = { path = "vendor/geometry" }

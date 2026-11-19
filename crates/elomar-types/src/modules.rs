@@ -46,11 +46,14 @@ pub(crate) struct ModuleScopes {
     pub all_items: HashSet<String>,
     /// Per module: name → full name, from `use app.x.{name}`.
     pub imported_names: HashMap<String, HashMap<String, String>>,
+    /// Package names (from `[dependencies]`).
+    pub packages: Vec<String>,
 }
 
 impl Checker {
     pub(crate) fn collect_module_info(&mut self, program: &Program) {
         self.scopes_mod.loaded = program.modules.iter().cloned().collect();
+        self.scopes_mod.packages = program.packages.clone();
         for item in &program.items {
             let (name, is_pub) = match item {
                 Item::Fn(f) => (&f.name.name, f.is_pub),
@@ -111,6 +114,27 @@ impl Checker {
             .collect::<Vec<_>>()
             .join(".");
         let alias = &u.path[u.path.len() - 1];
+        if !self.scopes_mod.loaded.contains(&target)
+            && let Some((package, rest)) = target.split_once('.')
+            && self.scopes_mod.packages.iter().any(|p| p == package)
+        {
+            let file = format!("src/{}.elo", rest.replace('.', "/"));
+            self.push(
+                Diagnostic::error(
+                    "E1011",
+                    u.span,
+                    Text::new(
+                        format!("package `{package}` has no module `{rest}`"),
+                        format!("الحزمة `{package}` ليس فيها الوحدة `{rest}`"),
+                    ),
+                )
+                .with_hint(Text::new(
+                    format!("expected the file `{file}` in the package folder"),
+                    format!("المتوقع وجود الملف `{file}` في مجلد الحزمة"),
+                )),
+            );
+            return;
+        }
         if !self.scopes_mod.loaded.contains(&target) {
             let file = format!("src/{}.elo", target.replace('.', "/"));
             self.push(

@@ -186,6 +186,7 @@ impl Parser {
             }
         }
         Program {
+            packages: Vec::new(),
             items,
             modules: Vec::new(),
         }

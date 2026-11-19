@@ -1,0 +1,12 @@
+// A package module. `use app.x` here means this package's own module `x`.
+use app.units
+
+pub type Rect = { w: Float, h: Float }
+
+pub fn area(r: Rect) -> Float {
+    return r.w * r.h
+}
+
+pub fn describe(r: Rect) -> String {
+    return to_string(area(r)) + " " + units.squared()
+}

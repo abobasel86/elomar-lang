@@ -15,6 +15,8 @@ pub struct Program {
     pub items: Vec<Item>,
     /// Imported modules that were found, e.g. `students` for `use app.students`.
     pub modules: Vec<String>,
+    /// Names of the packages (dependencies) the program can use.
+    pub packages: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

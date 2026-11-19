@@ -705,3 +705,80 @@ fn named_imports() {
     assert_eq!(codes, vec!["E1008", "E1012", "E1002"], "{stderr}");
     assert!(stderr.contains("did you mean `shout`?"), "{stderr}");
 }
+
+#[test]
+fn packages_add_use_and_remove() {
+    let main = module_project(
+        "packages",
+        &[
+            ("app/elomar.toml", "[package]\nname = \"app\"\n"),
+            (
+                "app/src/main.elo",
+                "use geo.shapes\n\nfn main() {\n    print(shapes.area(2.0, 3.0), shapes.label())\n}\n",
+            ),
+            (
+                "geo/elomar.toml",
+                "[package]\nname = \"geo\"\n\n[dependencies]\nunits = { path = \"../units\" }\n",
+            ),
+            (
+                "geo/src/shapes.elo",
+                "use app.helpers\nuse units.names\n\npub fn area(w: Float, h: Float) -> Float {\n    return helpers.times(w, h)\n}\n\npub fn label() -> String {\n    return names.unit()\n}\n",
+            ),
+            (
+                "geo/src/helpers.elo",
+                "pub fn times(a: Float, b: Float) -> Float {\n    return a * b\n}\n",
+            ),
+            ("units/elomar.toml", ""),
+            (
+                "units/src/names.elo",
+                "pub fn unit() -> String {\n    return \"m2\"\n}\n",
+            ),
+        ],
+    );
+    let root = main.parent().unwrap().parent().unwrap();
+    let app = root.join("app");
+    let run_in = |dir: &Path, args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_elomar"))
+            .args(["--no-color", "--lang", "en"])
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap()
+    };
+    // Not a dependency yet: an unknown module.
+    let out = run_in(&app, &["check", "src/main.elo"]);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("E1009"));
+
+    let out = run_in(&app, &["add", "geo", "--path", "../geo"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let toml = std::fs::read_to_string(app.join("elomar.toml")).unwrap();
+    assert!(
+        toml.contains("[dependencies]\ngeo = { path = \"../geo\" }"),
+        "{toml}"
+    );
+    let out = run_in(&app, &["run", "src/main.elo"]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&out.stdout)),
+        "6.0 m2\n",
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let out = run_in(&app, &["remove", "geo"]);
+    assert!(out.status.success());
+    assert!(
+        !std::fs::read_to_string(app.join("elomar.toml"))
+            .unwrap()
+            .contains("geo =")
+    );
+    assert!(!run_in(&app, &["remove", "geo"]).status.success());
+    assert!(
+        !run_in(&app, &["add", "App", "--path", "../geo"])
+            .status
+            .success()
+    );
+}

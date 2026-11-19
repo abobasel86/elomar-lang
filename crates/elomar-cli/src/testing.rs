@@ -91,6 +91,7 @@ pub(crate) fn run_tests(path: &Path, filter: Option<&str>, reporter: &Reporter) 
                 .to_string()
                 .replace('\\', "/"),
         );
+        crate::packages::fetch_for(file, reporter);
         let loaded = match elomar_loader::load(&entry, &project_root(file)) {
             Ok(l) => l,
             Err(e) => {

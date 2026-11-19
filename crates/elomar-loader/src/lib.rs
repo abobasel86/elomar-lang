@@ -7,12 +7,19 @@
 //! renamed with the module's name as a prefix (`count` in `students` becomes
 //! `students.count`), so the checker and interpreter see a single program.
 //! Missing modules are left for the checker to report.
+//!
+//! Packages (`[dependencies]` in elomar.toml, see `elomar-pkg`) are found
+//! offline, from the lock file and cache. `use mathx.stats` loads
+//! `src/stats.elo` of package `mathx`, and inside a package `use app.x`
+//! means that package's own module `x`. Both are rewritten to the form
+//! `use app.mathx.stats`, so the checker sees one kind of module path;
+//! the module's items are named `mathx.stats.item`.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-use elomar_ast::{Item, Program};
-use elomar_diagnostics::{Diagnostic, SourceFile, SourceMap};
+use elomar_ast::{Ident, Item, Program};
+use elomar_diagnostics::{Diagnostic, SourceFile, SourceMap, Span, Text};
 
 pub struct Loaded {
     pub program: Program,
@@ -78,12 +85,34 @@ pub fn load_with(
     let mut sources = SourceMap::default();
     let mut diagnostics = Vec::new();
 
+    // Package name → its module folder.
+    let mut packages: HashMap<String, PathBuf> = HashMap::new();
+    match elomar_pkg::resolve(
+        &std::path::absolute(project_root)?,
+        elomar_pkg::Mode::Offline,
+    ) {
+        Ok(list) => {
+            for p in list {
+                packages.insert(p.name, module_dir(&p.root));
+            }
+        }
+        Err(message) => diagnostics.push(Diagnostic::error(
+            "E1015",
+            Span::default(),
+            Text::new(
+                format!("dependencies: {message}"),
+                format!("الاعتماديات: {message}"),
+            ),
+        )),
+    }
+
     let text = match entry_text {
         Some(t) => t,
         None => std::fs::read_to_string(entry)?,
     };
     let base = sources.next_base();
-    let (main, diags) = elomar_parser::parse_at(&text, base);
+    let (mut main, diags) = elomar_parser::parse_at(&text, base);
+    canonical_uses(&mut main.items, None, &packages);
     sources.add(SourceFile::new(entry_display.clone(), text));
     let mut paths = vec![entry_abs.clone()];
     diagnostics.extend(diags);
@@ -96,7 +125,13 @@ pub fn load_with(
         if !seen.insert(module.clone()) {
             continue;
         }
-        let file = module_file(&dir, &module);
+        // `mathx.stats` is module `stats` of package `mathx`.
+        let (package, file) = match module.split_once('.') {
+            Some((p, rest)) if packages.contains_key(p) => {
+                (Some(p.to_string()), module_file(&packages[p], rest))
+            }
+            _ => (None, module_file(&dir, &module)),
+        };
         if file == entry_abs || !file.is_file() {
             continue;
         }
@@ -110,6 +145,7 @@ pub fn load_with(
         paths.push(file.clone());
         diagnostics.extend(diags);
         let mut items = parsed.items;
+        canonical_uses(&mut items, package.as_deref(), &packages);
         for item in &mut items {
             prefix(item, &module);
         }
@@ -117,7 +153,10 @@ pub fn load_with(
         modules.push((module, items));
     }
 
+    let mut names: Vec<String> = packages.into_keys().collect();
+    names.sort();
     let mut program = Program {
+        packages: names,
         modules: modules.iter().map(|(m, _)| m.clone()).collect(),
         items: Vec::new(),
     };
@@ -131,6 +170,37 @@ pub fn load_with(
         paths,
         diagnostics,
     })
+}
+
+/// Rewrites `use pkg.m` to `use app.pkg.m`, and inside package `current`
+/// `use app.m` to `use app.current.m`.
+fn canonical_uses(items: &mut [Item], current: Option<&str>, packages: &HashMap<String, PathBuf>) {
+    for item in items {
+        let Item::Use(u) = item else { continue };
+        if u.path.len() < 2 {
+            continue;
+        }
+        let first = u.path[0].clone();
+        if first.name == "app" {
+            if let Some(p) = current {
+                u.path.insert(
+                    1,
+                    Ident {
+                        name: p.to_string(),
+                        span: first.span,
+                    },
+                );
+            }
+        } else if packages.contains_key(&first.name) {
+            u.path.insert(
+                0,
+                Ident {
+                    name: "app".into(),
+                    span: first.span,
+                },
+            );
+        }
+    }
 }
 
 /// Modules named by `use app.*` items.
@@ -205,6 +275,60 @@ mod tests {
                 Item::Impl(i) => format!("impl@{}", i.module),
             })
             .collect()
+    }
+
+    #[test]
+    fn package_modules_are_rewritten_and_prefixed() {
+        let dir = project(&[
+            (
+                "app/elomar.toml",
+                "[dependencies]
+kit = { path = \"../kit\" }
+",
+            ),
+            (
+                "app/src/main.elo",
+                "use kit.text
+fn main() {}
+",
+            ),
+            ("kit/elomar.toml", ""),
+            (
+                "kit/src/text.elo",
+                "use app.inner
+pub fn f() {}
+",
+            ),
+            (
+                "kit/src/inner.elo",
+                "pub fn g() {}
+",
+            ),
+        ]);
+        let loaded = load(&dir.join("app/src/main.elo"), &dir.join("app")).unwrap();
+        assert!(loaded.diagnostics.is_empty(), "{:?}", loaded.diagnostics);
+        assert_eq!(loaded.program.packages, vec!["kit"]);
+        assert_eq!(loaded.program.modules, vec!["kit.text", "kit.inner"]);
+        assert_eq!(
+            names(&loaded.program),
+            vec!["kit.inner.g", "use@kit.text", "kit.text.f", "use@", "main"]
+        );
+        let paths: Vec<String> = loaded
+            .program
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Use(u) => Some(
+                    u.path
+                        .iter()
+                        .map(|p| p.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join("."),
+                ),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(paths, vec!["app.kit.inner", "app.kit.text"]);
     }
 
     #[test]

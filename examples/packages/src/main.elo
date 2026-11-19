@@ -1,0 +1,13 @@
+// Using a package: `use <package>.<module>`, with the same `pub` rules as
+// your own modules.
+
+use geometry.shapes
+use geometry.shapes.{Rect}
+
+fn main() {
+    let rooms: List<Rect> = [{ w: 4.0, h: 3.0 }, { w: 2.5, h: 2.0 }]
+    for r in rooms {
+        print(shapes.describe(r))
+    }
+    print("Total:", rooms.fold(0.0, |sum, r| sum + shapes.area(r)))
+}

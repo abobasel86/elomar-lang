@@ -46,6 +46,10 @@ by the compiler when they are not declared.
 - **VS Code support** in [`editor/vscode`](editor/vscode): highlighting
   (Arabic names included), errors while typing in English or Arabic, hover
   types, go to definition, outline, completion, a Run button and snippets.
+- **Packages:** `[dependencies]` from a local folder or a git repository
+  (`elomar add geometry --path vendor/geometry`, `elomar add kit --git URL --tag v1`),
+  locked in `elomar.lock`, used as `use geometry.shapes`. See
+  [`examples/packages`](examples/packages).
 - **Language server** `elomar lsp` (LSP over stdio) for any editor; see
   [Editors](#editors).
 - Effect inference with mandatory declarations on `pub` functions.
@@ -157,6 +161,9 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar new NAME` | Create a project with a program, a module and a passing test |
 | `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
 | `elomar fmt [PATHS] [--check] [--stdin]` | Format `.elo` files (comments kept; never changes meaning) |
+| `elomar add NAME --path DIR` / `--git URL [--tag T]` | Add a dependency and download it |
+| `elomar remove NAME` / `elomar update` | Remove a dependency / refresh git dependencies and `elomar.lock` |
+| `elomar lsp` | Language server for editors (LSP on stdio) |
 
 ## Repository layout
 
@@ -166,7 +173,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-lexer` | Tokens and newline rules |
 | `crates/elomar-ast` | Syntax tree |
 | `crates/elomar-parser` | Recursive-descent + Pratt parser |
-| `crates/elomar-loader` | Loads the main file and the `use app.*` modules it imports |
+| `crates/elomar-loader` | Loads the main file and the modules and packages it imports |
+| `crates/elomar-pkg` | Dependencies: path and git packages, cache, `elomar.lock` |
 | `crates/elomar-fmt` | The formatter behind `elomar fmt` |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
 | `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
@@ -195,7 +203,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`); ⏳ agents and MCP, package manager.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`); ⏳ agents and MCP, a package registry.
 5. Bytecode VM, performance work and stable releases.
 
 ## Editors

@@ -212,6 +212,7 @@ dependencies = [
  "elomar-interpreter",
  "elomar-loader",
  "elomar-parser",
+ "elomar-pkg",
  "elomar-types",
  "serde_json",
 ]
@@ -262,6 +263,7 @@ dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
  "elomar-parser",
+ "elomar-pkg",
 ]
 
 [[package]]
@@ -271,6 +273,14 @@ dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
  "elomar-lexer",
+]
+
+[[package]]
+name = "elomar-pkg"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]

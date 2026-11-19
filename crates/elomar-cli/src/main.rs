@@ -76,6 +76,30 @@ enum Command {
     },
     /// Run the language server (LSP) on standard input/output, for editors
     Lsp,
+    /// Add a dependency to elomar.toml and download it
+    Add {
+        /// The package name, used as `use <name>.<module>`
+        name: String,
+        /// A local folder with the package
+        #[arg(long, value_name = "FOLDER", conflicts_with = "git")]
+        path: Option<String>,
+        /// A git repository URL
+        #[arg(long, value_name = "URL")]
+        git: Option<String>,
+        /// Git tag to use
+        #[arg(long, requires = "git", conflicts_with_all = ["branch", "rev"])]
+        tag: Option<String>,
+        /// Git branch to use
+        #[arg(long, requires = "git", conflicts_with = "rev")]
+        branch: Option<String>,
+        /// Git commit to use
+        #[arg(long, requires = "git")]
+        rev: Option<String>,
+    },
+    /// Remove a dependency from elomar.toml
+    Remove { name: String },
+    /// Fetch the latest commits of git dependencies and update elomar.lock
+    Update,
 }
 
 /// Real terminal input/output for running programs.
@@ -155,6 +179,28 @@ fn main() -> ExitCode {
         }
         Command::New { name } => return scaffold::new_project(name, &reporter),
         Command::Lsp => return lsp::serve(lang),
+        Command::Add {
+            name,
+            path,
+            git,
+            tag,
+            branch,
+            rev,
+        } => {
+            return packages::add(
+                &packages::AddArgs {
+                    name,
+                    path: path.as_deref(),
+                    git: git.as_deref(),
+                    tag: tag.as_deref(),
+                    branch: branch.as_deref(),
+                    rev: rev.as_deref(),
+                },
+                &reporter,
+            );
+        }
+        Command::Remove { name } => return packages::remove(name, &reporter),
+        Command::Update => return packages::update(&reporter),
         Command::Fmt {
             paths,
             check,
@@ -184,6 +230,7 @@ fn main() -> ExitCode {
 }
 
 fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
+    packages::fetch_for(path, reporter);
     let loaded = match elomar_loader::load(path, &project_root(path)) {
         Ok(l) => l,
         Err(e) => {
@@ -266,6 +313,7 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
 mod editor;
 mod fmt;
 mod lsp;
+mod packages;
 mod scaffold;
 mod testing;
 

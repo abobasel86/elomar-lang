@@ -15,6 +15,7 @@ elomar-diagnostics.workspace = true
 elomar-ast.workspace = true
 elomar-parser.workspace = true
 elomar-loader.workspace = true
+elomar-pkg.workspace = true
 elomar-fmt.workspace = true
 elomar-types.workspace = true
 elomar-interpreter.workspace = true
