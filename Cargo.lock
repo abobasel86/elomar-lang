@@ -223,6 +223,8 @@ dependencies = [
  "elomar-types",
  "serde_json",
  "unicode-segmentation",
+ "ureq",
+ "url",
 ]
 
 [[package]]

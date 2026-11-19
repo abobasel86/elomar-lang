@@ -738,3 +738,31 @@ fn closure_effects_belong_to_their_creator() {
     );
     ok("pub fn shout(xs: List<Int>) !{io} {\n  xs.map(|x| { print(x)\n    return x })\n}");
 }
+
+// ----- std.http ----------------------------------------------------------------
+
+#[test]
+fn http_module() {
+    ok(
+        "use std.http\nfn main() {\n  match http.get(\"https://example.com\") {\n    Ok(r) => print(r.status, r.body.length)\n    Err(HttpError.PolicyDenied(m)) => print(m)\n    Err(e) => print(e.kind(), e.message())\n  }\n  let r: Result<{ status: Int, body: String }, HttpError> = http.post(\"https://example.com\", \"{}\", \"application/json\")\n}",
+    );
+    ok(
+        "use std.http\npub fn fetch(url: String) -> Bool !{net} {\n  return http.get(url).is_ok()\n}",
+    );
+    // The `net` effect must be declared on public functions.
+    assert_eq!(
+        codes(
+            "use std.http\npub fn fetch(url: String) -> Bool {\n  return http.get(url).is_ok()\n}"
+        ),
+        vec!["E3002"]
+    );
+    assert_eq!(
+        codes("use std.http\nfn main() {\n  http.put(\"x\")\n}"),
+        vec!["E1008"]
+    );
+    assert_eq!(
+        codes("use std.http\nfn main() {\n  http.post(\"x\")\n}"),
+        vec!["E2002"]
+    );
+    assert_eq!(codes("fn main() {\n  http.get(\"x\")\n}"), vec!["E1001"]);
+}

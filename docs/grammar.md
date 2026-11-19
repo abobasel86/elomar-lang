@@ -440,6 +440,32 @@ print(json.pretty(students))      // بمسافات بادئة
 - `std.json` خالية من التأثيرات.
 - السجلات الناتجة عن `json.parse` تُطبع حقولها بالترتيب الأبجدي، لأن أنواع السجلات بنيوية لا تحفظ ترتيب التعريف.
 
+## 4.11.1 HTTP: `std.http`
+
+```elomar
+use std.http
+
+fn main() {
+    match http.get("https://api.example.com/todos/1") {
+        Ok(resp) => print(resp.status, resp.body)
+        Err(HttpError.PolicyDenied(m)) => print("not allowed:", m)
+        Err(e) => print(e.kind(), e.message())
+    }
+    let r = http.post("https://api.example.com/todos", "{\"title\": \"x\"}")
+}
+```
+
+| الدالة | النوع |
+|---|---|
+| `http.get(url)` | `Result<{ status: Int, body: String }, HttpError>` |
+| `http.post(url, body[, content_type])` | النوع نفسه؛ `content_type` افتراضيًا `application/json` |
+
+- كل استدعاء هو تأثير `net`، والمضيف يجب أن يكون في `[permissions] network_hosts` (`host` أو `host:port`، بلا أحرف بدل) وإلا `HttpError.PolicyDenied`.
+- `https` إلزامي إلا لـ `localhost` و`127.0.0.1`؛ والعنوان غير الصالح `InvalidUrl`.
+- لا تُتبع إعادة التوجيه (3xx) لأنها قد تقود إلى مضيف غير مسموح؛ يحصل البرنامج على الاستجابة نفسها.
+- حالة الخطأ مثل 404 أو 500 **ليست** `Err`: هي استجابة بـ `status` الخاص بها. `Err` لفشل الاتصال فقط: `Timeout` (30 ثانية) و`Network` و`TooLarge` (أكبر من 10 MB أو ليست نصًا).
+- لتحويل الجسم إلى نوع: `json.parse<Todo>(resp.body)`.
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text

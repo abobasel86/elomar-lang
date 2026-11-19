@@ -66,6 +66,7 @@ document_language: "ar"
 | `std.fs` بتأثير `fs` وصلاحيات `filesystem_read`/`filesystem_write` بمنع افتراضي ومنع الهروب بـ `..` (crate جديد `elomar-policy`) | 16.3، 17، grammar §4.10 |
 | `std.json`: `json.parse<T>` بالتحقق نفسه المستخدم مع AI، و`stringify`/`pretty`؛ `Map<String, T>` نوع JSON | 17، grammar §4.11 |
 | `FsError` و`JsonError` نوعان معدودان مدمجان بحالات تحمل رسائل | 12.2 |
+| `std.http`: `http.get`/`http.post` بتأثير `net`، والمضيف من `network_hosts`، و`https` إلزامي إلا لـ localhost، وبلا اتباع لإعادة التوجيه؛ `HttpError` نوع معدود مدمج | 16.3، 17، grammar §4.11.1 |
 | الوحدات متعددة الملفات: `use app.x` ← `src/x.elo`، و`pub` للإتاحة، والاستيرادات خاصة بكل ملف، ورسائل أخطاء تشير إلى الملف الصحيح (crate جديد `elomar-loader`) | 11.2، grammar §4.12 |
 | مزود OpenAI (Chat Completions + Structured Outputs بوضع strict) بمفتاح من متغير بيئة يُقرأ عند الاستدعاء | 14 |
 | `[permissions] network_hosts` بمنع افتراضي يُفحص قبل كل اتصال، وعدم اتباع إعادة التوجيه، وإلزام https | 16.1، 16.3 |
@@ -1004,7 +1005,7 @@ async fn ask_model(text: String)
 | JSON | `std.json` | Encode, decode, schema | **منفذ**: `parse<T>` و`stringify` و`pretty` |
 | Files | `std.fs` | Read/write/list with policies | **منفذ**: قراءة وكتابة وإلحاق وسرد بصلاحيات `[permissions]` |
 | Time | `std.time` | Duration, DateTime, timers | v0.2 |
-| HTTP | `std.http` | Client/server, routing, middleware | v0.3 |
+| HTTP | `std.http` | Client/server, routing, middleware | **العميل منفذ**: `get` و`post` بتأثير `net` وقائمة `network_hosts`؛ الخادم v0.3 |
 | Network | `std.net` | Network primitives, TLS wrapper | v0.3 |
 | Database | `std.db` | Query, transactions, pooled connections | v0.3 |
 | Crypto | `std.crypto` | Maintained vetted algorithms, hashes, TLS integration | v0.3 |

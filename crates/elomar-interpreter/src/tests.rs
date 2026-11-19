@@ -503,3 +503,77 @@ fn closures_return_and_recurse() {
     let src = "fn fact(n: Int) -> Int {\n  if n <= 1 { return 1 }\n  return n * fact(n - 1)\n}\nfn main() {\n  let f = |n: Int| {\n    if n < 0 {\n      return 0\n    }\n    return fact(n)\n  }\n  print(f(5), f(-1), [1, 2, 3].map(fact))\n}";
     assert_eq!(out(src), "120 0 [1, 2, 6]\n");
 }
+
+// ----- std.http ----------------------------------------------------------------
+
+/// Serves `count` requests on 127.0.0.1: `/redirect` answers 302, anything
+/// else echoes the method, path and body with status 200 (or 404 for
+/// `/missing`).
+fn test_server(count: usize) -> u16 {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    std::thread::spawn(move || {
+        for stream in listener.incoming().take(count) {
+            let mut stream = stream.expect("connection");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+            let mut request_line = String::new();
+            reader.read_line(&mut request_line).expect("request line");
+            let mut length = 0;
+            loop {
+                let mut line = String::new();
+                reader.read_line(&mut line).expect("header");
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = v.trim().parse().expect("length");
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).expect("body");
+            let mut parts = request_line.split_whitespace();
+            let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+            let (status, extra) = match path {
+                "/redirect" => ("302 Found", "Location: https://elsewhere.example/\r\n"),
+                "/missing" => ("404 Not Found", ""),
+                _ => ("200 OK", ""),
+            };
+            let text = format!("{method} {path} {}", String::from_utf8_lossy(&body));
+            write!(
+                stream,
+                "HTTP/1.1 {status}\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{text}",
+                text.len()
+            )
+            .expect("write");
+        }
+    });
+    port
+}
+
+#[test]
+fn http_requests() {
+    let port = test_server(4);
+    let base = format!("http://127.0.0.1:{port}");
+    let src = format!(
+        "use std.http\nfn show(r: Result<{{ status: Int, body: String }}, HttpError>) {{\n  match r {{\n    Ok(resp) => print(resp.status, resp.body)\n    Err(e) => print(e.kind())\n  }}\n}}\nfn main() {{\n  show(http.get(\"{base}/hello\"))\n  show(http.post(\"{base}/items\", \"{{\\\"a\\\": 1}}\"))\n  show(http.get(\"{base}/missing\"))\n  show(http.get(\"{base}/redirect\"))\n  show(http.get(\"http://127.0.0.1:1/other-port\"))\n  show(http.get(\"http://example.com/\"))\n  show(http.get(\"not a url\"))\n}}"
+    );
+    let (mut program, diags) = elomar_parser::parse(&src);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let diags = elomar_types::check(&mut program, elomar_types::CheckOptions::default());
+    assert!(diags.iter().all(|d| !d.is_error()), "{diags:#?}");
+    let permissions = elomar_ai_core::Permissions {
+        network_hosts: vec![format!("127.0.0.1:{port}"), "example.com".into()],
+        ..Default::default()
+    };
+    let output = with_large_stack(|| {
+        let mut host = BufferHost::default();
+        let mut ai = AiRuntime::default().with_permissions(permissions);
+        run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(".")).expect("run");
+        host.output
+    });
+    assert_eq!(
+        output,
+        "200 GET /hello \n200 POST /items {\"a\": 1}\n404 GET /missing \n302 GET /redirect \nPolicyDenied\nInvalidUrl\nInvalidUrl\n"
+    );
+}

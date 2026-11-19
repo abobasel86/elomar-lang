@@ -189,6 +189,11 @@ impl AiRuntime {
         self.models.insert(model.into(), provider);
     }
 
+    /// The `[permissions]` of the run (for `std.http`).
+    pub fn permissions(&self) -> &Permissions {
+        &self.permissions
+    }
+
     pub fn has_model(&self, model: &str) -> bool {
         self.models.contains_key(model)
     }

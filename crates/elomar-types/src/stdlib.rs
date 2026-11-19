@@ -18,6 +18,12 @@ pub(crate) const FS_FUNCTIONS: [&str; 5] = [
     "list_dir",
 ];
 pub(crate) const JSON_FUNCTIONS: [&str; 3] = ["parse", "stringify", "pretty"];
+pub(crate) const HTTP_FUNCTIONS: [&str; 2] = ["get", "post"];
+
+/// What `http.get` and `http.post` return on success.
+pub(crate) fn http_response_ty() -> Ty {
+    Ty::Record(vec![("body".into(), Ty::Str), ("status".into(), Ty::Int)])
+}
 
 impl Checker {
     pub(crate) fn unknown_module_function(
@@ -93,6 +99,34 @@ impl Checker {
             }
         };
         Ty::result(ok, Ty::Enum(crate::enums::FS_ERROR.into()))
+    }
+
+    /// `http.get(url)` and `http.post(url, body[, content_type])`: the `net`
+    /// effect, `Result<{ status: Int, body: String }, HttpError>`.
+    pub(crate) fn check_http_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        if !HTTP_FUNCTIONS.contains(&func.name.as_str()) {
+            return self.unknown_module_function("http", func, &HTTP_FUNCTIONS, args);
+        }
+        self.usage.direct.push(("net".into(), func.span));
+        let what = format!("http.{}", func.name);
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        let (min, max) = if func.name == "get" { (1, 1) } else { (2, 3) };
+        if self.arity(&what, args, min, max, span) {
+            for arg in args.iter_mut() {
+                self.check_expr_against(&mut arg.value, &Ty::Str);
+            }
+        }
+        Ty::result(
+            http_response_ty(),
+            Ty::Enum(crate::enums::HTTP_ERROR.into()),
+        )
     }
 
     /// `json.parse<T>(text)`, `json.stringify(value)`, `json.pretty(value)`.

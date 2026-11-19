@@ -6,6 +6,7 @@
 
 mod ai;
 mod builtins;
+mod http;
 mod stdlib;
 mod value;
 
@@ -778,6 +779,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     match module.as_str() {
                         "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
                         "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
+                        "std.http" => {
+                            return Ok(http::call(self.ai.permissions(), &name.name, &values));
+                        }
                         "std.json" => {
                             return Ok(stdlib::json_call(
                                 &name.name,

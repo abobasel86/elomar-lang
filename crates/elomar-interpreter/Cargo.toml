@@ -13,6 +13,8 @@ elomar-ai-core.workspace = true
 elomar-policy.workspace = true
 serde_json.workspace = true
 unicode-segmentation.workspace = true
+ureq.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 elomar-ai-provider-mock.workspace = true

@@ -26,11 +26,12 @@ impl EnumInfo {
 pub(crate) const AI_ERROR: &str = "AIError";
 pub(crate) const FS_ERROR: &str = "FsError";
 pub(crate) const JSON_ERROR: &str = "JsonError";
+pub(crate) const HTTP_ERROR: &str = "HttpError";
 
 /// Built-in error enums: every variant carries a message, and values have
 /// `kind()` and `message()` methods.
 pub(crate) fn is_error_enum(name: &str) -> bool {
-    matches!(name, AI_ERROR | FS_ERROR | JSON_ERROR)
+    matches!(name, AI_ERROR | FS_ERROR | JSON_ERROR | HTTP_ERROR)
 }
 
 /// The variants of `FsError` (`std.fs`).
@@ -44,6 +45,16 @@ pub const FS_ERROR_KINDS: [&str; 5] = [
 
 /// The variants of `JsonError` (`std.json`).
 pub const JSON_ERROR_KINDS: [&str; 2] = ["InvalidJson", "TypeMismatch"];
+
+/// The variants of `HttpError` (`std.http`). An answer with an error
+/// status such as 404 is not an `HttpError`: it is a response.
+pub const HTTP_ERROR_KINDS: [&str; 5] = [
+    "PolicyDenied",
+    "InvalidUrl",
+    "Timeout",
+    "Network",
+    "TooLarge",
+];
 
 /// The variants of `AIError` (spec §13.4); each carries a message.
 pub const AI_ERROR_KINDS: [&str; 11] = [
@@ -66,6 +77,7 @@ impl Checker {
             (AI_ERROR, &AI_ERROR_KINDS[..]),
             (FS_ERROR, &FS_ERROR_KINDS[..]),
             (JSON_ERROR, &JSON_ERROR_KINDS[..]),
+            (HTTP_ERROR, &HTTP_ERROR_KINDS[..]),
         ] {
             self.enums.insert(
                 name.into(),
