@@ -482,3 +482,9 @@ fn sets_at_runtime() {
         "set([1, 2, 3]) 3\ntrue false set([2, 3, 5])\nset([2, 3, 4, 5]) set([2]) set([3, 5]) true\na\nb\nfalse true true\n"
     );
 }
+
+#[test]
+fn generic_functions_at_runtime() {
+    let src = "fn first<T>(xs: List<T>) -> Option<T> {\n  if xs.is_empty() { return None }\n  return Some(xs[0])\n}\nfn reversed<T>(xs: List<T>) -> List<T> {\n  var out: List<T> = []\n  for x in xs { out.insert(0, x) }\n  return out\n}\nfn main() {\n  print(first([3, 4]), first<String>([]), reversed([\"a\", \"b\", \"c\"]))\n}";
+    assert_eq!(out(src), "Some(3) None [\"c\", \"b\", \"a\"]\n");
+}

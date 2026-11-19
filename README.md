@@ -27,6 +27,7 @@ by the compiler when they are not declared.
   `filesystem_write` in `elomar.toml`) and typed `json.parse<T>` /
   `json.stringify`. See [`examples/files`](examples/files).
 - Sets: `set([1, 2])` with `union`, `intersection`, `difference`, `is_subset`.
+- Generic functions: `fn first<T>(xs: List<T>) -> Option<T>`.
 - Multi-file programs: `use app.students` loads `src/students.elo` (or
   `use app.students.{Student, average}` to import names directly); only `pub`
   items are visible to other files. See [`examples/school`](examples/school).

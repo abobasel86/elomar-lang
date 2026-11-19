@@ -24,6 +24,9 @@ pub enum Ty {
     Map(Box<Ty>, Box<Ty>),
     /// `Set<T>`; elements are `String` or `Int`.
     Set(Box<Ty>),
+    /// A type parameter inside a generic function (`T` in `fn f<T>`):
+    /// equal only to itself.
+    Param(String),
     /// An inference variable, index into [`Subst`].
     Var(u32),
     /// Produced after an error has been reported; unifies with anything so
@@ -59,6 +62,27 @@ impl Ty {
     pub fn record(mut fields: Vec<(String, Ty)>) -> Ty {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         Ty::Record(fields)
+    }
+
+    /// Replaces type parameters by the types in `map`.
+    pub fn substitute(&self, map: &[(String, Ty)]) -> Ty {
+        let sub = |t: &Ty| t.substitute(map);
+        match self {
+            Ty::Param(name) => map
+                .iter()
+                .find(|(n, _)| n == name)
+                .map_or_else(|| self.clone(), |(_, t)| t.clone()),
+            Ty::List(t) => Ty::list(sub(t)),
+            Ty::Option(t) => Ty::option(sub(t)),
+            Ty::Future(t) => Ty::future(sub(t)),
+            Ty::Set(t) => Ty::set(sub(t)),
+            Ty::Result(t, e) => Ty::result(sub(t), sub(e)),
+            Ty::Map(k, v) => Ty::map(sub(k), sub(v)),
+            Ty::Record(fields) => {
+                Ty::Record(fields.iter().map(|(n, t)| (n.clone(), sub(t))).collect())
+            }
+            other => other.clone(),
+        }
     }
 
     pub fn is_numeric(&self) -> bool {
@@ -171,7 +195,7 @@ impl Subst {
             Ty::Unit => out.push_str("Unit"),
             Ty::Range => out.push_str("Range"),
             Ty::Duration => out.push_str("Duration"),
-            Ty::Enum(name) => out.push_str(name),
+            Ty::Enum(name) | Ty::Param(name) => out.push_str(name),
             Ty::Set(t) => {
                 out.push_str("Set<");
                 self.write(out, t);

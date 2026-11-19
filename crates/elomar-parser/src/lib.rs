@@ -367,6 +367,16 @@ impl Parser {
         let is_async = self.eat(&TokenKind::Async);
         self.expect(TokenKind::Fn)?;
         let name = self.ident()?;
+        let mut type_params = Vec::new();
+        if self.eat(&TokenKind::Lt) {
+            while !self.at(&TokenKind::Gt) {
+                type_params.push(self.ident()?);
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Gt)?;
+        }
         self.expect(TokenKind::LParen)?;
         let mut params = Vec::new();
         while !self.at(&TokenKind::RParen) {
@@ -394,6 +404,7 @@ impl Parser {
             is_pub,
             is_async,
             name,
+            type_params,
             params,
             ret,
             effects,

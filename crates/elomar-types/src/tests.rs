@@ -653,3 +653,41 @@ fn sets() {
     );
     assert_eq!(codes("fn f(s: Set<Float>) {}"), vec!["E2018"]);
 }
+
+// ----- v0.3: generic functions --------------------------------------------
+
+#[test]
+fn generic_functions() {
+    ok(
+        "fn first<T>(xs: List<T>) -> Option<T> {\n  if xs.is_empty() { return None }\n  return Some(xs[0])\n}\nfn pair<A, B>(a: A, b: B) -> { left: A, right: B } {\n  return { left: a, right: b }\n}\nfn count<T>(xs: List<T>, x: T) -> Int {\n  var n = 0\n  for y in xs { if y == x { n += 1 } }\n  return n\n}\nfn main() {\n  let a: Option<Int> = first([1, 2])\n  let b: Option<String> = first([\"x\"])\n  let p = pair(1, \"one\")\n  let s: String = p.right\n  print(count([1, 2, 1], 1), first<String>([]))\n}",
+    );
+}
+
+#[test]
+fn generic_misuse() {
+    // A type parameter is not a concrete type.
+    assert_eq!(
+        codes("fn bad<T>(x: T) -> Int {\n  return x\n}"),
+        vec!["E2001"]
+    );
+    // No comparisons or arithmetic on an unknown type.
+    assert_eq!(
+        codes("fn less<T>(a: T, b: T) -> Bool {\n  return a < b\n}"),
+        vec!["E2005"]
+    );
+    // Both arguments must agree on T.
+    assert_eq!(
+        codes("fn same<T>(a: T, b: T) {}\nfn main() {\n  same(1, \"x\")\n}"),
+        vec!["E2001"]
+    );
+    // Wrong number of explicit type arguments; non-generic functions take none.
+    assert_eq!(
+        codes("fn id<T>(x: T) -> T {\n  return x\n}\nfn main() {\n  print(id<Int, Int>(1))\n}"),
+        vec!["E2002"]
+    );
+    assert_eq!(
+        codes("fn f() {}\nfn main() {\n  f<Int>()\n}"),
+        vec!["E0103"]
+    );
+    assert_eq!(codes("fn f<T, T>(x: T) {}"), vec!["E1002"]);
+}

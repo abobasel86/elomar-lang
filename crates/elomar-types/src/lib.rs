@@ -40,6 +40,8 @@ pub fn check(program: &mut Program, opts: CheckOptions) -> Vec<Diagnostic> {
 
 #[derive(Debug, Clone)]
 struct FnSig {
+    /// Type parameters of a generic function (`T` in `fn f<T>`).
+    type_params: Vec<String>,
     params: Vec<(String, Ty)>,
     ret: Ty,
     declared: Option<(BTreeSet<String>, Span)>,
@@ -79,6 +81,8 @@ struct Checker {
     in_async: bool,
     /// Imports and visibility per module (see `modules.rs`).
     scopes_mod: modules::ModuleScopes,
+    /// Type parameters in scope while checking a generic function.
+    type_params: Vec<String>,
     cloud_models: Vec<String>,
     usage: Usage,
 }
@@ -497,6 +501,9 @@ impl Checker {
                     "Result" => 2,
                     "Map" => 2,
                     "Set" => 1,
+                    param if args.is_empty() && self.type_params.iter().any(|p| p == param) => {
+                        return Ty::Param(param.to_string());
+                    }
                     _ => {
                         let Some(resolved) = self.resolve_type_name(name, true) else {
                             return Ty::Error;
@@ -621,6 +628,21 @@ impl Checker {
                 );
                 continue;
             }
+            let mut type_params: Vec<String> = Vec::new();
+            for tp in &f.type_params {
+                if type_params.contains(&tp.name) {
+                    self.error(
+                        "E1002",
+                        tp.span,
+                        Text::new(
+                            format!("type parameter `{}` is listed twice", tp.name),
+                            format!("معامل النوع `{}` مذكور مرتين", tp.name),
+                        ),
+                    );
+                }
+                type_params.push(tp.name.clone());
+            }
+            self.type_params = type_params.clone();
             let mut params: Vec<(String, Ty)> = Vec::new();
             for p in &f.params {
                 let ty = self.lower_type(&p.ty);
@@ -637,6 +659,7 @@ impl Checker {
                 params.push((p.name.name.clone(), ty));
             }
             let ret = f.ret.as_ref().map_or(Ty::Unit, |t| self.lower_type(t));
+            self.type_params.clear();
             let declared = f.effects.as_ref().map(|set| {
                 let mut names = BTreeSet::new();
                 for e in &set.effects {
@@ -667,6 +690,7 @@ impl Checker {
                     params,
                     ret,
                     declared,
+                    type_params: f.type_params.iter().map(|t| t.name.clone()).collect(),
                     is_pub: f.is_pub,
                     is_async: f.is_async,
                     name_span: f.name.span,
@@ -721,6 +745,7 @@ impl Checker {
         };
         self.ret_ty = Some(sig.ret.clone());
         self.in_async = sig.is_async;
+        self.type_params = sig.type_params.clone();
         self.loop_depth = 0;
         self.push_scope();
         for (p, (_, ty)) in f.params.iter().zip(&sig.params) {
@@ -729,6 +754,7 @@ impl Checker {
         self.check_block(&mut f.body);
         self.pop_scope();
         self.ret_ty = None;
+        self.type_params.clear();
 
         if !matches!(sig.ret, Ty::Unit | Ty::Error) && !expr::block_diverges(&f.body) {
             let ret = self.subst.show(&sig.ret);

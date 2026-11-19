@@ -538,7 +538,10 @@ impl Checker {
         {
             return ty;
         }
-        if let Some(first) = type_args.first() {
+        let generic_callee = matches!(&callee.kind, ExprKind::Name(n)
+            if self.lookup_local(n).is_none()
+                && self.fns.get(n).is_some_and(|s| !s.type_params.is_empty()));
+        if let Some(first) = type_args.first().filter(|_| !generic_callee) {
             let targs_span = first.span.to(type_args.last().expect("non-empty").span);
             self.push(
                 Diagnostic::error(
@@ -569,6 +572,7 @@ impl Checker {
                     return Ty::Error;
                 }
                 if let Some(sig) = self.fns.get(&name).cloned() {
+                    let sig = self.instantiate(&name, sig, type_args, span);
                     return self.check_user_call(&name, &sig, args, span, callee_span);
                 }
                 if CONSTRUCTORS.contains(&name.as_str()) {
@@ -654,6 +658,44 @@ impl Checker {
                 format!("`{what}` يأخذ {want} من المعاملات لكن أُعطي {got}"),
             ),
         );
+    }
+
+    /// A generic function's signature with its type parameters replaced by
+    /// the explicit type arguments, or by fresh variables to be inferred.
+    fn instantiate(&mut self, name: &str, sig: FnSig, type_args: &[TypeExpr], span: Span) -> FnSig {
+        if sig.type_params.is_empty() {
+            return sig;
+        }
+        if !type_args.is_empty() && type_args.len() != sig.type_params.len() {
+            self.wrong_arg_count(
+                name,
+                &format!("{} type", sig.type_params.len()),
+                type_args.len(),
+                span,
+            );
+        }
+        let map: Vec<(String, Ty)> = sig
+            .type_params
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let ty = match type_args.get(i) {
+                    Some(t) if type_args.len() == sig.type_params.len() => self.lower_type(t),
+                    _ => self.subst.fresh(),
+                };
+                (p.clone(), ty)
+            })
+            .collect();
+        FnSig {
+            type_params: Vec::new(),
+            params: sig
+                .params
+                .iter()
+                .map(|(n, t)| (n.clone(), t.substitute(&map)))
+                .collect(),
+            ret: sig.ret.substitute(&map),
+            ..sig
+        }
     }
 
     fn check_user_call(

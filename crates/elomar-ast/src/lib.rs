@@ -79,6 +79,8 @@ pub struct FnDecl {
     /// `async fn`: calling it returns a `Future`; `await` runs it.
     pub is_async: bool,
     pub name: Ident,
+    /// `fn first<T>(...)`: type parameters, empty for a non-generic function.
+    pub type_params: Vec<Ident>,
     pub params: Vec<Param>,
     pub ret: Option<TypeExpr>,
     pub effects: Option<EffectSet>,
