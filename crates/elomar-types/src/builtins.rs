@@ -139,7 +139,7 @@ fn methods_of(ty: &Ty) -> &'static [&'static str] {
         Ty::Duration => DURATION_METHODS,
         Ty::Map(..) => MAP_METHODS,
         Ty::Set(_) => SET_METHODS,
-        Ty::Enum(name) if crate::enums::is_error_enum(name) => ERROR_METHODS,
+        Ty::Enum(name, _) if crate::enums::is_error_enum(name) => ERROR_METHODS,
         _ => OTHER_METHODS,
     }
 }
@@ -366,7 +366,7 @@ impl Checker {
             (Ty::Float, "abs" | "sqrt") => self.no_args(m, args, span, Ty::Float),
             (Ty::Map(k, v), _) => self.map_method(recv, k, v, m, args, span),
             (Ty::Set(t), _) => self.set_method(recv, t, m, args, span),
-            (Ty::Enum(name), "kind" | "message") if crate::enums::is_error_enum(name) => {
+            (Ty::Enum(name, _), "kind" | "message") if crate::enums::is_error_enum(name) => {
                 self.no_args(m, args, span, Ty::Str)
             }
             (Ty::Duration, "millis") => self.no_args(m, args, span, Ty::Int),

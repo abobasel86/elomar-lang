@@ -81,8 +81,11 @@ struct Checker {
     in_async: bool,
     /// Imports and visibility per module (see `modules.rs`).
     scopes_mod: modules::ModuleScopes,
-    /// Type parameters in scope while checking a generic function.
+    /// Type parameters in scope while checking a generic function, alias or
+    /// enum.
     type_params: Vec<String>,
+    /// Type parameters of generic type aliases (`type Pair<A, B> = ...`).
+    alias_params: HashMap<String, Vec<String>>,
     /// Inside a closure: the index of its parameter scope. Variables in
     /// scopes below it were captured by value and cannot be changed.
     closure_scope: Option<usize>,
@@ -374,6 +377,10 @@ impl Checker {
                 _ => None,
             })
             .collect();
+        for t in decls.values() {
+            let params = self.type_param_names(&t.type_params);
+            self.alias_params.insert(t.name.name.clone(), params);
+        }
         let mut seen: HashMap<String, Span> = HashMap::new();
         for item in &program.items {
             let Item::Type(t) = item else { continue };
@@ -450,17 +457,44 @@ impl Checker {
             &mut self.scopes_mod.current,
             modules::module_of(name).to_string(),
         );
+        let params = self.alias_params.get(name).cloned().unwrap_or_default();
+        let saved_params = std::mem::replace(&mut self.type_params, params);
         let ty = self.lower_type_with(&decl.ty, &mut |c, n| {
             if decls.contains_key(n) {
-                Some(c.resolve_alias(n, decls, stack))
+                // The alias may be resolved while another one's parameters
+                // are in scope; it has its own.
+                let outer = std::mem::take(&mut c.type_params);
+                let ty = c.resolve_alias(n, decls, stack);
+                c.type_params = outer;
+                Some(ty)
             } else {
                 c.aliases.get(n).cloned()
             }
         });
+        self.type_params = saved_params;
         stack.pop();
         self.scopes_mod.current = saved;
         self.aliases.insert(name.to_string(), ty.clone());
         ty
+    }
+
+    /// The names of declared type parameters; a repeated one is `E1002`.
+    fn type_param_names(&mut self, params: &[Ident]) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for tp in params {
+            if out.contains(&tp.name) {
+                self.error(
+                    "E1002",
+                    tp.span,
+                    Text::new(
+                        format!("type parameter `{}` is listed twice", tp.name),
+                        format!("معامل النوع `{}` مذكور مرتين", tp.name),
+                    ),
+                );
+            }
+            out.push(tp.name.clone());
+        }
+        out
     }
 
     /// Converts a written type into a [`Ty`].
@@ -520,17 +554,22 @@ impl Checker {
                             return Ty::Error;
                         };
                         let other = resolved.as_str();
-                        if self.enums.contains_key(other) {
-                            if !args.is_empty() {
-                                self.wrong_type_args(name, 0, args.len(), t.span);
+                        if let Some(info) = self.enums.get(other) {
+                            let want = info.params.len();
+                            if lowered.len() != want {
+                                self.wrong_type_args(name, want, args.len(), t.span);
+                                return Ty::Error;
                             }
-                            return Ty::Enum(other.to_string());
+                            return Ty::Enum(other.to_string(), lowered);
                         }
                         if let Some(ty) = alias(self, other) {
-                            if !args.is_empty() {
-                                self.wrong_type_args(name, 0, args.len(), t.span);
+                            let params = self.alias_params.get(other).cloned().unwrap_or_default();
+                            if lowered.len() != params.len() {
+                                self.wrong_type_args(name, params.len(), args.len(), t.span);
+                                return Ty::Error;
                             }
-                            return ty;
+                            let map: Vec<(String, Ty)> = params.into_iter().zip(lowered).collect();
+                            return ty.substitute(&map);
                         }
                         let mut diag = Diagnostic::error(
                             "E1006",

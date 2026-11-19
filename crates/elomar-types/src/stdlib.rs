@@ -98,7 +98,7 @@ impl Checker {
                 Ty::list(Ty::Str)
             }
         };
-        Ty::result(ok, Ty::Enum(crate::enums::FS_ERROR.into()))
+        Ty::result(ok, Ty::Enum(crate::enums::FS_ERROR.into(), Vec::new()))
     }
 
     /// `http.get(url)` and `http.post(url, body[, content_type])`: the `net`
@@ -125,7 +125,7 @@ impl Checker {
         }
         Ty::result(
             http_response_ty(),
-            Ty::Enum(crate::enums::HTTP_ERROR.into()),
+            Ty::Enum(crate::enums::HTTP_ERROR.into(), Vec::new()),
         )
     }
 
@@ -182,6 +182,6 @@ impl Checker {
             }
         };
         self.typed_args(&what, args, &[Ty::Str], span);
-        Ty::result(out, Ty::Enum(crate::enums::JSON_ERROR.into()))
+        Ty::result(out, Ty::Enum(crate::enums::JSON_ERROR.into(), Vec::new()))
     }
 }

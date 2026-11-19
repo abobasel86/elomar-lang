@@ -18,8 +18,8 @@ pub enum Ty {
     Result(Box<Ty>, Box<Ty>),
     /// Structural record; fields are kept sorted by name.
     Record(Vec<(String, Ty)>),
-    /// A nominal enum, by name.
-    Enum(String),
+    /// A nominal enum, by name, with its type arguments (`Tree<Int>`).
+    Enum(String, Vec<Ty>),
     /// `Map<K, V>`; keys are `String` or `Int`.
     Map(Box<Ty>, Box<Ty>),
     /// `Set<T>`; elements are `String` or `Int`.
@@ -81,6 +81,7 @@ impl Ty {
             Ty::Result(t, e) => Ty::result(sub(t), sub(e)),
             Ty::Map(k, v) => Ty::map(sub(k), sub(v)),
             Ty::Fn(ps, r) => Ty::Fn(ps.iter().map(sub).collect(), Box::new(sub(r))),
+            Ty::Enum(n, args) => Ty::Enum(n.clone(), args.iter().map(sub).collect()),
             Ty::Record(fields) => {
                 Ty::Record(fields.iter().map(|(n, t)| (n.clone(), sub(t))).collect())
             }
@@ -128,6 +129,7 @@ impl Subst {
                 Box::new(self.resolve(&r)),
             ),
             Ty::Option(t) => Ty::option(self.resolve(&t)),
+            Ty::Enum(n, args) => Ty::Enum(n, args.iter().map(|a| self.resolve(a)).collect()),
             Ty::Result(t, e) => Ty::result(self.resolve(&t), self.resolve(&e)),
             Ty::Map(k, v) => Ty::map(self.resolve(&k), self.resolve(&v)),
             Ty::Record(fields) => Ty::Record(
@@ -147,6 +149,7 @@ impl Subst {
             Ty::Result(t, e) | Ty::Map(t, e) => self.occurs(v, &t) || self.occurs(v, &e),
             Ty::Record(fields) => fields.iter().any(|(_, t)| self.occurs(v, t)),
             Ty::Fn(ps, r) => ps.iter().any(|p| self.occurs(v, p)) || self.occurs(v, &r),
+            Ty::Enum(_, args) => args.iter().any(|a| self.occurs(v, a)),
             _ => false,
         }
     }
@@ -172,6 +175,16 @@ impl Subst {
             (Ty::Result(t1, e1), Ty::Result(t2, e2)) | (Ty::Map(t1, e1), Ty::Map(t2, e2)) => {
                 let ok = self.unify(t1, t2);
                 self.unify(e1, e2) && ok
+            }
+            (Ty::Enum(n1, a1), Ty::Enum(n2, a2)) => {
+                if n1 != n2 || a1.len() != a2.len() {
+                    return false;
+                }
+                let mut ok = true;
+                for (x, y) in a1.iter().zip(a2) {
+                    ok &= self.unify(x, y);
+                }
+                ok
             }
             (Ty::Fn(p1, r1), Ty::Fn(p2, r2)) => {
                 if p1.len() != p2.len() {
@@ -213,7 +226,20 @@ impl Subst {
             Ty::Unit => out.push_str("Unit"),
             Ty::Range => out.push_str("Range"),
             Ty::Duration => out.push_str("Duration"),
-            Ty::Enum(name) | Ty::Param(name) => out.push_str(name),
+            Ty::Param(name) => out.push_str(name),
+            Ty::Enum(name, args) => {
+                out.push_str(name);
+                if !args.is_empty() {
+                    out.push('<');
+                    for (i, a) in args.iter().enumerate() {
+                        if i > 0 {
+                            out.push_str(", ");
+                        }
+                        self.write(out, a);
+                    }
+                    out.push('>');
+                }
+            }
             Ty::Fn(ps, r) => {
                 out.push_str("fn(");
                 for (i, p) in ps.iter().enumerate() {

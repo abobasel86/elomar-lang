@@ -30,7 +30,8 @@ by the compiler when they are not declared.
 - HTTP client: `http.get(url)` / `http.post(url, body)` from `std.http`, with
   the `net` effect and the same `network_hosts` allowlist (https only, no
   redirects followed).
-- Generic functions: `fn first<T>(xs: List<T>) -> Option<T>`.
+- Generics: `fn first<T>(xs: List<T>) -> Option<T>`, `type Pair<A, B>`,
+  `enum Tree<T>`. See [`examples/generics`](examples/generics).
 - Closures and function values: `xs.map(|x| x * 2)`, `filter`, `fold`,
   `sort_by`, and `fn(Int) -> Int` types. See [`examples/closures`](examples/closures).
 - Multi-file programs: `use app.students` loads `src/students.elo` (or
@@ -178,7 +179,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, closures and `map`/`filter`/`fold`, `std.http` client; ⏳ generic types, traits, database support, Python bridge, AI tools and agents.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client; ⏳ traits, database support, Python bridge, AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 
 ## License

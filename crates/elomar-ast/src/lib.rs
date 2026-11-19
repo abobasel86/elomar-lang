@@ -43,6 +43,8 @@ pub struct UseDecl {
 pub struct TypeDecl {
     pub is_pub: bool,
     pub name: Ident,
+    /// `type Pair<A, B> = ...`: type parameters, usually empty.
+    pub type_params: Vec<Ident>,
     pub ty: TypeExpr,
     pub span: Span,
 }
@@ -52,6 +54,8 @@ pub struct TypeDecl {
 pub struct EnumDecl {
     pub is_pub: bool,
     pub name: Ident,
+    /// `enum Tree<T> { ... }`: type parameters, usually empty.
+    pub type_params: Vec<Ident>,
     pub variants: Vec<VariantDecl>,
     pub span: Span,
 }

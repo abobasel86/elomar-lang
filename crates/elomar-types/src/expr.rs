@@ -408,7 +408,7 @@ impl Checker {
             ExprKind::Lambda { params, body } => {
                 self.check_lambda(params, body, hint_resolved.as_ref())
             }
-            ExprKind::Variant { enum_name, .. } => Ty::Enum(enum_name.clone()),
+            ExprKind::Variant { enum_name, .. } => self.enum_instance(&enum_name.clone()).0,
             ExprKind::Map(entries) => {
                 let (k, v) = match hint_resolved {
                     Some(Ty::Map(k, v)) => (*k, *v),
@@ -1321,7 +1321,7 @@ impl Checker {
                 .map(|(n, _)| n.to_string())
                 .collect(),
             Ty::Error | Ty::Var(_) => return,
-            Ty::Enum(name) => self.missing_variants(&name, arms),
+            Ty::Enum(name, _) => self.missing_variants(&name, arms),
             _ => vec!["_".to_string()],
         };
         if missing.is_empty() {

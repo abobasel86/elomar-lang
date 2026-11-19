@@ -12,6 +12,9 @@ use crate::{Checker, Ty, suggest};
 
 #[derive(Debug, Clone)]
 pub(crate) struct EnumInfo {
+    /// Type parameters (`T` in `enum Tree<T>`); payloads refer to them as
+    /// `Ty::Param`.
+    pub params: Vec<String>,
     /// Variant name and payload types, in declaration order.
     pub variants: Vec<(String, Vec<Ty>)>,
 }
@@ -82,6 +85,7 @@ impl Checker {
             self.enums.insert(
                 name.into(),
                 EnumInfo {
+                    params: Vec::new(),
                     variants: kinds
                         .iter()
                         .map(|k| (k.to_string(), vec![Ty::Str]))
@@ -125,9 +129,11 @@ impl Checker {
                 continue;
             }
             seen.push((name.clone(), e.name.span));
+            let params = self.type_param_names(&e.type_params);
             self.enums.insert(
                 name.clone(),
                 EnumInfo {
+                    params,
                     variants: Vec::new(),
                 },
             );
@@ -144,6 +150,8 @@ impl Checker {
             {
                 continue;
             }
+            let params = self.enums[&e.name.name].params.clone();
+            let saved = std::mem::replace(&mut self.type_params, params.clone());
             let mut variants: Vec<(String, Vec<Ty>)> = Vec::new();
             for v in &e.variants {
                 if variants.iter().any(|(n, _)| n == &v.name.name) {
@@ -160,6 +168,7 @@ impl Checker {
                 let fields = v.fields.iter().map(|t| self.lower_type(t)).collect();
                 variants.push((v.name.name.clone(), fields));
             }
+            self.type_params = saved;
             if variants.is_empty() {
                 self.error(
                     "E1002",
@@ -171,8 +180,27 @@ impl Checker {
                 );
             }
             self.enums
-                .insert(e.name.name.clone(), EnumInfo { variants });
+                .insert(e.name.name.clone(), EnumInfo { params, variants });
         }
+    }
+
+    /// A use of enum `name` with fresh variables for its type parameters,
+    /// and the parameter-to-variable map for its payload types.
+    pub(crate) fn enum_instance(&mut self, name: &str) -> (Ty, Vec<(String, Ty)>) {
+        let params = self
+            .enums
+            .get(name)
+            .map(|e| e.params.clone())
+            .unwrap_or_default();
+        let map: Vec<(String, Ty)> = params
+            .into_iter()
+            .map(|p| (p, self.subst.fresh()))
+            .collect();
+        let ty = Ty::Enum(
+            name.to_string(),
+            map.iter().map(|(_, t)| t.clone()).collect(),
+        );
+        (ty, map)
     }
 
     /// If `kind` is `E.V` or `E.V(...)` with `E` an enum (and not shadowed
@@ -245,6 +273,9 @@ impl Checker {
             .iter()
             .find(|(n, _)| n == &variant.name)
             .map(|(_, f)| f.clone());
+        let (enum_ty, map) = self.enum_instance(&enum_name);
+        let fields: Option<Vec<Ty>> =
+            fields.map(|f| f.iter().map(|t| t.substitute(&map)).collect());
         let Some(fields) = fields else {
             self.unknown_variant(&enum_name, &variant);
             self.check_args_loosely(&mut args);
@@ -289,7 +320,7 @@ impl Checker {
             variant: variant.name,
             args: args.into_iter().map(|a| a.value).collect(),
         };
-        Ty::Enum(enum_name)
+        enum_ty
     }
 
     pub(crate) fn check_variant_pattern(
@@ -327,7 +358,8 @@ impl Checker {
             self.unknown_variant(&enum_name.name, variant);
             return;
         };
-        let enum_ty = Ty::Enum(enum_name.name.clone());
+        let (enum_ty, map) = self.enum_instance(&enum_name.name);
+        let fields: Vec<Ty> = fields.iter().map(|t| t.substitute(&map)).collect();
         if !self.subst.unify(ty, &enum_ty) {
             self.mismatch(ty, &enum_ty, p.span);
             return;

@@ -58,8 +58,8 @@ item        = use_decl | [ "pub" ] , ( type_decl | enum_decl | const_decl ) | fn
 path        = IDENT , { "." , IDENT } ;
 
 use_decl    = "use" , IDENT , { "." , IDENT } ;
-type_decl   = "type" , IDENT , "=" , type ;
-enum_decl   = "enum" , IDENT , "{" , [ variant , { ( "," | NEWLINE ) , variant } ] , "}" ;
+type_decl   = "type" , IDENT , [ "<" , IDENT , { "," , IDENT } , ">" ] , "=" , type ;
+enum_decl   = "enum" , IDENT , [ "<" , IDENT , { "," , IDENT } , ">" ] , "{" , [ variant , { ( "," | NEWLINE ) , variant } ] , "}" ;
 variant     = IDENT , [ "(" , type , { "," , type } , ")" ] ;
 const_decl  = "let" , IDENT , [ ":" , type ] , "=" , expr ;
 fn_decl     = [ "pub" ] , [ "async" ] , "fn" , IDENT , [ "<" , IDENT , { "," , IDENT } , ">" ] ,
@@ -537,7 +537,28 @@ let s = first<String>([])                 // أو يُكتب صراحة
 - معاملات النوع تُكتب بعد اسم الدالة، وتُستنتج عند كل استدعاء من المعاملات أو من النوع المتوقع، أو تُعطى صراحة `f<Int>(...)`.
 - داخل الدالة يكون `T` نوعًا مجهولًا: يُمرَّر ويُخزَّن ويُقارن بـ `==` ويُطبع، لكن لا تُطبَّق عليه عمليات حسابية ولا `<` (`E2005`)، ولا يُعامل كنوع محدد (`E2001`).
 - عدد معاملات النوع الصريحة الخاطئ `E2002`؛ ومعاملات نوع لدالة غير عامة `E0103`.
-- الأنواع والأنواع المعدودة العامة (`type Pair<A, B>`) غير مدعومة بعد.
+
+### الأنواع والأنواع المعدودة العامة
+
+```elomar
+type Pair<A, B> = { left: A, right: B }
+
+enum Tree<T> {
+    Leaf
+    Node(Tree<T>, T, Tree<T>)
+}
+
+fn swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
+    return { left: p.right, right: p.left }
+}
+
+let t: Tree<Int> = Tree.Leaf
+let names = Tree.Node(Tree.Leaf, "Lina", Tree.Leaf)   // Tree<String> يُستنتج
+```
+
+- `Pair<Int, String>` يعني السجل بعد التعويض، فالسجلات تبقى بنيوية.
+- الأنواع المعدودة العامة اسمية: `Tree<Int>` و`Tree<String>` نوعان مختلفان، ونوع الحالة يُستنتج من قيمها أو من السياق، ونوع القيم في الأنماط يتبع نوع ما يُطابَق.
+- عند الاستخدام يجب ذكر كل معاملات النوع (`Tree` وحده `E1006`). المعامل المكرر `E1002`.
 
 ## 4.15 الدوال المجهولة والدوال كقيم
 
@@ -761,4 +782,4 @@ fn test_greets_by_name() {
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
 `ai.generate` و`ai.stream` و`ai.embed` · حذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة ·
-الأنواع والأنواع المعدودة العامة و`trait`/`impl` والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي.
+`trait`/`impl` والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي.

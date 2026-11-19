@@ -766,3 +766,40 @@ fn http_module() {
     );
     assert_eq!(codes("fn main() {\n  http.get(\"x\")\n}"), vec!["E1001"]);
 }
+
+// ----- v0.3: generic types and enums --------------------------------------------
+
+#[test]
+fn generic_types_and_enums() {
+    ok(
+        "type Pair<A, B> = { left: A, right: B }\ntype Named<T> = { name: String, value: T }\nenum Tree<T> {\n  Leaf\n  Node(Tree<T>, T, Tree<T>)\n}\nfn swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {\n  return { left: p.right, right: p.left }\n}\nfn size<T>(t: Tree<T>) -> Int {\n  return match t {\n    Tree.Leaf => 0\n    Tree.Node(l, _, r) => size(l) + 1 + size(r)\n  }\n}\nfn main() {\n  let p: Pair<Int, String> = { left: 1, right: \"a\" }\n  let q: Pair<String, Int> = swap(p)\n  let n: Named<List<Int>> = { name: \"xs\", value: [1] }\n  let t = Tree.Node(Tree.Leaf, \"x\", Tree.Leaf)\n  let u: Tree<Int> = Tree.Leaf\n  print(size(t), size(u), n.value.length)\n}",
+    );
+}
+
+#[test]
+fn generic_type_errors() {
+    assert_eq!(
+        codes(
+            "type Pair<A, B> = { left: A, right: B }\nfn main() {\n  let a: Pair<Int> = { left: 1 }\n}"
+        ),
+        vec!["E1006"]
+    );
+    assert_eq!(
+        codes("enum Box<T> {\n  Full(T)\n  Empty\n}\nfn main() {\n  let b: Box = Box.Empty\n}"),
+        vec!["E1006"]
+    );
+    assert_eq!(
+        codes(
+            "enum Box<T> {\n  Full(T)\n  Empty\n}\nfn main() {\n  let c: Box<Int> = Box.Full(\"x\")\n}"
+        ),
+        vec!["E2001"]
+    );
+    // The payload type follows the scrutinee's type argument.
+    assert_eq!(
+        codes(
+            "enum Box<T> {\n  Full(T)\n  Empty\n}\nfn f(c: Box<Int>) {\n  match c {\n    Box.Full(s) => print(s.upper())\n    Box.Empty => print(\"\")\n  }\n}"
+        ),
+        vec!["E1008"]
+    );
+    assert_eq!(codes("enum E<T, T> {\n  A(T)\n}"), vec!["E1002"]);
+}

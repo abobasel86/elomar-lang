@@ -1,0 +1,49 @@
+// Generic functions, types and enums.
+
+type Pair<A, B> = { left: A, right: B }
+
+enum Tree<T> {
+    Leaf
+    Node(Tree<T>, T, Tree<T>)
+}
+
+fn insert(t: Tree<Int>, x: Int) -> Tree<Int> {
+    return match t {
+        Tree.Leaf => Tree.Node(Tree.Leaf, x, Tree.Leaf)
+        Tree.Node(l, v, r) => match x < v {
+            true => Tree.Node(insert(l, x), v, r)
+            false => Tree.Node(l, v, insert(r, x))
+        }
+    }
+}
+
+// Works for a tree of any element type.
+fn in_order<T>(t: Tree<T>) -> List<T> {
+    return match t {
+        Tree.Leaf => []
+        Tree.Node(l, v, r) => in_order(l) + [v] + in_order(r)
+    }
+}
+
+fn depth<T>(t: Tree<T>) -> Int {
+    return match t {
+        Tree.Leaf => 0
+        Tree.Node(l, _, r) => 1 + max(depth(l), depth(r))
+    }
+}
+
+fn swap<A, B>(p: Pair<A, B>) -> Pair<B, A> {
+    return { left: p.right, right: p.left }
+}
+
+fn main() {
+    let tree = [50, 30, 70, 20, 40, 60].fold(Tree.Leaf, |t, x| insert(t, x))
+    print("Sorted:", in_order(tree))
+    print("Depth:", depth(tree))
+
+    let names = Tree.Node(Tree.Leaf, "Lina", Tree.Node(Tree.Leaf, "Omar", Tree.Leaf))
+    print("Names:", in_order(names))
+
+    let p: Pair<String, Int> = { left: "age", right: 30 }
+    print(swap(p))
+}

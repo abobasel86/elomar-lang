@@ -577,3 +577,9 @@ fn http_requests() {
         "200 GET /hello \n200 POST /items {\"a\": 1}\n404 GET /missing \n302 GET /redirect \nPolicyDenied\nInvalidUrl\nInvalidUrl\n"
     );
 }
+
+#[test]
+fn generic_enums_at_runtime() {
+    let src = "enum Tree<T> {\n  Leaf\n  Node(Tree<T>, T, Tree<T>)\n}\nfn insert(t: Tree<Int>, x: Int) -> Tree<Int> {\n  return match t {\n    Tree.Leaf => Tree.Node(Tree.Leaf, x, Tree.Leaf)\n    Tree.Node(l, v, r) => match x < v {\n      true => Tree.Node(insert(l, x), v, r)\n      false => Tree.Node(l, v, insert(r, x))\n    }\n  }\n}\nfn items<T>(t: Tree<T>) -> List<T> {\n  return match t {\n    Tree.Leaf => []\n    Tree.Node(l, v, r) => items(l) + [v] + items(r)\n  }\n}\nfn main() {\n  print(items([5, 2, 8, 1].fold(Tree.Leaf, |t, x| insert(t, x))))\n}";
+    assert_eq!(out(src), "[1, 2, 5, 8]\n");
+}

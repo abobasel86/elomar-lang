@@ -266,9 +266,25 @@ impl Parser {
         }
     }
 
+    /// `<T, U>` after a declared name, or nothing.
+    fn type_params(&mut self) -> PResult<Vec<Ident>> {
+        let mut params = Vec::new();
+        if self.eat(&TokenKind::Lt) {
+            while !self.at(&TokenKind::Gt) {
+                params.push(self.ident()?);
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Gt)?;
+        }
+        Ok(params)
+    }
+
     fn enum_decl(&mut self, is_pub: bool) -> PResult<EnumDecl> {
         let start = self.expect(TokenKind::Enum)?;
         let name = self.ident()?;
+        let type_params = self.type_params()?;
         self.expect(TokenKind::LBrace)?;
         let mut variants = Vec::new();
         self.skip_newlines();
@@ -298,6 +314,7 @@ impl Parser {
         Ok(EnumDecl {
             is_pub,
             name,
+            type_params,
             variants,
             span: start.to(end),
         })
@@ -334,11 +351,13 @@ impl Parser {
     fn type_decl(&mut self, is_pub: bool) -> PResult<TypeDecl> {
         let start = self.expect(TokenKind::Type)?;
         let name = self.ident()?;
+        let type_params = self.type_params()?;
         self.expect(TokenKind::Eq)?;
         let ty = self.type_expr()?;
         Ok(TypeDecl {
             is_pub,
             name,
+            type_params,
             ty,
             span: start.to(self.prev_span()),
         })
@@ -367,16 +386,7 @@ impl Parser {
         let is_async = self.eat(&TokenKind::Async);
         self.expect(TokenKind::Fn)?;
         let name = self.ident()?;
-        let mut type_params = Vec::new();
-        if self.eat(&TokenKind::Lt) {
-            while !self.at(&TokenKind::Gt) {
-                type_params.push(self.ident()?);
-                if !self.eat(&TokenKind::Comma) {
-                    break;
-                }
-            }
-            self.expect(TokenKind::Gt)?;
-        }
+        let type_params = self.type_params()?;
         self.expect(TokenKind::LParen)?;
         let mut params = Vec::new();
         while !self.at(&TokenKind::RParen) {
