@@ -1,0 +1,5 @@
+Lina 91.7 excellent
+Omar 71.7 good
+Sara 47.5 weak
+  below the pass mark of 60
+{ name: "Lina", grades: [95, 88, 92] } true

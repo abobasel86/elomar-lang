@@ -27,7 +27,11 @@ fn examples_produce_expected_output() {
     let mut count = 0;
     for entry in std::fs::read_dir(root().join("examples")).unwrap() {
         let dir = entry.unwrap().path();
-        let main = dir.join("main.elo");
+        // Single-file examples have `main.elo`; projects have `src/main.elo`.
+        let main = [dir.join("main.elo"), dir.join("src/main.elo")]
+            .into_iter()
+            .find(|p| p.exists())
+            .unwrap_or_else(|| dir.join("main.elo"));
         let expected = dir.join("expected.out");
         if !main.exists() || !expected.exists() {
             continue;
@@ -281,4 +285,136 @@ fn openai_config_errors() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(2), "{stderr}");
     assert!(stderr.contains("must use https"), "{stderr}");
+}
+
+// ----- Multi-file modules ----------------------------------------------------
+
+/// Writes a project under the test temp folder and returns its main file.
+fn module_project(name: &str, files: &[(&str, &str)]) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _ = std::fs::remove_dir_all(&dir);
+    for (path, text) in files {
+        let p = dir.join(path);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, text).unwrap();
+    }
+    dir.join("src/main.elo")
+}
+
+fn check_codes(main: &Path) -> (Vec<String>, String) {
+    let out = elomar(&["check", main.to_str().unwrap()]);
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    let codes = stderr
+        .lines()
+        .filter_map(|l| l.strip_prefix("error["))
+        .filter_map(|l| l.split(']').next())
+        .map(str::to_string)
+        .collect();
+    (codes, stderr)
+}
+
+const LIB: &str = "pub fn shout(s: String) -> String {\n    return s.upper() + suffix()\n}\n\nfn suffix() -> String {\n    return \"!\"\n}\n\npub enum Mood {\n    Happy\n    Sad\n}\n";
+
+#[test]
+fn modules_run_and_respect_pub() {
+    let ok = module_project(
+        "modules-ok",
+        &[
+            ("elomar.toml", ""),
+            ("src/lib.elo", LIB),
+            (
+                "src/main.elo",
+                "use app.lib\nfn main() {\n    print(lib.shout(\"hi\"), lib.Mood.Sad)\n    match lib.Mood.Happy {\n        lib.Mood.Happy => print(\"happy\")\n        lib.Mood.Sad => print(\"sad\")\n    }\n}\n",
+            ),
+        ],
+    );
+    let out = elomar(&["run", ok.to_str().unwrap()]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&out.stdout)),
+        "HI! lib.Mood.Sad\nhappy\n",
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let private = module_project(
+        "modules-private",
+        &[
+            ("elomar.toml", ""),
+            ("src/lib.elo", LIB),
+            (
+                "src/main.elo",
+                "use app.lib\nfn main() {\n    print(lib.suffix())\n}\n",
+            ),
+        ],
+    );
+    let (codes, stderr) = check_codes(&private);
+    assert_eq!(codes, vec!["E1012"], "{stderr}");
+    assert!(stderr.contains("mark it `pub` in src/lib.elo"), "{stderr}");
+}
+
+#[test]
+fn module_errors() {
+    let missing = module_project(
+        "modules-missing",
+        &[
+            ("elomar.toml", ""),
+            ("src/main.elo", "use app.nothing\nfn main() {}\n"),
+        ],
+    );
+    let (codes, stderr) = check_codes(&missing);
+    assert_eq!(codes, vec!["E1011"], "{stderr}");
+    assert!(stderr.contains("src/nothing.elo"), "{stderr}");
+
+    // Errors inside a module point at the module's file.
+    let broken = module_project(
+        "modules-broken",
+        &[
+            ("elomar.toml", ""),
+            ("src/lib.elo", "pub fn f() -> Int {\n    return \"x\"\n}\n"),
+            (
+                "src/main.elo",
+                "use app.lib\nfn main() {\n    print(lib.f())\n}\n",
+            ),
+        ],
+    );
+    let (codes, stderr) = check_codes(&broken);
+    assert_eq!(codes, vec!["E2001"], "{stderr}");
+    assert!(stderr.contains("src/lib.elo:2:12"), "{stderr}");
+
+    // Imports are per file: `lib` does not see `std.ai` imported by main.
+    let isolated = module_project(
+        "modules-isolated",
+        &[
+            ("elomar.toml", ""),
+            (
+                "src/lib.elo",
+                "pub async fn ask() -> Result<String, AIError> !{ai} {\n    return await ai.infer<String>(\"mock\", \"hi\", \"x\")\n}\n",
+            ),
+            (
+                "src/main.elo",
+                "use std.ai\nuse app.lib\nasync fn main() {\n    print(await lib.ask())\n}\n",
+            ),
+        ],
+    );
+    let (codes, stderr) = check_codes(&isolated);
+    assert_eq!(codes, vec!["E1001"], "{stderr}");
+
+    // Unknown items and private types.
+    let unknown = module_project(
+        "modules-unknown",
+        &[
+            ("elomar.toml", ""),
+            (
+                "src/lib.elo",
+                "type Secret = { x: Int }\npub fn shout() {}\n",
+            ),
+            (
+                "src/main.elo",
+                "use app.lib\nfn main() {\n    lib.shuot()\n    let s: lib.Secret = { x: 1 }\n}\n",
+            ),
+        ],
+    );
+    let (codes, stderr) = check_codes(&unknown);
+    assert_eq!(codes, vec!["E1008", "E1012"], "{stderr}");
+    assert!(stderr.contains("did you mean `lib.shout`?"), "{stderr}");
 }

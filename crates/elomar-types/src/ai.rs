@@ -43,6 +43,10 @@ pub(crate) fn ai_error_ty() -> Ty {
 
 impl Checker {
     pub(crate) fn check_use(&mut self, u: &UseDecl) {
+        if u.path.first().is_some_and(|p| p.name == "app") {
+            self.check_app_use(u);
+            return;
+        }
         let path = u
             .path
             .iter()
@@ -51,11 +55,13 @@ impl Checker {
             .join(".");
         match KNOWN_MODULES.iter().find(|(p, _)| *p == path) {
             Some((_, Some(short))) => {
-                self.modules.insert((*short).to_string());
+                self.import_std(&u.module, short);
             }
             Some((_, None)) => {}
             None => {
-                let known: Vec<String> = KNOWN_MODULES.iter().map(|(p, _)| p.to_string()).collect();
+                let mut known: Vec<String> =
+                    KNOWN_MODULES.iter().map(|(p, _)| p.to_string()).collect();
+                known.push("app.<file>".into());
                 self.push(
                     Diagnostic::error(
                         "E1009",
@@ -137,7 +143,7 @@ impl Checker {
         let (path, _) = KNOWN_MODULES
             .iter()
             .find(|(_, short)| *short == Some(module.as_str()))?;
-        if !self.modules.contains(module.as_str()) {
+        if !self.std_imported(module.as_str()) {
             self.push(
                 Diagnostic::error(
                     "E1001",

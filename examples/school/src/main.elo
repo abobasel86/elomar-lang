@@ -1,0 +1,22 @@
+// A program split over several files (spec §11.2): `use app.students`
+// loads src/students.elo, and its `pub` items are used as `students.name`.
+use app.students
+use app.grading
+
+fn main() {
+    let class = [
+        students.new_student("Lina", [95, 88, 92]),
+        students.new_student("Omar", [70, 65, 80]),
+        students.new_student("Sara", [50, 45])
+    ]
+    for s in class {
+        let level = students.level(s)
+        print(s.name, students.average(s), grading.label(level))
+        match level {
+            grading.Level.Weak => print("  below the pass mark of", grading.PASS_MARK)
+            _ => {}
+        }
+    }
+    let first: students.Student = class[0]
+    print(first, students.level(first) == grading.Level.Excellent)
+}

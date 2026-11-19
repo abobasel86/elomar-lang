@@ -10,7 +10,11 @@ pub struct Ident {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Program {
+    /// Items of every loaded file. Items of an imported module have names
+    /// prefixed with the module name (`students.count`); see the loader.
     pub items: Vec<Item>,
+    /// Imported modules that were found, e.g. `students` for `use app.students`.
+    pub modules: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,12 +30,15 @@ pub enum Item {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseDecl {
     pub path: Vec<Ident>,
+    /// The module this `use` appears in; empty for the main file.
+    pub module: String,
     pub span: Span,
 }
 
 /// `type Student = { name: String }`
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeDecl {
+    pub is_pub: bool,
     pub name: Ident,
     pub ty: TypeExpr,
     pub span: Span,
@@ -40,6 +47,7 @@ pub struct TypeDecl {
 /// `enum Shape { Circle(Float), Square(Float), Empty }`
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDecl {
+    pub is_pub: bool,
     pub name: Ident,
     pub variants: Vec<VariantDecl>,
     pub span: Span,
@@ -55,6 +63,7 @@ pub struct VariantDecl {
 /// A file-level `let`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConstDecl {
+    pub is_pub: bool,
     pub name: Ident,
     pub ty: Option<TypeExpr>,
     pub value: Expr,

@@ -1,0 +1,27 @@
+// Students and their averages; uses the grading module.
+use app.grading
+
+pub type Student = {
+    name: String,
+    grades: List<Int>
+}
+
+pub fn new_student(name: String, grades: List<Int>) -> Student {
+    return { name, grades }
+}
+
+pub fn average(s: Student) -> Float {
+    if s.grades.is_empty() {
+        return 0
+    }
+    return round1(s.grades.sum() / s.grades.length)
+}
+
+pub fn level(s: Student) -> grading.Level {
+    return grading.level_for(average(s))
+}
+
+// Private: only this file can call it.
+fn round1(x: Float) -> Float {
+    return (x * 10).round() / 10
+}

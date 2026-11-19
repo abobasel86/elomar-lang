@@ -9,10 +9,11 @@ mod ai;
 mod builtins;
 mod enums;
 mod expr;
+mod modules;
 mod stdlib;
 mod ty;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
@@ -76,8 +77,8 @@ struct Checker {
     loop_depth: u32,
     /// Whether the function being checked is `async` (so `await` is allowed).
     in_async: bool,
-    /// Short names of imported modules, e.g. `ai` for `use std.ai`.
-    modules: HashSet<String>,
+    /// Imports and visibility per module (see `modules.rs`).
+    scopes_mod: modules::ModuleScopes,
     cloud_models: Vec<String>,
     usage: Usage,
 }
@@ -85,9 +86,11 @@ struct Checker {
 impl Checker {
     fn run(&mut self, program: &mut Program, opts: CheckOptions) {
         self.register_builtin_enums();
+        self.collect_module_info(program);
         self.cloud_models = opts.cloud_models.clone();
         for item in &program.items {
             if let Item::Use(u) = item {
+                self.scopes_mod.current = u.module.clone();
                 self.check_use(u);
             }
         }
@@ -99,6 +102,7 @@ impl Checker {
         let mut const_usage = Vec::new();
         for item in &mut program.items {
             if let Item::Const(c) = item {
+                self.enter_module_of(&c.name.name);
                 self.check_const(c);
                 const_usage.push((c.name.clone(), std::mem::take(&mut self.usage)));
             }
@@ -107,11 +111,13 @@ impl Checker {
         let mut fn_usage: HashMap<String, Usage> = HashMap::new();
         for item in &mut program.items {
             if let Item::Fn(f) = item {
+                self.enter_module_of(&f.name.name);
                 self.check_fn(f);
                 fn_usage.insert(f.name.name.clone(), std::mem::take(&mut self.usage));
             }
         }
 
+        self.scopes_mod.current.clear();
         let effects = infer_effects(&fn_usage);
         self.check_fn_effects(&fn_usage, &effects);
         self.check_const_effects(&const_usage, &effects);
@@ -311,7 +317,21 @@ impl Checker {
             .chain(self.fns.keys().cloned())
             .chain(BUILTIN_FUNCTIONS.iter().map(|s| s.to_string()))
             .chain(CONSTRUCTORS.iter().map(|s| s.to_string()))
-            .chain(self.modules.iter().cloned())
+            .chain(
+                self.scopes_mod
+                    .std_imports
+                    .get(&self.scopes_mod.current)
+                    .into_iter()
+                    .flatten()
+                    .cloned(),
+            )
+            .chain(
+                self.scopes_mod
+                    .app_aliases
+                    .get(&self.scopes_mod.current)
+                    .into_iter()
+                    .flat_map(|a| a.keys().cloned()),
+            )
             .collect();
         names.sort();
         names.dedup();
@@ -350,6 +370,7 @@ impl Checker {
         let mut seen: HashMap<String, Span> = HashMap::new();
         for item in &program.items {
             let Item::Type(t) = item else { continue };
+            self.enter_module_of(&t.name.name);
             if builtins::is_builtin_type(&t.name.name) {
                 self.error(
                     "E1002",
@@ -417,6 +438,11 @@ impl Checker {
             return Ty::Error;
         }
         stack.push(name.to_string());
+        // Names inside the alias are resolved in the alias's own module.
+        let saved = std::mem::replace(
+            &mut self.scopes_mod.current,
+            modules::module_of(name).to_string(),
+        );
         let ty = self.lower_type_with(&decl.ty, &mut |c, n| {
             if decls.contains_key(n) {
                 Some(c.resolve_alias(n, decls, stack))
@@ -425,6 +451,7 @@ impl Checker {
             }
         });
         stack.pop();
+        self.scopes_mod.current = saved;
         self.aliases.insert(name.to_string(), ty.clone());
         ty
     }
@@ -469,7 +496,11 @@ impl Checker {
                     "List" | "Option" | "Future" => 1,
                     "Result" => 2,
                     "Map" => 2,
-                    other => {
+                    _ => {
+                        let Some(resolved) = self.resolve_type_name(name, true) else {
+                            return Ty::Error;
+                        };
+                        let other = resolved.as_str();
                         if self.enums.contains_key(other) {
                             if !args.is_empty() {
                                 self.wrong_type_args(name, 0, args.len(), t.span);
@@ -555,8 +586,10 @@ impl Checker {
     fn collect_fns(&mut self, program: &Program) {
         for item in &program.items {
             let Item::Fn(f) = item else { continue };
+            self.enter_module_of(&f.name.name);
             let name = &f.name.name;
-            if BUILTIN_FUNCTIONS.contains(&name.as_str()) || CONSTRUCTORS.contains(&name.as_str()) {
+            let base = modules::base_name(name);
+            if BUILTIN_FUNCTIONS.contains(&base) || CONSTRUCTORS.contains(&base) {
                 self.error(
                     "E1002",
                     f.name.span,

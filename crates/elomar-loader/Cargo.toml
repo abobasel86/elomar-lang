@@ -1,0 +1,12 @@
+[package]
+name = "elomar-loader"
+description = "Loads an Elomar-Lang program and the modules it imports"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+elomar-diagnostics.workspace = true
+elomar-ast.workspace = true
+elomar-parser.workspace = true

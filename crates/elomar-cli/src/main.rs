@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use elomar_ai_core::{AiRuntime, ModelProvider, ProjectConfig, UnavailableProvider, parse_config};
 use elomar_ai_provider_mock::MockProvider;
 use elomar_ai_provider_openai::OpenAiProvider;
-use elomar_diagnostics::{Diagnostic, Lang, RenderOptions, SourceFile, render};
+use elomar_diagnostics::{Diagnostic, Lang, RenderOptions, SourceMap, render_in};
 use elomar_interpreter::{FsPolicy, Host};
 
 #[derive(Parser)]
@@ -71,8 +71,8 @@ struct Reporter {
 }
 
 impl Reporter {
-    fn emit(&self, diag: &Diagnostic, file: &SourceFile) {
-        eprintln!("{}", render(diag, file, self.opts));
+    fn emit(&self, diag: &Diagnostic, sources: &SourceMap) {
+        eprintln!("{}", render_in(diag, sources, self.opts));
     }
 
     fn say(&self, en: &str, ar: &str) {
@@ -111,8 +111,8 @@ fn main() -> ExitCode {
 }
 
 fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
-    let text = match std::fs::read_to_string(path) {
-        Ok(t) => t,
+    let loaded = match elomar_loader::load(path, &project_root(path)) {
+        Ok(l) => l,
         Err(e) => {
             let shown = path.display();
             reporter.say(
@@ -122,7 +122,8 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let file = SourceFile::new(path.display().to_string(), text);
+    let sources = loaded.sources;
+    let name = path.display().to_string();
 
     // The project config decides which models are cloud models (`net`), so
     // it is loaded before checking.
@@ -138,7 +139,8 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
         }
     };
 
-    let (mut program, mut diags) = elomar_parser::parse(&file.text);
+    let mut program = loaded.program;
+    let mut diags = loaded.diagnostics;
     if diags.iter().all(|d| !d.is_error()) {
         diags.extend(elomar_types::check(
             &mut program,
@@ -150,27 +152,25 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
     }
     diags.sort_by_key(|d| (d.label.span.start, !d.is_error()));
     for d in &diags {
-        reporter.emit(d, &file);
+        reporter.emit(d, &sources);
     }
     let errors = diags.iter().filter(|d| d.is_error()).count();
     let warnings = diags.len() - errors;
     if errors > 0 {
         reporter.say(
             &format!(
-                "error: `{}` has {errors} error(s) and {warnings} warning(s); it was not run",
-                file.name
+                "error: `{name}` has {errors} error(s) and {warnings} warning(s); it was not run"
             ),
             &format!(
-                "خطأ: في `{}` عدد {errors} من الأخطاء و{warnings} من التحذيرات؛ لم يُنفَّذ البرنامج",
-                file.name
+                "خطأ: في `{name}` عدد {errors} من الأخطاء و{warnings} من التحذيرات؛ لم يُنفَّذ البرنامج"
             ),
         );
         return ExitCode::from(1);
     }
     if !execute {
         reporter.say(
-            &format!("`{}`: no errors ({warnings} warning(s))", file.name),
-            &format!("`{}`: لا توجد أخطاء ({warnings} من التحذيرات)", file.name),
+            &format!("`{name}`: no errors ({warnings} warning(s))"),
+            &format!("`{name}`: لا توجد أخطاء ({warnings} من التحذيرات)"),
         );
         return ExitCode::SUCCESS;
     }
@@ -184,10 +184,21 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            reporter.emit(&err.to_diagnostic(), &file);
+            reporter.emit(&err.to_diagnostic(), &sources);
             ExitCode::from(1)
         }
     }
+}
+
+/// The project folder: where `elomar.toml` is, else the program's folder.
+/// Relative paths and modules (`src/`) are looked up from here.
+fn project_root(source: &Path) -> PathBuf {
+    find_config(source)
+        .as_deref()
+        .or(Some(source))
+        .and_then(Path::parent)
+        .and_then(|p| std::path::absolute(p).ok())
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 /// The nearest `elomar.toml` in the source file's directory or above it.
@@ -221,12 +232,7 @@ fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
     let config_error = |message: String| (config_path.clone().unwrap_or_default(), message);
     // Relative paths (in the program and in `[permissions]`) start at the
     // project folder: where elomar.toml is, else the program's folder.
-    let base = config_path
-        .as_deref()
-        .or(Some(source))
-        .and_then(Path::parent)
-        .and_then(|p| std::path::absolute(p).ok())
-        .unwrap_or_else(|| PathBuf::from("."));
+    let base = project_root(source);
     let fs = FsPolicy::new(
         base,
         &config.permissions.filesystem_read,

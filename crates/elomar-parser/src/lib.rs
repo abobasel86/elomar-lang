@@ -13,7 +13,13 @@ use elomar_lexer::{Token, TokenKind};
 /// Lexes and parses a source file. Lexical and syntax errors are both
 /// returned; the program contains every item that parsed successfully.
 pub fn parse(src: &str) -> (Program, Vec<Diagnostic>) {
-    let (tokens, mut diags) = elomar_lexer::lex(src);
+    parse_at(src, 0)
+}
+
+/// Like [`parse`], with every span shifted by `base`, so several files can
+/// share one span space (see `elomar_diagnostics::SourceMap`).
+pub fn parse_at(src: &str, base: usize) -> (Program, Vec<Diagnostic>) {
+    let (tokens, mut diags) = elomar_lexer::lex_at(src, base);
     let (program, parse_diags) = parse_tokens(tokens);
     diags.extend(parse_diags);
     (program, diags)
@@ -176,7 +182,10 @@ impl Parser {
                 }
             }
         }
-        Program { items }
+        Program {
+            items,
+            modules: Vec::new(),
+        }
     }
 
     /// Skips to the next token that can start an item at the start of a line.
@@ -217,14 +226,19 @@ impl Parser {
         match self.peek() {
             TokenKind::Pub => {
                 let start = self.bump().span;
-                self.fn_decl(true, start).map(Item::Fn)
+                match self.peek() {
+                    TokenKind::Type => self.type_decl(true).map(Item::Type),
+                    TokenKind::Enum => self.enum_decl(true).map(Item::Enum),
+                    TokenKind::Let => self.const_decl(true).map(Item::Const),
+                    _ => self.fn_decl(true, start).map(Item::Fn),
+                }
             }
             TokenKind::Fn | TokenKind::Async => {
                 let start = self.span();
                 self.fn_decl(false, start).map(Item::Fn)
             }
-            TokenKind::Type => self.type_decl().map(Item::Type),
-            TokenKind::Let => self.const_decl().map(Item::Const),
+            TokenKind::Type => self.type_decl(false).map(Item::Type),
+            TokenKind::Let => self.const_decl(false).map(Item::Const),
             TokenKind::Use => self.use_decl().map(Item::Use),
             TokenKind::Var => Err(Diagnostic::error(
                 "E0105",
@@ -238,7 +252,7 @@ impl Parser {
                 "use `let` for a file-level constant, or move the variable into a function",
                 "استخدم `let` لثابت على مستوى الملف، أو انقل المتغير إلى داخل دالة",
             ))),
-            TokenKind::Enum => self.enum_decl().map(Item::Enum),
+            TokenKind::Enum => self.enum_decl(false).map(Item::Enum),
             TokenKind::Trait | TokenKind::Impl => Err(not_yet(
                 self.span(),
                 "`trait`/`impl`",
@@ -252,7 +266,7 @@ impl Parser {
         }
     }
 
-    fn enum_decl(&mut self) -> PResult<EnumDecl> {
+    fn enum_decl(&mut self, is_pub: bool) -> PResult<EnumDecl> {
         let start = self.expect(TokenKind::Enum)?;
         let name = self.ident()?;
         self.expect(TokenKind::LBrace)?;
@@ -282,6 +296,7 @@ impl Parser {
         }
         let end = self.expect(TokenKind::RBrace)?;
         Ok(EnumDecl {
+            is_pub,
             name,
             variants,
             span: start.to(end),
@@ -296,23 +311,25 @@ impl Parser {
         }
         Ok(UseDecl {
             path,
+            module: String::new(),
             span: start.to(self.prev_span()),
         })
     }
 
-    fn type_decl(&mut self) -> PResult<TypeDecl> {
+    fn type_decl(&mut self, is_pub: bool) -> PResult<TypeDecl> {
         let start = self.expect(TokenKind::Type)?;
         let name = self.ident()?;
         self.expect(TokenKind::Eq)?;
         let ty = self.type_expr()?;
         Ok(TypeDecl {
+            is_pub,
             name,
             ty,
             span: start.to(self.prev_span()),
         })
     }
 
-    fn const_decl(&mut self) -> PResult<ConstDecl> {
+    fn const_decl(&mut self, is_pub: bool) -> PResult<ConstDecl> {
         let start = self.expect(TokenKind::Let)?;
         let name = self.ident()?;
         let ty = if self.eat(&TokenKind::Colon) {
@@ -323,6 +340,7 @@ impl Parser {
         self.expect(TokenKind::Eq)?;
         let value = self.expr()?;
         Ok(ConstDecl {
+            is_pub,
             name,
             ty,
             value,
@@ -397,7 +415,7 @@ impl Parser {
     fn type_expr(&mut self) -> PResult<TypeExpr> {
         match self.peek() {
             TokenKind::Ident(_) => {
-                let name = self.ident()?;
+                let name = self.dotted_name()?;
                 let mut args = Vec::new();
                 if self.eat(&TokenKind::Lt) {
                     loop {
@@ -444,6 +462,19 @@ impl Parser {
                 ),
             )),
         }
+    }
+
+    /// `Student` or `students.Student`, as one name joined with dots.
+    fn dotted_name(&mut self) -> PResult<Ident> {
+        let mut name = self.ident()?;
+        while self.at(&TokenKind::Dot) && matches!(self.peek_n(1), TokenKind::Ident(_)) {
+            self.bump();
+            let part = self.ident()?;
+            name.name.push('.');
+            name.name.push_str(&part.name);
+            name.span = name.span.to(part.span);
+        }
+        Ok(name)
     }
 
     // ----- statements ------------------------------------------------------
@@ -972,7 +1003,20 @@ impl Parser {
             TokenKind::Ident(_) => {
                 let name = self.ident()?;
                 if self.eat(&TokenKind::Dot) {
-                    let variant = self.ident()?;
+                    // `Enum.Variant` or `module.Enum.Variant`.
+                    let mut path = vec![name, self.ident()?];
+                    while self.eat(&TokenKind::Dot) {
+                        path.push(self.ident()?);
+                    }
+                    let variant = path.pop().expect("at least two segments");
+                    let name = Ident {
+                        name: path
+                            .iter()
+                            .map(|i| i.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join("."),
+                        span: path[0].span.to(path[path.len() - 1].span),
+                    };
                     let mut args = Vec::new();
                     if self.eat(&TokenKind::LParen) {
                         while !self.at(&TokenKind::RParen) {
@@ -1324,6 +1368,41 @@ mod tests {
         let (_, diags) = parse("impl E {}\ntrait T {}");
         let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
         assert_eq!(codes, vec!["E0103", "E0103"]);
+    }
+
+    #[test]
+    fn pub_items_and_dotted_paths() {
+        let program = parse_ok(
+            "pub type T = { a: lib.Thing }
+pub enum E { A }
+pub let X = 1
+fn f(x: lib.Level) {
+  match x {
+    lib.Level.High(v) => v
+    _ => 0
+  }
+}",
+        );
+        assert!(matches!(&program.items[0], Item::Type(t) if t.is_pub));
+        assert!(matches!(&program.items[1], Item::Enum(e) if e.is_pub));
+        assert!(matches!(&program.items[2], Item::Const(c) if c.is_pub));
+        let Item::Fn(f) = &program.items[3] else {
+            panic!()
+        };
+        assert!(
+            matches!(&f.params[0].ty.kind, TypeExprKind::Named { name, .. } if name.name == "lib.Level")
+        );
+        let StmtKind::Expr(Expr {
+            kind: ExprKind::Match { arms, .. },
+            ..
+        }) = &f.body.stmts[0].kind
+        else {
+            panic!()
+        };
+        assert!(matches!(
+            &arms[0].pattern.kind,
+            PatternKind::Variant { enum_name, variant, .. } if enum_name.name == "lib.Level" && variant.name == "High"
+        ));
     }
 
     #[test]

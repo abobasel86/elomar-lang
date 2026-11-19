@@ -26,6 +26,8 @@ by the compiler when they are not declared.
 - Files and JSON: `std.fs` (the `fs` effect, default-deny `filesystem_read` /
   `filesystem_write` in `elomar.toml`) and typed `json.parse<T>` /
   `json.stringify`. See [`examples/files`](examples/files).
+- Multi-file programs: `use app.students` loads `src/students.elo`; only `pub`
+  items are visible to other files. See [`examples/school`](examples/school).
 - Effect inference with mandatory declarations on `pub` functions.
 - `async fn` / `await` (sequential, lazy futures).
 - **Typed AI calls:** `ai.infer<T>(...)` returns `Result<T, AIError>` (`AIError` is an enum, e.g. `AIError.Timeout(msg)`); answers are
@@ -120,6 +122,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-lexer` | Tokens and newline rules |
 | `crates/elomar-ast` | Syntax tree |
 | `crates/elomar-parser` | Recursive-descent + Pratt parser |
+| `crates/elomar-loader` | Loads the main file and the `use app.*` modules it imports |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
 | `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
 | `crates/elomar-ai-core` | Schemas (shared with `std.json`), AI errors, `elomar.toml`, answer validation |
@@ -145,7 +148,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, CI; ⏳ `Set`, modules, formatter, package tooling.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, CI; ⏳ `Set`, formatter, package tooling.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

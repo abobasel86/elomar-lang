@@ -86,7 +86,7 @@ impl Checker {
         for item in &program.items {
             let Item::Enum(e) = item else { continue };
             let name = &e.name.name;
-            if crate::builtins::is_builtin_type(name) {
+            if crate::builtins::is_builtin_type(crate::modules::base_name(name)) {
                 self.error(
                     "E1002",
                     e.name.span,
@@ -126,8 +126,9 @@ impl Checker {
     pub(crate) fn resolve_enums(&mut self, program: &Program) {
         for item in &program.items {
             let Item::Enum(e) = item else { continue };
+            self.enter_module_of(&e.name.name);
             if !self.enums.contains_key(&e.name.name)
-                || crate::builtins::is_builtin_type(&e.name.name)
+                || crate::builtins::is_builtin_type(crate::modules::base_name(&e.name.name))
             {
                 continue;
             }
@@ -287,6 +288,13 @@ impl Checker {
         args: &[Pattern],
         ty: &Ty,
     ) {
+        let Some(full) = self.resolve_type_name(enum_name, true) else {
+            return;
+        };
+        let enum_name = &Ident {
+            name: full,
+            span: enum_name.span,
+        };
         if !self.enums.contains_key(&enum_name.name) {
             self.push(Diagnostic::error(
                 "E1006",
@@ -323,25 +331,32 @@ impl Checker {
     }
 
     /// Variants of `enum_name` that no arm covers, as `E.V` or `E.V(_)`.
-    pub(crate) fn missing_variants(&self, enum_name: &str, arms: &[MatchArm]) -> Vec<String> {
+    pub(crate) fn missing_variants(&mut self, enum_name: &str, arms: &[MatchArm]) -> Vec<String> {
+        // Patterns name the enum as written; compare by full name.
+        let written: Vec<Option<String>> = arms
+            .iter()
+            .map(|a| match &a.pattern.kind {
+                PatternKind::Variant { enum_name: e, .. } => self.resolve_type_name(e, false),
+                _ => None,
+            })
+            .collect();
         let Some(info) = self.enums.get(enum_name) else {
             return Vec::new();
         };
         info.variants
             .iter()
             .filter(|(vname, _)| {
-                !arms.iter().any(|a| match &a.pattern.kind {
-                    PatternKind::Variant {
-                        enum_name: e,
-                        variant,
-                        args,
-                    } => {
-                        e.name == enum_name
-                            && &variant.name == vname
-                            && args.iter().all(crate::expr::irrefutable)
-                    }
-                    _ => false,
-                })
+                !arms
+                    .iter()
+                    .zip(&written)
+                    .any(|(a, full)| match &a.pattern.kind {
+                        PatternKind::Variant { variant, args, .. } => {
+                            full.as_deref() == Some(enum_name)
+                                && &variant.name == vname
+                                && args.iter().all(crate::expr::irrefutable)
+                        }
+                        _ => false,
+                    })
             })
             .map(|(vname, fields)| {
                 if fields.is_empty() {

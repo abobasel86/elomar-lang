@@ -1,0 +1,27 @@
+// Grading rules. Only `pub` items can be used from other files.
+
+pub enum Level {
+    Excellent
+    Good
+    Weak
+}
+
+pub let PASS_MARK = 60
+
+pub fn level_for(avg: Float) -> Level {
+    if avg >= 90 {
+        return Level.Excellent
+    }
+    if avg >= PASS_MARK {
+        return Level.Good
+    }
+    return Level.Weak
+}
+
+pub fn label(l: Level) -> String {
+    return match l {
+        Level.Excellent => "excellent"
+        Level.Good => "good"
+        Level.Weak => "weak"
+    }
+}

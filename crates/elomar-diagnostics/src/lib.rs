@@ -209,6 +209,56 @@ const RESET: &str = "\x1b[0m";
 ///    = hint: ...
 /// ```
 pub fn render(diag: &Diagnostic, file: &SourceFile, opts: RenderOptions) -> String {
+    render_in(diag, &SourceMap::single(file.clone()), opts)
+}
+
+/// Several source files sharing one span space: a file's spans are offset
+/// by its base, so a [`Span`] alone identifies the file it points into.
+#[derive(Debug, Clone, Default)]
+pub struct SourceMap {
+    files: Vec<(usize, SourceFile)>,
+}
+
+impl SourceMap {
+    pub fn single(file: SourceFile) -> Self {
+        SourceMap {
+            files: vec![(0, file)],
+        }
+    }
+
+    /// The base offset the next added file will get.
+    pub fn next_base(&self) -> usize {
+        self.files
+            .last()
+            .map_or(0, |(base, f)| base + f.text.len() + 1)
+    }
+
+    /// Adds a file and returns its base offset.
+    pub fn add(&mut self, file: SourceFile) -> usize {
+        let base = self.next_base();
+        self.files.push((base, file));
+        base
+    }
+
+    /// The file a global offset points into, and that file's base.
+    pub fn file_at(&self, offset: usize) -> (&SourceFile, usize) {
+        let (base, file) = self
+            .files
+            .iter()
+            .rev()
+            .find(|(base, _)| *base <= offset)
+            .unwrap_or(&self.files[0]);
+        (file, *base)
+    }
+
+    pub fn files(&self) -> impl Iterator<Item = &SourceFile> {
+        self.files.iter().map(|(_, f)| f)
+    }
+}
+
+/// Like [`render`], for spans that may point into any file of `map`.
+/// Labels in another file than the primary one get their own `:::` line.
+pub fn render_in(diag: &Diagnostic, map: &SourceMap, opts: RenderOptions) -> String {
     let paint = |code: &'static str, s: &str| -> String {
         if opts.color {
             format!("{code}{s}{RESET}")
@@ -232,28 +282,45 @@ pub fn render(diag: &Diagnostic, file: &SourceFile, opts: RenderOptions) -> Stri
         paint(BOLD, &format!(": {}", diag.message.get(lang)))
     );
 
-    let mut labels = vec![&diag.label];
-    labels.extend(diag.notes.iter());
+    // Each label with its file and file-local span.
+    let mut labels: Vec<(&Label, &SourceFile, Span)> = Vec::new();
+    for label in std::iter::once(&diag.label).chain(diag.notes.iter()) {
+        let (file, base) = map.file_at(label.span.start as usize);
+        let local = Span {
+            start: label.span.start - base as u32,
+            end: label.span.end.saturating_sub(base as u32),
+        };
+        labels.push((label, file, local));
+    }
     let max_line = labels
         .iter()
-        .map(|l| file.line_col(l.span.start as usize).0)
+        .map(|(_, f, s)| f.line_col(s.start as usize).0)
         .max()
         .unwrap_or(1);
     let gutter = max_line.to_string().len();
     let pad = " ".repeat(gutter);
 
-    let (line, col) = file.line_col(diag.label.span.start as usize);
+    let primary_file = labels[0].1;
+    let (line, col) = primary_file.line_col(labels[0].2.start as usize);
     let _ = writeln!(
         out,
         "{pad}{} {}:{line}:{col}",
         paint(BLUE, "-->"),
-        file.name
+        primary_file.name
     );
 
-    for (i, label) in labels.iter().enumerate() {
-        let (line, col) = file.line_col(label.span.start as usize);
+    for (i, (label, file, span)) in labels.iter().enumerate() {
+        let (line, col) = file.line_col(span.start as usize);
+        if !std::ptr::eq(*file, primary_file) {
+            let _ = writeln!(
+                out,
+                "{pad}{} {}:{line}:{col}",
+                paint(BLUE, ":::"),
+                file.name
+            );
+        }
         let text = file.line_text(line);
-        let width = caret_width(file, label.span, text, col);
+        let width = caret_width(file, *span, text, col);
         let marker = if i == 0 { "^" } else { "-" };
         let color = if i == 0 { kind_color } else { BLUE };
         let _ = writeln!(out, "{pad} {}", paint(BLUE, "|"));
@@ -312,6 +379,22 @@ mod tests {
         assert_eq!(f.line_col(off), (1, 9));
         let off2 = f.text.rfind('(').unwrap();
         assert_eq!(f.line_col(off2), (2, 6));
+    }
+
+    #[test]
+    fn renders_across_files() {
+        let mut map = SourceMap::default();
+        map.add(SourceFile::new("main.elo", "use app.lib\nfn main() {}\n"));
+        let base = map.add(SourceFile::new("src/lib.elo", "fn helper() {}\n"));
+        let d = Diagnostic::error("E1012", Span::new(4, 11), Text::new("private", "خاص"))
+            .with_note(
+                Span::new(base + 3, base + 9),
+                Text::new("defined here", "معرّف هنا"),
+            );
+        let out = render_in(&d, &map, RenderOptions::default());
+        assert!(out.contains("--> main.elo:1:5"), "{out}");
+        assert!(out.contains("::: src/lib.elo:1:4"), "{out}");
+        assert!(out.contains("------ defined here"), "{out}");
     }
 
     #[test]

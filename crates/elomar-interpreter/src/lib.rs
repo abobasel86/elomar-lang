@@ -858,20 +858,15 @@ fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) ->
             args.first()
                 .is_some_and(|a| match_pattern(a, inner, bindings))
         }
+        // The checker made sure the pattern's enum is the value's enum (the
+        // pattern may name it as written, e.g. `Level` inside its module).
         (
-            PatternKind::Variant {
-                enum_name,
-                variant,
-                args,
-            },
+            PatternKind::Variant { variant, args, .. },
             Value::Enum {
-                enum_name: e,
-                variant: v,
-                fields,
+                variant: v, fields, ..
             },
         ) => {
-            **e == *enum_name.name
-                && **v == *variant.name
+            **v == *variant.name
                 && args
                     .iter()
                     .zip(fields.iter())

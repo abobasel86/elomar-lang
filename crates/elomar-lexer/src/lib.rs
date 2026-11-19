@@ -203,7 +203,12 @@ pub struct Token {
 /// Tokenizes `src`. Always ends with an `Eof` token; lexical errors are
 /// reported and the offending characters skipped, so parsing can continue.
 pub fn lex(src: &str) -> (Vec<Token>, Vec<Diagnostic>) {
-    let (raw, diags) = raw_tokens(src);
+    lex_at(src, 0)
+}
+
+/// Like [`lex`], with every span shifted by `base` (see `SourceMap`).
+pub fn lex_at(src: &str, base: usize) -> (Vec<Token>, Vec<Diagnostic>) {
+    let (raw, diags) = raw_tokens_at(src, base);
     (apply_newline_rules(raw), diags)
 }
 
@@ -250,6 +255,8 @@ fn is_ident_continue(c: char) -> bool {
 struct Lexer<'a> {
     src: &'a str,
     pos: usize,
+    /// Added to every span, so several files can share one span space.
+    base: usize,
     tokens: Vec<Token>,
     diags: Vec<Diagnostic>,
 }
@@ -272,13 +279,16 @@ impl<'a> Lexer<'a> {
     fn push(&mut self, kind: TokenKind, start: usize) {
         self.tokens.push(Token {
             kind,
-            span: Span::new(start, self.pos),
+            span: Span::new(self.base + start, self.base + self.pos),
         });
     }
 
     fn error(&mut self, code: &'static str, start: usize, end: usize, text: Text) {
-        self.diags
-            .push(Diagnostic::error(code, Span::new(start, end), text));
+        self.diags.push(Diagnostic::error(
+            code,
+            Span::new(self.base + start, self.base + end),
+            text,
+        ));
     }
 
     fn run(mut self) -> (Vec<Token>, Vec<Diagnostic>) {
@@ -310,7 +320,7 @@ impl<'a> Lexer<'a> {
         let end = self.src.len();
         self.tokens.push(Token {
             kind: TokenKind::Eof,
-            span: Span::new(end, end),
+            span: Span::new(self.base + end, self.base + end),
         });
         (self.tokens, self.diags)
     }
@@ -610,9 +620,14 @@ impl<'a> Lexer<'a> {
 
 /// First pass: every token, with a `Newline` at each line break.
 pub fn raw_tokens(src: &str) -> (Vec<Token>, Vec<Diagnostic>) {
+    raw_tokens_at(src, 0)
+}
+
+fn raw_tokens_at(src: &str, base: usize) -> (Vec<Token>, Vec<Diagnostic>) {
     Lexer {
         src,
         pos: 0,
+        base,
         tokens: Vec::new(),
         diags: Vec::new(),
     }

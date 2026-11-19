@@ -294,6 +294,9 @@ impl Checker {
             }
             return Ty::Int;
         }
+        if self.resolve_refs(&mut e.kind) {
+            return Ty::Error;
+        }
         if let Some(enum_name) = self.enum_target(&e.kind) {
             return self.check_variant_expr(e, enum_name);
         }
@@ -465,6 +468,17 @@ impl Checker {
             );
             return Ty::Error;
         }
+        if self.app_target(name).is_some() {
+            self.error(
+                "E2004",
+                span,
+                Text::new(
+                    format!("`{name}` is a module; use one of its items, e.g. `{name}.something`"),
+                    format!("`{name}` وحدة؛ استخدم أحد عناصرها، مثل `{name}.something`"),
+                ),
+            );
+            return Ty::Error;
+        }
         if self.enums.contains_key(name) {
             self.error(
                 "E2004",
@@ -476,7 +490,7 @@ impl Checker {
             );
             return Ty::Error;
         }
-        if self.modules.contains(name) {
+        if self.std_imported(name) {
             self.error(
                 "E2004",
                 span,

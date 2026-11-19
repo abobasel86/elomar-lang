@@ -54,7 +54,8 @@ let a = 1; let b = 2      // جملتان في سطر واحد تحتاجان ;
 
 ```ebnf
 program     = { SEP } , { item , ( SEP | EOF ) , { SEP } } ;
-item        = use_decl | type_decl | enum_decl | const_decl | fn_decl ;
+item        = use_decl | [ "pub" ] , ( type_decl | enum_decl | const_decl ) | fn_decl ;
+path        = IDENT , { "." , IDENT } ;
 
 use_decl    = "use" , IDENT , { "." , IDENT } ;
 type_decl   = "type" , IDENT , "=" , type ;
@@ -66,7 +67,7 @@ fn_decl     = [ "pub" ] , [ "async" ] , "fn" , IDENT , "(" , [ param , { "," , p
 param       = IDENT , ":" , type ;
 effects     = "!" , "{" , [ IDENT , { "," , IDENT } ] , "}" ;
 
-type        = IDENT , [ "<" , type , { "," , type } , ">" ]
+type        = path , [ "<" , type , { "," , type } , ">" ]   (* `students.Student` *)
             | "{" , [ field_ty , { ( "," | NEWLINE ) , field_ty } ] , "}" ;
 field_ty    = IDENT , ":" , type ;
 
@@ -98,7 +99,7 @@ primary     = INT | FLOAT | DURATION | STRING | "true" | "false" | IDENT
 field       = IDENT , [ ":" , expr ] ;           (* { name } اختصار لـ { name: name } *)
 arm         = pattern , "=>" , ( block | expr ) ;
 pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
-            | IDENT , "." , IDENT , [ "(" , pattern , { "," , pattern } , ")" ]
+            | path , "." , IDENT , [ "(" , pattern , { "," , pattern } , ")" ]   (* `lib.Level.High` *)
             | [ "-" ] , ( INT | FLOAT ) | STRING | "true" | "false" ;
 ```
 
@@ -415,6 +416,58 @@ print(json.pretty(students))      // بمسافات بادئة
 - `std.json` خالية من التأثيرات.
 - السجلات الناتجة عن `json.parse` تُطبع حقولها بالترتيب الأبجدي، لأن أنواع السجلات بنيوية لا تحفظ ترتيب التعريف.
 
+## 4.12 الوحدات متعددة الملفات
+
+```text
+school/
+├── elomar.toml
+└── src/
+    ├── main.elo        ← البرنامج الرئيسي (يحتوي main)
+    ├── students.elo    ← use app.students
+    └── grading.elo     ← use app.grading
+```
+
+```elomar
+// src/students.elo
+use app.grading
+
+pub type Student = { name: String, grades: List<Int> }
+
+pub fn level(s: Student) -> grading.Level {
+    return grading.level_for(average(s))
+}
+
+fn round1(x: Float) -> Float {      // خاصة: لا تُرى خارج هذا الملف
+    return (x * 10).round() / 10
+}
+```
+
+```elomar
+// src/main.elo
+use app.students
+use app.grading
+
+fn main() {
+    let s: students.Student = { name: "Lina", grades: [95] }
+    match students.level(s) {
+        grading.Level.Excellent => print("excellent")
+        _ => print("keep going")
+    }
+}
+```
+
+- `use app.a.b` يحمّل الملف `src/a/b.elo` من مجلد المشروع (مجلد `elomar.toml`، أو مجلد البرنامج إن لم يوجد)؛ وإن لم يوجد
+  مجلد `src/` يُبحث بجانب `elomar.toml`. الاسم المختصر هو آخر جزء (`b`).
+- الوصول دائمًا بالاسم المؤهَّل: `students.level(s)` و`students.Student` و`grading.Level.Excellent` (في التعابير والأنماط والأنواع).
+- **الخصوصية افتراضية:** لا يُرى من ملف آخر إلا ما عُلّم بـ `pub` (`pub fn` و`pub type` و`pub enum` و`pub let`)؛ وإلا `E1012`
+  مع تلميح بمكان إضافة `pub`. العنصر غير الموجود `E1008` مع اقتراح أقرب اسم.
+- **الاستيرادات خاصة بكل ملف:** `use std.ai` أو `use app.x` في ملف لا تنطبق على ملف آخر.
+- داخل الوحدة تُستخدم عناصرها بأسمائها المختصرة (`average(s)`)؛ ويمكن للوحدات أن يستورد بعضها بعضًا، ولو بشكل دائري.
+- الدوال `pub` يجب أن تصرّح بتأثيراتها (`E3002`)، فلا يُفاجأ من يستخدم الوحدة باتصال شبكي أو كتابة ملف.
+- رسائل الأخطاء تشير إلى الملف الصحيح، مع سطر `:::` للمواضع في ملفات أخرى.
+- الوحدة غير الموجودة `E1011` مع المسار المتوقع.
+- ثوابت `let` في الوحدات تُقيَّم قبل ثوابت الملف الرئيسي.
+
 ## 5. التأثيرات (Effects)
 
 التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
@@ -509,6 +562,8 @@ print(json.pretty(students))      // بمسافات بادئة
 | `E1008` | دالة تابعة غير موجودة، أو دالة غير موجودة في وحدة |
 | `E1009` | وحدة غير معروفة في `use` |
 | `E1010` | حالة غير موجودة في نوع معدود |
+| `E1011` | وحدة `use app.*` غير موجودة |
+| `E1012` | عنصر غير `pub` مستخدم من ملف آخر |
 
 ### أخطاء الأنواع (`E2xxx`)
 
@@ -571,5 +626,5 @@ print(json.pretty(students))      // بمسافات بادئة
 ## 9. غير المنفذ بعد (مخطط)
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
-`ai.generate` و`ai.stream` و`ai.embed` · `Set` والوحدات المتعددة الملفات وحذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
+`ai.generate` و`ai.stream` و`ai.embed` · `Set` واستيراد أسماء محددة (`use app.x.{a, b}`) وحذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
 الأنواع العامة والدوال كقيم و`trait`/`impl` وتعدد التأثيرات والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي · المعامل `?`.

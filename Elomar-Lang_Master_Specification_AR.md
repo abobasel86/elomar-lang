@@ -66,6 +66,7 @@ document_language: "ar"
 | `std.fs` بتأثير `fs` وصلاحيات `filesystem_read`/`filesystem_write` بمنع افتراضي ومنع الهروب بـ `..` (crate جديد `elomar-policy`) | 16.3، 17، grammar §4.10 |
 | `std.json`: `json.parse<T>` بالتحقق نفسه المستخدم مع AI، و`stringify`/`pretty`؛ `Map<String, T>` نوع JSON | 17، grammar §4.11 |
 | `FsError` و`JsonError` نوعان معدودان مدمجان بحالات تحمل رسائل | 12.2 |
+| الوحدات متعددة الملفات: `use app.x` ← `src/x.elo`، و`pub` للإتاحة، والاستيرادات خاصة بكل ملف، ورسائل أخطاء تشير إلى الملف الصحيح (crate جديد `elomar-loader`) | 11.2، grammar §4.12 |
 | مزود OpenAI (Chat Completions + Structured Outputs بوضع strict) بمفتاح من متغير بيئة يُقرأ عند الاستدعاء | 14 |
 | `[permissions] network_hosts` بمنع افتراضي يُفحص قبل كل اتصال، وعدم اتباع إعادة التوجيه، وإلزام https | 16.1، 16.3 |
 | `ai.infer` على نموذج سحابي يُحدث `net` إضافة إلى `ai` (يُستنتج من `elomar.toml` وقت الترجمة) | 13.1، 16.2 |
@@ -645,7 +646,7 @@ fn main() {
 }
 ```
 
-`use` لاستيراد الوحدات. قد يرتبط مسار `app.students` بملف `src/students.elo` وفق آلية مشروع محددة في RFC الموديولات؛ لا يُفترض توفرها قبل تنفيذها.
+**منفذ:** `use app.students` يحمّل `src/students.elo`، وعناصره المعلّمة بـ `pub` متاحة بالاسم المؤهَّل `students.count()`. التفاصيل في `docs/grammar.md` §4.12.
 
 ## 11.3 أساليب البرمجة المستهدفة
 

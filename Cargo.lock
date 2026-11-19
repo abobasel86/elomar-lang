@@ -190,6 +190,7 @@ dependencies = [
  "elomar-ai-provider-openai",
  "elomar-diagnostics",
  "elomar-interpreter",
+ "elomar-loader",
  "elomar-parser",
  "elomar-types",
 ]
@@ -220,6 +221,15 @@ dependencies = [
  "elomar-diagnostics",
  "unicode-ident",
  "unicode-normalization",
+]
+
+[[package]]
+name = "elomar-loader"
+version = "0.0.1"
+dependencies = [
+ "elomar-ast",
+ "elomar-diagnostics",
+ "elomar-parser",
 ]
 
 [[package]]
