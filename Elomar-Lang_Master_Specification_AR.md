@@ -579,12 +579,12 @@ fn main() {
 
 السجلات **بنيوية**: `type Student = {...}` اسم مستعار لبنية، وأي سجل بالحقول والأنواع نفسها يطابقها (كما في TypeScript). هذا يتيح كتابة السجل دون تكرار اسم النوع، ويجعل اشتقاق JSON Schema لـ `ai.infer` مباشرًا.
 
-## 10.5 الأنواع العامة والواجهات — الدوال والأنواع والأنواع المعدودة العامة منفذة؛ الواجهات مخططة
+## 10.5 الأنواع العامة والواجهات — منفذة (الدوال والأنواع العامة، و`trait`/`impl` مع القيود `<T: Trait>`)
 
 **قاعدة فك الغموض عند الاستدعاء:** في `f<T>(x)` يحاول الـ Parser قراءة `<...>` قائمةَ أنواع؛ فإن نجح وجاء بعدها مباشرة `(` فهي معاملات نوع لاستدعاء، وإلا فهي عملية مقارنة `<`. هذه القاعدة المعتمدة في C# وTypeScript وKotlin، وتحفظ الصيغة المألوفة `ai.infer<Ticket>(...)` دون رموز مثل `::<>`. التعبير `a < b > (c)` يُفسر استدعاءً، ولا خسارة لأن مقارنة `Bool` بعدد خطأ نوعي على كل حال.
 
 ```elomar
-// Implemented: generic functions (generic types and traits are still planned)
+// Implemented: generic functions, types and enums, traits (see docs/grammar.md §4.14–4.16)
 fn first<T>(values: List<T>) -> Option<T> {
     if values.length == 0 {
         return None

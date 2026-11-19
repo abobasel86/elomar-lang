@@ -32,6 +32,9 @@ by the compiler when they are not declared.
   redirects followed).
 - Generics: `fn first<T>(xs: List<T>) -> Option<T>`, `type Pair<A, B>`,
   `enum Tree<T>`. See [`examples/generics`](examples/generics).
+- Traits and methods: `trait Describe`, `impl Describe for Student`,
+  `impl Shape { fn area(self) ... }`, bounds `fn report<T: Describe>`.
+  See [`examples/traits`](examples/traits).
 - Closures and function values: `xs.map(|x| x * 2)`, `filter`, `fold`,
   `sort_by`, and `fn(Int) -> Int` types. See [`examples/closures`](examples/closures).
 - Multi-file programs: `use app.students` loads `src/students.elo` (or
@@ -179,7 +182,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client; ⏳ traits, database support, Python bridge, AI tools and agents.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods; ⏳ database support, Python bridge, AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 
 ## License

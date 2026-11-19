@@ -528,6 +528,24 @@ impl Checker {
             );
             return Ty::Error;
         }
+        if let Some(sig) = self.fns.get(name).cloned().filter(|s| !s.bounds.is_empty()) {
+            let _ = sig;
+            self.push(
+                Diagnostic::error(
+                    "E0103",
+                    span,
+                    Text::new(
+                        "a function with trait bounds cannot be used as a value yet",
+                        "لا يمكن بعد استخدام دالة ذات قيود واجهات كقيمة",
+                    ),
+                )
+                .with_hint(Text::new(
+                    format!("wrap it in a closure: `|x| {name}(x)`"),
+                    format!("ضعها داخل دالة مجهولة: `|x| {name}(x)`"),
+                )),
+            );
+            return Ty::Error;
+        }
         if let Some(sig) = self.fns.get(name).cloned() {
             // A named function used as a value. Its effects are charged
             // here, where it is referred to (see `check_lambda`).
@@ -607,8 +625,13 @@ impl Checker {
                     return self.check_value_call(&name, &ty, args, callee_span);
                 }
                 if let Some(sig) = self.fns.get(&name).cloned() {
-                    let sig = self.instantiate(&name, sig, type_args, span);
-                    return self.check_user_call(&name, &sig, args, span, callee_span);
+                    let bounds = sig.bounds.clone();
+                    let (sig, map) = self.instantiate_with_map(&name, sig, type_args, span);
+                    let ty = self.check_user_call(&name, &sig, args, span, callee_span);
+                    if !bounds.is_empty() {
+                        self.pass_dictionaries(&name, &bounds, &map, args, callee_span);
+                    }
+                    return ty;
                 }
                 if CONSTRUCTORS.contains(&name.as_str()) {
                     return self.check_ctor(&name, args, span, hint);
@@ -620,9 +643,18 @@ impl Checker {
                 self.check_args_loosely(args);
                 Ty::Error
             }
-            ExprKind::Field { target, name } => {
+            ExprKind::Field { .. } => {
+                let ExprKind::Field { target, name } = &mut callee.kind else {
+                    unreachable!()
+                };
                 let method = name.clone();
                 let recv_ty = self.check_expr(target, None);
+                if let Some(ty) = self.try_user_method(callee, &recv_ty, &method, args, span) {
+                    return ty;
+                }
+                let ExprKind::Field { target, name } = &mut callee.kind else {
+                    unreachable!()
+                };
                 let ty = self.check_method(target, &recv_ty, &method, args, span);
                 // An empty list's sum must still be a Float when the list is
                 // `List<Float>`; tell the interpreter, which has no types.
@@ -787,8 +819,19 @@ impl Checker {
     /// A generic function's signature with its type parameters replaced by
     /// the explicit type arguments, or by fresh variables to be inferred.
     fn instantiate(&mut self, name: &str, sig: FnSig, type_args: &[TypeExpr], span: Span) -> FnSig {
+        self.instantiate_with_map(name, sig, type_args, span).0
+    }
+
+    /// Like `instantiate`, also returning what each type parameter became.
+    fn instantiate_with_map(
+        &mut self,
+        name: &str,
+        sig: FnSig,
+        type_args: &[TypeExpr],
+        span: Span,
+    ) -> (FnSig, Vec<(String, Ty)>) {
         if sig.type_params.is_empty() {
-            return sig;
+            return (sig, Vec::new());
         }
         if !type_args.is_empty() && type_args.len() != sig.type_params.len() {
             self.wrong_arg_count(
@@ -810,7 +853,7 @@ impl Checker {
                 (p.clone(), ty)
             })
             .collect();
-        FnSig {
+        let sig = FnSig {
             type_params: Vec::new(),
             params: sig
                 .params
@@ -819,10 +862,11 @@ impl Checker {
                 .collect(),
             ret: sig.ret.substitute(&map),
             ..sig
-        }
+        };
+        (sig, map)
     }
 
-    fn check_user_call(
+    pub(crate) fn check_user_call(
         &mut self,
         name: &str,
         sig: &FnSig,

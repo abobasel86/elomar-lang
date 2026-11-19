@@ -803,3 +803,67 @@ fn generic_type_errors() {
     );
     assert_eq!(codes("enum E<T, T> {\n  A(T)\n}"), vec!["E1002"]);
 }
+
+// ----- v0.3: traits and impl -------------------------------------------------
+
+const DESCRIBE: &str = "trait Describe {\n  fn describe(self) -> String\n}\ntype Student = { name: String }\nimpl Describe for Student {\n  fn describe(self) -> String {\n    return self.name\n  }\n}\nimpl Describe for Int {\n  fn describe(self) -> String {\n    return to_string(self)\n  }\n}\nfn show<T: Describe>(x: T) -> String {\n  return x.describe()\n}\n";
+
+#[test]
+fn traits_and_methods() {
+    ok(&format!(
+        "{DESCRIBE}impl Student {{\n  fn shout(self, times: Int) -> String {{\n    return self.name.upper().repeat(times)\n  }}\n}}\nfn twice<U: Describe>(x: U) -> String {{\n  return show(x) + show(x)\n}}\nfn main() {{\n  let s: Student = {{ name: \"Lina\" }}\n  let a: String = s.describe()\n  print(a, s.shout(2), show(s), show(3), twice(4), [1, 2].map(|x| show(x)))\n}}"
+    ));
+}
+
+#[test]
+fn trait_errors() {
+    // Missing, mismatched and extra methods.
+    assert_eq!(
+        codes(
+            "trait T {\n  fn a(self) -> Int\n  fn b(self)\n}\nimpl T for Int {\n  fn a(self) -> String {\n    return \"\"\n  }\n  fn c(self) {}\n}"
+        ),
+        vec!["E2001", "E1014", "E1008"]
+    );
+    // A type that does not implement the trait.
+    assert_eq!(
+        codes(&format!("{DESCRIBE}fn main() {{\n  print(show(true))\n}}")),
+        vec!["E2019"]
+    );
+    // A type parameter without the bound.
+    assert_eq!(
+        codes(&format!(
+            "{DESCRIBE}fn wrap<U>(x: U) -> String {{\n  return show(x)\n}}"
+        )),
+        vec!["E2019"]
+    );
+    // Without a bound, a type parameter has no methods.
+    assert_eq!(
+        codes(&format!(
+            "{DESCRIBE}fn wrap<U>(x: U) -> String {{\n  return x.describe()\n}}"
+        )),
+        vec!["E1008"]
+    );
+    assert_eq!(codes("fn f<T: Nope>(x: T) {}"), vec!["E1006"]);
+    assert_eq!(
+        codes(&format!(
+            "{DESCRIBE}impl Describe for Int {{\n  fn describe(self) -> String {{\n    return \"\"\n  }}\n}}"
+        )),
+        vec!["E1002"]
+    );
+    assert_eq!(
+        codes(&format!("{DESCRIBE}fn main() {{\n  let f = show\n}}")),
+        vec!["E0103"]
+    );
+}
+
+#[test]
+fn method_effects_reach_the_caller() {
+    let src = "trait Say {\n  fn say(self)\n}\nimpl Say for Int {\n  fn say(self) {\n    print(self)\n  }\n}\nfn speak<T: Say>(x: T) {\n  x.say()\n}\n";
+    assert_eq!(
+        codes(&format!("{src}pub fn run() {{\n  speak(1)\n}}")),
+        vec!["E3002"]
+    );
+    ok(&format!(
+        "{src}pub fn run() !{{io}} {{\n  speak(1)\n  2.say()\n}}"
+    ));
+}

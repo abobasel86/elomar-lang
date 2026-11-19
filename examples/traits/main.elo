@@ -1,0 +1,70 @@
+// Traits: shared behaviour for different types.
+
+trait Describe {
+    fn describe(self) -> String
+}
+
+trait Area {
+    fn area(self) -> Float
+}
+
+type Student = { name: String, grade: Int }
+
+enum Shape {
+    Circle(Float)
+    Rect(Float, Float)
+}
+
+impl Describe for Student {
+    fn describe(self) -> String {
+        return self.name + ": " + to_string(self.grade)
+    }
+}
+
+impl Describe for Shape {
+    fn describe(self) -> String {
+        return match self {
+            Shape.Circle(r) => "circle r=" + to_string(r)
+            Shape.Rect(w, h) => "rect " + to_string(w) + "x" + to_string(h)
+        }
+    }
+}
+
+impl Area for Shape {
+    fn area(self) -> Float {
+        return match self {
+            Shape.Circle(r) => 3.14 * r * r
+            Shape.Rect(w, h) => w * h
+        }
+    }
+}
+
+// Methods without a trait.
+impl Student {
+    fn passed(self) -> Bool {
+        return self.grade >= 60
+    }
+}
+
+// Works for any type that implements `Describe`.
+fn report<T: Describe>(title: String, items: List<T>) {
+    print(title)
+    for item in items {
+        print("  -", item.describe())
+    }
+}
+
+fn largest<T: Area + Describe>(items: List<T>) -> String {
+    let sorted = items.sort_by(|x| -x.area())
+    return sorted[0].describe()
+}
+
+fn main() {
+    let students = [{ name: "Lina", grade: 91 }, { name: "Omar", grade: 55 }]
+    report("Students:", students)
+    print("Passed:", students.filter(|s| s.passed()).map(|s| s.name))
+
+    let shapes = [Shape.Circle(1.0), Shape.Rect(2.0, 3.0)]
+    report("Shapes:", shapes)
+    print("Largest:", largest(shapes))
+}

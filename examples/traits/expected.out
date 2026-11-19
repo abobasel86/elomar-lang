@@ -1,0 +1,8 @@
+Students:
+  - Lina: 91
+  - Omar: 55
+Passed: ["Lina"]
+Shapes:
+  - circle r=1.0
+  - rect 2.0x3.0
+Largest: rect 2.0x3.0

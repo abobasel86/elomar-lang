@@ -309,7 +309,7 @@ fn type_brackets(tokens: &[&Token]) -> Vec<bool> {
                         break;
                     }
                 }
-                Ident(_) | Comma | Dot => {}
+                Ident(_) | Comma | Dot | Colon | Plus => {}
                 _ => break,
             }
         }

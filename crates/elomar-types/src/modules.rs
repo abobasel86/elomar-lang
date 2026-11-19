@@ -25,7 +25,7 @@ pub(crate) fn base_name(name: &str) -> &str {
 }
 
 /// Names `use std.*` binds; an app module cannot reuse them as an alias.
-const STD_SHORT_NAMES: [&str; 3] = ["ai", "fs", "json"];
+const STD_SHORT_NAMES: [&str; 4] = ["ai", "fs", "json", "http"];
 
 #[derive(Default)]
 pub(crate) struct ModuleScopes {
@@ -40,6 +40,8 @@ pub(crate) struct ModuleScopes {
     pub public: HashSet<String>,
     /// Full names of declared type aliases.
     pub type_names: HashSet<String>,
+    /// Full names of declared traits.
+    pub trait_names: HashSet<String>,
     /// Full names of every top-level item, known before checking starts.
     pub all_items: HashSet<String>,
     /// Per module: name → full name, from `use app.x.{name}`.
@@ -58,7 +60,11 @@ impl Checker {
                 }
                 Item::Enum(e) => (&e.name.name, e.is_pub),
                 Item::Const(c) => (&c.name.name, c.is_pub),
-                Item::Use(_) => continue,
+                Item::Trait(t) => {
+                    self.scopes_mod.trait_names.insert(t.name.name.clone());
+                    (&t.name.name, t.is_pub)
+                }
+                Item::Use(_) | Item::Impl(_) => continue,
             };
             self.scopes_mod.all_items.insert(name.clone());
             if is_pub {
@@ -238,6 +244,8 @@ impl Checker {
             || self.consts.contains_key(full)
             || self.enums.contains_key(full)
             || self.scopes_mod.type_names.contains(full)
+            || self.traits.contains_key(full)
+            || self.scopes_mod.trait_names.contains(full)
     }
 
     /// The full name an unqualified `name` refers to in the current module:

@@ -583,3 +583,9 @@ fn generic_enums_at_runtime() {
     let src = "enum Tree<T> {\n  Leaf\n  Node(Tree<T>, T, Tree<T>)\n}\nfn insert(t: Tree<Int>, x: Int) -> Tree<Int> {\n  return match t {\n    Tree.Leaf => Tree.Node(Tree.Leaf, x, Tree.Leaf)\n    Tree.Node(l, v, r) => match x < v {\n      true => Tree.Node(insert(l, x), v, r)\n      false => Tree.Node(l, v, insert(r, x))\n    }\n  }\n}\nfn items<T>(t: Tree<T>) -> List<T> {\n  return match t {\n    Tree.Leaf => []\n    Tree.Node(l, v, r) => items(l) + [v] + items(r)\n  }\n}\nfn main() {\n  print(items([5, 2, 8, 1].fold(Tree.Leaf, |t, x| insert(t, x))))\n}";
     assert_eq!(out(src), "[1, 2, 5, 8]\n");
 }
+
+#[test]
+fn traits_at_runtime() {
+    let src = "trait Area {\n  fn area(self) -> Float\n  fn scaled(self, k: Float) -> Self\n}\nenum Shape {\n  Circle(Float)\n  Square(Float)\n}\ntype Rect = { w: Float, h: Float }\nimpl Area for Shape {\n  fn area(self) -> Float {\n    return match self {\n      Shape.Circle(r) => 3.0 * r * r\n      Shape.Square(s) => s * s\n    }\n  }\n  fn scaled(self, k: Float) -> Self {\n    return match self {\n      Shape.Circle(r) => Shape.Circle(r * k)\n      Shape.Square(s) => Shape.Square(s * k)\n    }\n  }\n}\nimpl Area for Rect {\n  fn area(self) -> Float {\n    return self.w * self.h\n  }\n  fn scaled(self, k: Float) -> Rect {\n    return { w: self.w * k, h: self.h * k }\n  }\n}\nimpl Rect {\n  fn is_square(self) -> Bool {\n    return self.w == self.h\n  }\n}\nfn total<T: Area>(xs: List<T>) -> Float {\n  return xs.fold(0.0, |acc, x| acc + x.area())\n}\nfn double_total<T: Area>(xs: List<T>) -> Float {\n  return total(xs.map(|x| x.scaled(2.0)))\n}\nfn main() {\n  let r: Rect = { w: 1.0, h: 2.0 }\n  print(r.area(), r.is_square(), r.scaled(3.0))\n  print(total([Shape.Circle(1.0), Shape.Square(2.0)]), double_total([r]))\n}";
+    assert_eq!(out(src), "2.0 false { w: 3.0, h: 6.0 }\n7.0 8.0\n");
+}

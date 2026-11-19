@@ -11,6 +11,7 @@ mod enums;
 mod expr;
 mod modules;
 mod stdlib;
+mod traits;
 mod ty;
 
 use std::collections::{BTreeSet, HashMap};
@@ -42,6 +43,8 @@ pub fn check(program: &mut Program, opts: CheckOptions) -> Vec<Diagnostic> {
 struct FnSig {
     /// Type parameters of a generic function (`T` in `fn f<T>`).
     type_params: Vec<String>,
+    /// Trait bounds: (type parameter, trait full name).
+    bounds: Vec<(String, String)>,
     params: Vec<(String, Ty)>,
     ret: Ty,
     declared: Option<(BTreeSet<String>, Span)>,
@@ -91,11 +94,20 @@ struct Checker {
     closure_scope: Option<usize>,
     cloud_models: Vec<String>,
     usage: Usage,
+    traits: HashMap<String, traits::TraitInfo>,
+    /// Methods from `impl` blocks.
+    methods: Vec<traits::MethodEntry>,
+    impls: Vec<traits::ImplRecord>,
+    /// (trait, target type, index into `impls`).
+    trait_impls: Vec<(String, Ty, usize)>,
+    /// Bounds of the function being checked.
+    bounds: Vec<(String, String)>,
 }
 
 impl Checker {
     fn run(&mut self, program: &mut Program, opts: CheckOptions) {
         self.register_builtin_enums();
+        self.desugar_impls(program);
         self.collect_module_info(program);
         self.cloud_models = opts.cloud_models.clone();
         for item in &program.items {
@@ -107,7 +119,10 @@ impl Checker {
         self.declare_enums(program);
         self.collect_types(program);
         self.resolve_enums(program);
+        self.collect_traits(program);
         self.collect_fns(program);
+        self.resolve_impls();
+        self.add_dictionary_params(program);
 
         let mut const_usage = Vec::new();
         for item in &mut program.items {
@@ -710,6 +725,7 @@ impl Checker {
             }
             let ret = f.ret.as_ref().map_or(Ty::Unit, |t| self.lower_type(t));
             self.type_params.clear();
+            let bounds = self.resolve_bounds(f);
             let declared = f.effects.as_ref().map(|set| {
                 let mut names = BTreeSet::new();
                 for e in &set.effects {
@@ -741,6 +757,7 @@ impl Checker {
                     ret,
                     declared,
                     type_params: f.type_params.iter().map(|t| t.name.clone()).collect(),
+                    bounds,
                     is_pub: f.is_pub,
                     is_async: f.is_async,
                     name_span: f.name.span,
@@ -796,6 +813,7 @@ impl Checker {
         self.ret_ty = Some(sig.ret.clone());
         self.in_async = sig.is_async;
         self.type_params = sig.type_params.clone();
+        self.bounds = sig.bounds.clone();
         self.loop_depth = 0;
         self.push_scope();
         for (p, (_, ty)) in f.params.iter().zip(&sig.params) {
@@ -805,6 +823,7 @@ impl Checker {
         self.pop_scope();
         self.ret_ty = None;
         self.type_params.clear();
+        self.bounds.clear();
 
         if !matches!(sig.ret, Ty::Unit | Ty::Error) && !expr::block_diverges(&f.body) {
             let ret = self.subst.show(&sig.ret);

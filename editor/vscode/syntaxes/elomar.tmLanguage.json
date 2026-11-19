@@ -100,7 +100,7 @@
           }
         },
         {
-          "match": "\\b(type|enum)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
+          "match": "\\b(type|enum|trait)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
           "captures": {
             "1": { "name": "storage.type.elomar" },
             "2": { "name": "entity.name.type.elomar" }
@@ -116,7 +116,7 @@
         },
         {
           "name": "storage.type.elomar",
-          "match": "\\b(?:let|var|fn|type|enum)\\b"
+          "match": "\\b(?:let|var|fn|type|enum|trait|impl)\\b"
         },
         {
           "name": "storage.modifier.elomar",
@@ -131,8 +131,12 @@
           "match": "\\bdiv\\b"
         },
         {
+          "name": "variable.language.self.elomar",
+          "match": "\\bself\\b"
+        },
+        {
           "name": "keyword.other.reserved.elomar",
-          "match": "\\b(?:trait|impl|self|as)\\b"
+          "match": "\\bas\\b"
         }
       ]
     },

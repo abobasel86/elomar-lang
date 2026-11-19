@@ -157,6 +157,11 @@ fn prefix(item: &mut Item, module: &str) {
         Item::Type(t) => &mut t.name.name,
         Item::Enum(e) => &mut e.name.name,
         Item::Const(c) => &mut c.name.name,
+        Item::Trait(t) => &mut t.name.name,
+        Item::Impl(i) => {
+            i.module = module.to_string();
+            return;
+        }
         Item::Use(u) => {
             u.module = module.to_string();
             return;
@@ -196,6 +201,8 @@ mod tests {
                 Item::Enum(e) => e.name.name.clone(),
                 Item::Const(c) => c.name.name.clone(),
                 Item::Use(u) => format!("use@{}", u.module),
+                Item::Trait(t) => t.name.name.clone(),
+                Item::Impl(i) => format!("impl@{}", i.module),
             })
             .collect()
     }

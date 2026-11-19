@@ -30,6 +30,7 @@ pub fn parse_tokens(tokens: Vec<Token>) -> (Program, Vec<Diagnostic>) {
         tokens,
         pos: 0,
         diags: Vec::new(),
+        self_ty: None,
     };
     let program = p.program();
     (program, p.diags)
@@ -44,6 +45,8 @@ struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     diags: Vec<Diagnostic>,
+    /// The type of `self` while parsing an `impl` or `trait` body.
+    self_ty: Option<TypeExpr>,
 }
 
 fn not_yet(span: Span, what_en: &str, what_ar: &str, phase: &str) -> Diagnostic {
@@ -230,6 +233,7 @@ impl Parser {
                     TokenKind::Type => self.type_decl(true).map(Item::Type),
                     TokenKind::Enum => self.enum_decl(true).map(Item::Enum),
                     TokenKind::Let => self.const_decl(true).map(Item::Const),
+                    TokenKind::Trait => self.trait_decl(true, start).map(Item::Trait),
                     _ => self.fn_decl(true, start).map(Item::Fn),
                 }
             }
@@ -253,12 +257,11 @@ impl Parser {
                 "استخدم `let` لثابت على مستوى الملف، أو انقل المتغير إلى داخل دالة",
             ))),
             TokenKind::Enum => self.enum_decl(false).map(Item::Enum),
-            TokenKind::Trait | TokenKind::Impl => Err(not_yet(
-                self.span(),
-                "`trait`/`impl`",
-                "`trait`/`impl`",
-                "v0.3",
-            )),
+            TokenKind::Trait => {
+                let start = self.span();
+                self.trait_decl(false, start).map(Item::Trait)
+            }
+            TokenKind::Impl => self.impl_decl().map(Item::Impl),
             _ => Err(self.unexpected(
                 "`fn`, `type`, `let` or `use`",
                 "`fn` أو `type` أو `let` أو `use`",
@@ -266,19 +269,180 @@ impl Parser {
         }
     }
 
-    /// `<T, U>` after a declared name, or nothing.
+    /// `<T, U>` after a type or enum name, or nothing.
     fn type_params(&mut self) -> PResult<Vec<Ident>> {
+        let (params, bounds) = self.type_params_with_bounds()?;
+        if let Some((p, _)) = bounds.first() {
+            return Err(Diagnostic::error(
+                "E0101",
+                p.span,
+                Text::new(
+                    "trait bounds are allowed only on functions: `fn f<T: Describe>(...)`",
+                    "قيود الواجهات مسموحة على الدوال فقط: `fn f<T: Describe>(...)`",
+                ),
+            ));
+        }
+        Ok(params)
+    }
+
+    /// `<T, U: Describe + Compare>`: type parameters and their trait bounds.
+    #[allow(clippy::type_complexity)]
+    fn type_params_with_bounds(&mut self) -> PResult<(Vec<Ident>, Vec<(Ident, Ident)>)> {
         let mut params = Vec::new();
+        let mut bounds = Vec::new();
         if self.eat(&TokenKind::Lt) {
             while !self.at(&TokenKind::Gt) {
-                params.push(self.ident()?);
+                let p = self.ident()?;
+                if self.eat(&TokenKind::Colon) {
+                    loop {
+                        bounds.push((p.clone(), self.dotted_name()?));
+                        if !self.eat(&TokenKind::Plus) {
+                            break;
+                        }
+                    }
+                }
+                params.push(p);
                 if !self.eat(&TokenKind::Comma) {
                     break;
                 }
             }
             self.expect(TokenKind::Gt)?;
         }
-        Ok(params)
+        Ok((params, bounds))
+    }
+
+    /// `trait Name { fn m(self, ...) -> T ... }`: signatures only.
+    fn trait_decl(&mut self, is_pub: bool, start: Span) -> PResult<TraitDecl> {
+        self.expect(TokenKind::Trait)?;
+        let name = self.ident()?;
+        let self_ty = TypeExpr {
+            kind: TypeExprKind::Named {
+                name: Ident {
+                    name: "Self".into(),
+                    span: name.span,
+                },
+                args: Vec::new(),
+            },
+            span: name.span,
+        };
+        self.expect(TokenKind::LBrace)?;
+        let saved = self.self_ty.replace(self_ty);
+        let mut methods = Vec::new();
+        let result = (|| {
+            self.skip_seps();
+            while !self.at(&TokenKind::RBrace) {
+                let mstart = self.span();
+                let (is_async, mname, type_params, _, params, ret, effects) = self.fn_header()?;
+                if let Some(tp) = type_params.first() {
+                    return Err(not_yet(
+                        tp.span,
+                        "generic trait methods",
+                        "دوال الواجهة العامة",
+                        "a later version",
+                    ));
+                }
+                if self.at(&TokenKind::LBrace) {
+                    return Err(Diagnostic::error(
+                        "E0101",
+                        self.span(),
+                        Text::new(
+                            "a trait lists method signatures without bodies; write the body in each `impl`",
+                            "الواجهة تذكر تواقيع الدوال دون أجسام؛ اكتب الجسم في كل `impl`",
+                        ),
+                    ));
+                }
+                self.require_self(&params, &mname)?;
+                methods.push(TraitMethod {
+                    is_async,
+                    name: mname,
+                    params,
+                    ret,
+                    effects,
+                    span: mstart.to(self.prev_span()),
+                });
+                self.skip_seps();
+            }
+            Ok(())
+        })();
+        self.self_ty = saved;
+        result?;
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(TraitDecl {
+            is_pub,
+            name,
+            methods,
+            span: start.to(end),
+        })
+    }
+
+    /// `impl Type { ... }` or `impl Trait for Type { ... }`.
+    fn impl_decl(&mut self) -> PResult<ImplDecl> {
+        let start = self.expect(TokenKind::Impl)?;
+        let first = self.type_expr()?;
+        let (trait_name, target) = if self.eat(&TokenKind::For) {
+            let trait_name = match first.kind {
+                TypeExprKind::Named { name, args } if args.is_empty() => name,
+                _ => {
+                    return Err(Diagnostic::error(
+                        "E0101",
+                        first.span,
+                        Text::new(
+                            "expected a trait name before `for`",
+                            "يُتوقع اسم واجهة قبل `for`",
+                        ),
+                    ));
+                }
+            };
+            (Some(trait_name), self.type_expr()?)
+        } else {
+            (None, first)
+        };
+        self.expect(TokenKind::LBrace)?;
+        let saved = self.self_ty.replace(target.clone());
+        let mut methods = Vec::new();
+        let result = (|| {
+            self.skip_seps();
+            while !self.at(&TokenKind::RBrace) {
+                let mstart = self.span();
+                let is_pub = self.eat(&TokenKind::Pub);
+                let f = self.fn_decl(is_pub, mstart)?;
+                self.require_self(&f.params, &f.name)?;
+                methods.push(f);
+                self.skip_seps();
+            }
+            Ok(())
+        })();
+        self.self_ty = saved;
+        result?;
+        let end = self.expect(TokenKind::RBrace)?;
+        Ok(ImplDecl {
+            trait_name,
+            target,
+            methods,
+            module: String::new(),
+            span: start.to(end),
+        })
+    }
+
+    fn require_self(&self, params: &[Param], name: &Ident) -> PResult<()> {
+        if params.first().is_some_and(|p| p.name.name == "self") {
+            return Ok(());
+        }
+        Err(Diagnostic::error(
+            "E0101",
+            name.span,
+            Text::new(
+                format!(
+                    "method `{}` must take `self` as its first parameter",
+                    name.name
+                ),
+                format!("يجب أن يكون `self` أول معاملات الدالة `{}`", name.name),
+            ),
+        )
+        .with_hint(Text::new(
+            format!("write `fn {}(self, ...)`", name.name),
+            format!("اكتب `fn {}(self, ...)`", name.name),
+        )))
     }
 
     fn enum_decl(&mut self, is_pub: bool) -> PResult<EnumDecl> {
@@ -382,18 +546,51 @@ impl Parser {
         })
     }
 
-    fn fn_decl(&mut self, is_pub: bool, start: Span) -> PResult<FnDecl> {
+    /// Everything of a function before its body.
+    #[allow(clippy::type_complexity)]
+    fn fn_header(
+        &mut self,
+    ) -> PResult<(
+        bool,
+        Ident,
+        Vec<Ident>,
+        Vec<(Ident, Ident)>,
+        Vec<Param>,
+        Option<TypeExpr>,
+        Option<EffectSet>,
+    )> {
         let is_async = self.eat(&TokenKind::Async);
         self.expect(TokenKind::Fn)?;
         let name = self.ident()?;
-        let type_params = self.type_params()?;
+        let (type_params, bounds) = self.type_params_with_bounds()?;
         self.expect(TokenKind::LParen)?;
         let mut params = Vec::new();
         while !self.at(&TokenKind::RParen) {
-            let pname = self.ident()?;
-            self.expect(TokenKind::Colon)?;
-            let ty = self.type_expr()?;
-            params.push(Param { name: pname, ty });
+            if self.at(&TokenKind::SelfKw) {
+                let span = self.bump().span;
+                let Some(ty) = self.self_ty.clone().filter(|_| params.is_empty()) else {
+                    return Err(Diagnostic::error(
+                        "E0101",
+                        span,
+                        Text::new(
+                            "`self` can only be the first parameter of a method in an `impl` or `trait`",
+                            "`self` يكون فقط أول معامل لدالة داخل `impl` أو `trait`",
+                        ),
+                    ));
+                };
+                params.push(Param {
+                    name: Ident {
+                        name: "self".into(),
+                        span,
+                    },
+                    ty,
+                });
+            } else {
+                let pname = self.ident()?;
+                self.expect(TokenKind::Colon)?;
+                let ty = self.type_expr()?;
+                params.push(Param { name: pname, ty });
+            }
             if !self.eat(&TokenKind::Comma) {
                 break;
             }
@@ -409,12 +606,18 @@ impl Parser {
         } else {
             None
         };
+        Ok((is_async, name, type_params, bounds, params, ret, effects))
+    }
+
+    fn fn_decl(&mut self, is_pub: bool, start: Span) -> PResult<FnDecl> {
+        let (is_async, name, type_params, bounds, params, ret, effects) = self.fn_header()?;
         let body = self.block()?;
         Ok(FnDecl {
             is_pub,
             is_async,
             name,
             type_params,
+            bounds,
             params,
             ret,
             effects,
@@ -923,7 +1126,11 @@ impl Parser {
             TokenKind::Pipe | TokenKind::OrOr => return self.lambda(),
             TokenKind::Match => return self.match_expr(),
             TokenKind::SelfKw => {
-                return Err(not_yet(span, "`self`", "`self`", "v0.3"));
+                self.bump();
+                return Ok(Expr {
+                    kind: ExprKind::Name("self".into()),
+                    span,
+                });
             }
             TokenKind::If => {
                 return Err(Diagnostic::error(
@@ -1480,10 +1687,47 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_features_are_flagged() {
-        let (_, diags) = parse("impl E {}\ntrait T {}");
-        let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
-        assert_eq!(codes, vec!["E0103", "E0103"]);
+    fn trait_methods_have_no_bodies() {
+        let (_, diags) = parse("trait T {\n  fn f(self) {}\n}");
+        assert_eq!(diags[0].code, "E0101");
+        let (_, diags) = parse("trait T {\n  fn f<U>(self)\n}");
+        assert_eq!(diags[0].code, "E0103");
+    }
+
+    #[test]
+    fn traits_and_impls() {
+        let program = parse_ok(
+            "pub trait Describe {\n  fn describe(self) -> String\n  fn rename(self, name: String) -> Self\n}\nimpl Describe for Student {\n  fn describe(self) -> String {\n    return self.name\n  }\n}\nimpl Shape {\n  pub fn area(self) -> Float {\n    return 1.0\n  }\n}\nfn show<T: Describe + Other, U>(x: T) {}",
+        );
+        let Item::Trait(t) = &program.items[0] else {
+            panic!()
+        };
+        assert!(t.is_pub && t.methods.len() == 2 && t.methods[1].params.len() == 2);
+        let Item::Impl(i) = &program.items[1] else {
+            panic!()
+        };
+        assert_eq!(
+            i.trait_name.as_ref().map(|n| n.name.as_str()),
+            Some("Describe")
+        );
+        assert_eq!(i.methods[0].params[0].name.name, "self");
+        let Item::Impl(i) = &program.items[2] else {
+            panic!()
+        };
+        assert!(i.trait_name.is_none() && i.methods[0].is_pub);
+        let Item::Fn(f) = &program.items[3] else {
+            panic!()
+        };
+        assert_eq!(f.bounds.len(), 2);
+        assert_eq!(f.type_params.len(), 2);
+    }
+
+    #[test]
+    fn self_outside_methods_is_an_error() {
+        let (_, diags) = parse("fn f(self) {}");
+        assert_eq!(diags[0].code, "E0101");
+        let (_, diags) = parse("impl X {\n  fn f(x: Int) {}\n}");
+        assert_eq!(diags[0].code, "E0101");
     }
 
     #[test]

@@ -24,6 +24,41 @@ pub enum Item {
     Enum(EnumDecl),
     Const(ConstDecl),
     Fn(FnDecl),
+    Trait(TraitDecl),
+    Impl(ImplDecl),
+}
+
+/// `trait Describe { fn describe(self) -> String }`
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDecl {
+    pub is_pub: bool,
+    pub name: Ident,
+    pub methods: Vec<TraitMethod>,
+    pub span: Span,
+}
+
+/// A method signature in a trait. `params[0]` is `self`, of type `Self`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitMethod {
+    pub is_async: bool,
+    pub name: Ident,
+    pub params: Vec<Param>,
+    pub ret: Option<TypeExpr>,
+    pub effects: Option<EffectSet>,
+    pub span: Span,
+}
+
+/// `impl Describe for Student { ... }` or `impl Shape { ... }`. Each
+/// method's first parameter is `self`, typed as the target.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplDecl {
+    pub trait_name: Option<Ident>,
+    pub target: TypeExpr,
+    pub methods: Vec<FnDecl>,
+    /// The module the impl is written in (set by the loader); empty for
+    /// the main file.
+    pub module: String,
+    pub span: Span,
 }
 
 /// `use std.io`
@@ -85,6 +120,8 @@ pub struct FnDecl {
     pub name: Ident,
     /// `fn first<T>(...)`: type parameters, empty for a non-generic function.
     pub type_params: Vec<Ident>,
+    /// `fn show<T: Describe>`: (type parameter, trait) pairs.
+    pub bounds: Vec<(Ident, Ident)>,
     pub params: Vec<Param>,
     pub ret: Option<TypeExpr>,
     pub effects: Option<EffectSet>,

@@ -29,6 +29,16 @@
     "body": ["enum ${1:Name} {", "\t${2:First}", "\t${3:Second}", "}"],
     "description": "Enum"
   },
+  "trait": {
+    "prefix": "trait",
+    "body": ["trait ${1:Name} {", "\tfn ${2:method}(self) -> ${3:String}", "}"],
+    "description": "Trait"
+  },
+  "impl": {
+    "prefix": "impl",
+    "body": ["impl ${1:Trait} for ${2:Type} {", "\tfn ${3:method}(self) -> ${4:String} {", "\t\t$0", "\t}", "}"],
+    "description": "Implement a trait for a type"
+  },
   "match result": {
     "prefix": "matchr",
     "body": ["match ${1:result} {", "\tOk(${2:value}) => $3", "\tErr(${4:e}) => $0", "}"],
