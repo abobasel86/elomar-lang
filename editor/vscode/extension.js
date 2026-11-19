@@ -213,6 +213,35 @@ const runOnLaunch = {
   },
 };
 
+/** Format Document / format on save, via `elomar fmt --stdin`. */
+const formatter = {
+  provideDocumentFormattingEdits(doc) {
+    return new Promise((resolve) => {
+      const text = doc.getText();
+      const child = cp.spawn(executable(), ['--lang', messageLanguage(), 'fmt', '--stdin'], {
+        cwd: path.dirname(doc.uri.fsPath),
+      });
+      let output = '';
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', (chunk) => {
+        output += chunk;
+      });
+      child.on('error', () => resolve([]));
+      child.on('close', (code) => {
+        // Code with syntax errors is left as it is; the errors are already shown.
+        if (code !== 0 || output === text) {
+          resolve([]);
+          return;
+        }
+        const all = new vscode.Range(doc.positionAt(0), doc.positionAt(text.length));
+        resolve([vscode.TextEdit.replace(all, output)]);
+      });
+      child.stdin.on('error', () => {});
+      child.stdin.end(text, 'utf8');
+    });
+  },
+};
+
 function activate(context) {
   collection = vscode.languages.createDiagnosticCollection('elomar');
   context.subscriptions.push(
@@ -232,6 +261,7 @@ function activate(context) {
       }
     }),
     vscode.commands.registerCommand('elomar.run', runCurrentFile),
+    vscode.languages.registerDocumentFormattingEditProvider('elomar', formatter),
     vscode.debug.registerDebugConfigurationProvider('elomar', runOnLaunch),
     vscode.commands.registerCommand('elomar.check', () => {
       const editor = vscode.window.activeTextEditor;

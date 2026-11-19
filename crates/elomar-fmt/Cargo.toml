@@ -1,0 +1,11 @@
+[package]
+name = "elomar-fmt"
+description = "The Elomar-Lang code formatter (`elomar fmt`)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+elomar-diagnostics.workspace = true
+elomar-lexer.workspace = true

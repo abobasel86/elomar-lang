@@ -1119,7 +1119,7 @@ fn main() {
 | `elomar check --format json --stdin FILE` | تشخيصات بصيغة JSON للمحررات (النص غير المحفوظ من stdin، ومواضع UTF-16) | **منفذ** |
 | `elomar --lang ar run ...` | رسائل الأخطاء بالعربية (أو `ELOMAR_LANG=ar`) | v0.1 |
 | `elomar test` | تشغيل دوال `test_*` في `tests/` | **منفذ** (مع `--filter`) |
-| `elomar fmt` | تنسيق الشيفرة | v0.2 |
+| `elomar fmt` | تنسيق الشيفرة | **منفذ**: يحفظ التعليقات وفواصل الأسطر، ويرفض أي تنسيق يغيّر المعنى؛ `--check` و`--stdin`، وتنسيق عند الحفظ في VS Code |
 | `elomar new myapp` | إنشاء هيكل مشروع | **منفذ**: برنامج ووحدة واختبار ناجح |
 | `elomar add package` | إضافة حزمة | v0.3 |
 | `elomar build` | تجهيز مخرجات توزيع بحسب Target | v0.3 |

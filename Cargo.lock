@@ -190,6 +190,7 @@ dependencies = [
  "elomar-ai-provider-openai",
  "elomar-ast",
  "elomar-diagnostics",
+ "elomar-fmt",
  "elomar-interpreter",
  "elomar-loader",
  "elomar-parser",
@@ -200,6 +201,14 @@ dependencies = [
 [[package]]
 name = "elomar-diagnostics"
 version = "0.0.1"
+
+[[package]]
+name = "elomar-fmt"
+version = "0.0.1"
+dependencies = [
+ "elomar-diagnostics",
+ "elomar-lexer",
+]
 
 [[package]]
 name = "elomar-interpreter"

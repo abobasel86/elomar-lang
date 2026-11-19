@@ -27,6 +27,8 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all --check
+      - name: Elomar files are formatted
+        run: cargo run --quiet -p elomar-cli -- fmt --check examples tests
 
   check:
     name: Clippy and tests (${{ matrix.os }})

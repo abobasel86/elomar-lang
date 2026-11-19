@@ -131,6 +131,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |
 | `elomar new NAME` | Create a project with a program, a module and a passing test |
 | `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
+| `elomar fmt [PATHS] [--check] [--stdin]` | Format `.elo` files (comments kept; never changes meaning) |
 
 ## Repository layout
 
@@ -141,6 +142,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-ast` | Syntax tree |
 | `crates/elomar-parser` | Recursive-descent + Pratt parser |
 | `crates/elomar-loader` | Loads the main file and the `use app.*` modules it imports |
+| `crates/elomar-fmt` | The formatter behind `elomar fmt` |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
 | `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
 | `crates/elomar-ai-core` | Schemas (shared with `std.json`), AI errors, `elomar.toml`, answer validation |
@@ -167,7 +169,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, `elomar new`, `elomar test`, CI; ⏳ `Set`, formatter, package tooling, language server.
+3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI; ⏳ `Set`, named imports, package tooling, language server.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

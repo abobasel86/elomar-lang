@@ -6,6 +6,7 @@ members = [
     "crates/elomar-ast",
     "crates/elomar-parser",
     "crates/elomar-loader",
+    "crates/elomar-fmt",
     "crates/elomar-types",
     "crates/elomar-policy",
     "crates/elomar-ai-core",
@@ -27,6 +28,7 @@ elomar-lexer = { path = "crates/elomar-lexer" }
 elomar-ast = { path = "crates/elomar-ast" }
 elomar-parser = { path = "crates/elomar-parser" }
 elomar-loader = { path = "crates/elomar-loader" }
+elomar-fmt = { path = "crates/elomar-fmt" }
 elomar-types = { path = "crates/elomar-types" }
 elomar-policy = { path = "crates/elomar-policy" }
 elomar-interpreter = { path = "crates/elomar-interpreter" }

@@ -597,3 +597,71 @@ fn example_project_tests_pass() {
     assert!(out.status.success(), "{stdout}");
     assert!(stdout.contains("4 passed; 0 failed"), "{stdout}");
 }
+
+// ----- elomar fmt -------------------------------------------------------------
+
+#[test]
+fn fmt_command() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("fmt-project");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("src")).unwrap();
+    let messy = "fn main( ){\nlet x=1+2;   // sum\nprint( x )\n}\n";
+    let tidy = "fn main() {\n    let x = 1 + 2 // sum\n    print(x)\n}\n";
+    std::fs::write(dir.join("src/main.elo"), messy).unwrap();
+    std::fs::write(dir.join("src/ok.elo"), tidy).unwrap();
+    std::fs::write(dir.join("src/broken.elo"), "let s = \"open\n").unwrap();
+
+    // --check reports without writing.
+    let out = elomar_in(&dir, &["fmt", "--check", "src/main.elo", "src/ok.elo"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("would reformat src/main.elo"));
+    assert_eq!(
+        std::fs::read_to_string(dir.join("src/main.elo")).unwrap(),
+        messy
+    );
+
+    // Formatting a folder rewrites files; broken files are reported, not touched.
+    let out = elomar_in(&dir, &["fmt"]);
+    assert_eq!(out.status.code(), Some(1), "broken.elo cannot be formatted");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("src/main.elo")).unwrap(),
+        tidy
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join("src/broken.elo")).unwrap(),
+        "let s = \"open\n"
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("error[E0002]"));
+
+    // --stdin prints the result (used by the VS Code extension).
+    use std::io::Write as _;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_elomar"))
+        .args(["fmt", "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(messy.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(String::from_utf8_lossy(&out.stdout), tidy);
+}
+
+#[test]
+fn repository_elo_files_are_formatted() {
+    let out = elomar(&[
+        "fmt",
+        "--check",
+        root().join("examples").to_str().unwrap(),
+        root().join("tests").to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "run `elomar fmt examples tests`:\n{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+}

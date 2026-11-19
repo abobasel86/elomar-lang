@@ -5,6 +5,8 @@
   occur (also inside imported modules), with hints and related locations.
 - **Run** button in the editor title bar, `Elomar: Run File`, or **F5**.
   There is no debugger yet (no breakpoints), so F5 runs the file.
+- **Formatting** with `elomar fmt`: Format Document, and on save by default
+  (turn off with `"[elomar]": { "editor.formatOnSave": false }`).
 - **Snippets**: `main`, `amain`, `fn`, `pfn`, `type`, `enum`, `matchr`,
   `matcho`, `for`, `ife`, `infer`, `readjson`.
 

@@ -57,6 +57,18 @@ enum Command {
         #[arg(long, value_name = "TEXT")]
         filter: Option<String>,
     },
+    /// Format .elo files in place (folders are searched recursively)
+    Fmt {
+        /// Files or folders (default: the current folder)
+        #[arg(default_value = ".")]
+        paths: Vec<PathBuf>,
+        /// Only report files that need formatting; exit 1 if any do
+        #[arg(long)]
+        check: bool,
+        /// Format standard input and print the result (for editors)
+        #[arg(long)]
+        stdin: bool,
+    },
     /// Create a new project folder with a program, a module and a test
     New {
         /// Name of the project (and its folder)
@@ -140,6 +152,11 @@ fn main() -> ExitCode {
             return testing::run_tests(path, filter.as_deref(), &reporter);
         }
         Command::New { name } => return scaffold::new_project(name, &reporter),
+        Command::Fmt {
+            paths,
+            check,
+            stdin,
+        } => return fmt::run_fmt(paths, *check, *stdin, &reporter),
         Command::Check {
             file,
             format,
@@ -244,6 +261,7 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
 }
 
 mod editor;
+mod fmt;
 mod scaffold;
 mod testing;
 

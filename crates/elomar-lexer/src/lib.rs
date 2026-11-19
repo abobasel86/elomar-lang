@@ -82,6 +82,8 @@ pub enum TokenKind {
 
     /// A line break that terminates a statement.
     Newline,
+    /// A `//` or `/* */` comment; only produced by [`tokens_with_comments`].
+    Comment,
     Eof,
 }
 
@@ -96,6 +98,7 @@ impl TokenKind {
             Str(_) => return "string literal".into(),
             Ident(name) => return name.clone(),
             Newline => return "end of line".into(),
+            Comment => return "comment".into(),
             Eof => return "end of file".into(),
             Let => "let",
             Var => "var",
@@ -259,6 +262,8 @@ struct Lexer<'a> {
     base: usize,
     tokens: Vec<Token>,
     diags: Vec<Diagnostic>,
+    /// Emit `Comment` tokens (for the formatter) instead of skipping them.
+    keep_comments: bool,
 }
 
 impl<'a> Lexer<'a> {
@@ -309,6 +314,9 @@ impl<'a> Lexer<'a> {
                         }
                         self.bump();
                     }
+                    if self.keep_comments {
+                        self.push(TokenKind::Comment, start);
+                    }
                 }
                 '/' if self.peek_at(1) == Some('*') => self.block_comment(start),
                 '"' => self.string(start),
@@ -348,6 +356,10 @@ impl<'a> Lexer<'a> {
                     self.bump();
                 }
             }
+        }
+        if self.keep_comments {
+            self.push(TokenKind::Comment, start);
+            return;
         }
         // A comment spanning lines behaves like a line break (as in Go).
         if saw_newline {
@@ -623,11 +635,26 @@ pub fn raw_tokens(src: &str) -> (Vec<Token>, Vec<Diagnostic>) {
     raw_tokens_at(src, 0)
 }
 
+/// Every token including comments, with a `Newline` at each line break
+/// and no newline rules applied: the input of the formatter.
+pub fn tokens_with_comments(src: &str) -> (Vec<Token>, Vec<Diagnostic>) {
+    Lexer {
+        src,
+        pos: 0,
+        base: 0,
+        tokens: Vec::new(),
+        diags: Vec::new(),
+        keep_comments: true,
+    }
+    .run()
+}
+
 fn raw_tokens_at(src: &str, base: usize) -> (Vec<Token>, Vec<Diagnostic>) {
     Lexer {
         src,
         pos: 0,
         base,
+        keep_comments: false,
         tokens: Vec::new(),
         diags: Vec::new(),
     }
