@@ -142,8 +142,13 @@ impl Checker {
                     );
                     return;
                 }
-                let unused = !matches!(e.kind, ExprKind::Call { .. })
-                    && !matches!(self.subst.shallow(&ty), Ty::Unit | Ty::Error);
+                // A call's result may be ignored, also after `?` (`db.execute(...)?`).
+                let is_call = match &e.kind {
+                    ExprKind::Call { .. } => true,
+                    ExprKind::Try(inner) => matches!(inner.kind, ExprKind::Call { .. }),
+                    _ => false,
+                };
+                let unused = !is_call && !matches!(self.subst.shallow(&ty), Ty::Unit | Ty::Error);
                 if unused {
                     let mut diag = Diagnostic::warning(
                         "W1002",

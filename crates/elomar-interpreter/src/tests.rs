@@ -589,3 +589,23 @@ fn traits_at_runtime() {
     let src = "trait Area {\n  fn area(self) -> Float\n  fn scaled(self, k: Float) -> Self\n}\nenum Shape {\n  Circle(Float)\n  Square(Float)\n}\ntype Rect = { w: Float, h: Float }\nimpl Area for Shape {\n  fn area(self) -> Float {\n    return match self {\n      Shape.Circle(r) => 3.0 * r * r\n      Shape.Square(s) => s * s\n    }\n  }\n  fn scaled(self, k: Float) -> Self {\n    return match self {\n      Shape.Circle(r) => Shape.Circle(r * k)\n      Shape.Square(s) => Shape.Square(s * k)\n    }\n  }\n}\nimpl Area for Rect {\n  fn area(self) -> Float {\n    return self.w * self.h\n  }\n  fn scaled(self, k: Float) -> Rect {\n    return { w: self.w * k, h: self.h * k }\n  }\n}\nimpl Rect {\n  fn is_square(self) -> Bool {\n    return self.w == self.h\n  }\n}\nfn total<T: Area>(xs: List<T>) -> Float {\n  return xs.fold(0.0, |acc, x| acc + x.area())\n}\nfn double_total<T: Area>(xs: List<T>) -> Float {\n  return total(xs.map(|x| x.scaled(2.0)))\n}\nfn main() {\n  let r: Rect = { w: 1.0, h: 2.0 }\n  print(r.area(), r.is_square(), r.scaled(3.0))\n  print(total([Shape.Circle(1.0), Shape.Square(2.0)]), double_total([r]))\n}";
     assert_eq!(out(src), "2.0 false { w: 3.0, h: 6.0 }\n7.0 8.0\n");
 }
+
+// ----- std.db ----------------------------------------------------------------------
+
+#[test]
+fn sqlite_in_memory() {
+    let src = "use std.db\ntype Student = { id: Int, name: String, grade: Float, email: Option<String>, active: Bool }\nfn setup(conn: Db) -> Result<Int, DbError> {\n  db.execute(conn, \"CREATE TABLE s (id INTEGER PRIMARY KEY, name TEXT UNIQUE, grade REAL, email TEXT, active INTEGER); CREATE INDEX i ON s(name)\")?\n  for p in [{ n: \"Lina\", g: 91 }, { n: \"Omar\", g: 55 }] {\n    db.execute(conn, \"INSERT INTO s (name, grade, active) VALUES (:n, :g, 1)\", p)?\n  }\n  return db.execute(conn, \"UPDATE s SET email = :e WHERE name = :n\", { e: Some(\"l@x\"), n: \"Lina\" })\n}\nfn main() {\n  match db.open(\":memory:\") {\n    Ok(conn) => {\n      print(setup(conn))\n      print(db.query<Student>(conn, \"SELECT * FROM s WHERE grade > :min\", { min: 60 }))\n      print(db.query<String>(conn, \"SELECT name FROM s ORDER BY name\"), db.query_one<Int>(conn, \"SELECT id FROM s WHERE name = 'x'\"))\n      print(db.execute(conn, \"INSERT INTO s (name) VALUES ('Lina')\").is_err(), db.query<{ email: String }>(conn, \"SELECT email FROM s\").is_err())\n      match db.query<Int>(conn, \"SELECT missing FROM s\") {\n        Ok(_) => print(\"?\")\n        Err(e) => print(e.kind())\n      }\n    }\n    Err(e) => print(e)\n  }\n}";
+    assert_eq!(
+        out(src),
+        "Ok(1)\nOk([{ active: true, email: Some(\"l@x\"), grade: 91.0, id: 1, name: \"Lina\" }])\nOk([\"Lina\", \"Omar\"]) Ok(None)\ntrue true\nSql\n"
+    );
+}
+
+#[test]
+fn sqlite_file_needs_write_permission() {
+    let dir = temp_project("db");
+    let policy = FsPolicy::new(&dir, &["data".into()], &["out".into()]);
+    let src = "use std.db\nfn main() {\n  match db.open(\"out/app.db\") {\n    Ok(conn) => {\n      print(db.execute(conn, \"CREATE TABLE t (x INTEGER); INSERT INTO t VALUES (7)\"))\n      print(db.query<Int>(conn, \"SELECT x FROM t\"))\n    }\n    Err(e) => print(e)\n  }\n  match db.open(\"data/app.db\") {\n    Ok(_) => print(\"opened\")\n    Err(e) => print(e.kind())\n  }\n}";
+    assert_eq!(run_fs(src, policy), "Ok(1)\nOk([7])\nPolicyDenied\n");
+    assert!(dir.join("out/app.db").exists());
+}

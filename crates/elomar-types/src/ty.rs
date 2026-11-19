@@ -11,6 +11,8 @@ pub enum Ty {
     Unit,
     Range,
     Duration,
+    /// An open database (`std.db`).
+    Db,
     List(Box<Ty>),
     /// The pending result of an `async fn` call or `ai.infer`.
     Future(Box<Ty>),
@@ -226,6 +228,7 @@ impl Subst {
             Ty::Unit => out.push_str("Unit"),
             Ty::Range => out.push_str("Range"),
             Ty::Duration => out.push_str("Duration"),
+            Ty::Db => out.push_str("Db"),
             Ty::Param(name) => out.push_str(name),
             Ty::Enum(name, args) => {
                 out.push_str(name);

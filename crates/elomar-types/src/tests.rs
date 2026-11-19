@@ -867,3 +867,37 @@ fn method_effects_reach_the_caller() {
         "{src}pub fn run() !{{io}} {{\n  speak(1)\n  2.say()\n}}"
     ));
 }
+
+// ----- std.db ----------------------------------------------------------------------
+
+#[test]
+fn db_module() {
+    ok(
+        "use std.db\ntype Row = { id: Int, name: String, note: Option<String> }\nfn main() {\n  match db.open(\":memory:\") {\n    Ok(conn) => {\n      let n: Result<Int, DbError> = db.execute(conn, \"DELETE FROM t WHERE id = :id\", { id: 1 })\n      let rows: Result<List<Row>, DbError> = db.query<Row>(conn, \"SELECT * FROM t\")\n      let one: Result<Option<Int>, DbError> = db.query_one<Int>(conn, \"SELECT 1\")\n    }\n    Err(DbError.PolicyDenied(m)) => print(m)\n    Err(e) => print(e.kind(), e.message())\n  }\n}",
+    );
+    ok(
+        "use std.db\npub fn count(conn: Db) -> Int !{db} {\n  return match db.query_one<Int>(conn, \"SELECT 1\") {\n    Ok(Some(n)) => n\n    _ => 0\n  }\n}",
+    );
+    assert_eq!(
+        codes(
+            "use std.db\npub fn count(conn: Db) -> Bool {\n  return db.execute(conn, \"x\").is_ok()\n}"
+        ),
+        vec!["E3002"]
+    );
+    assert_eq!(
+        codes("use std.db\nfn f(conn: Db) {\n  print(db.query(conn, \"x\"))\n}"),
+        vec!["E2008"]
+    );
+    assert_eq!(
+        codes("use std.db\nfn f(conn: Db) {\n  print(db.query<List<Int>>(conn, \"x\"))\n}"),
+        vec!["E2021"]
+    );
+    assert_eq!(
+        codes("use std.db\nfn f(conn: Db) {\n  print(db.execute(conn, \"x\", [1]))\n}"),
+        vec!["E2021"]
+    );
+    assert_eq!(
+        codes("use std.db\nfn f() {\n  print(db.execute(\"x\", \"y\"))\n}"),
+        vec!["E2001"]
+    );
+}

@@ -556,7 +556,7 @@ impl Checker {
                     .map(|a| self.lower_type_with(a, alias))
                     .collect();
                 let arity = match name.name.as_str() {
-                    "Int" | "Float" | "Bool" | "String" | "Unit" | "Range" | "Duration" => 0,
+                    "Int" | "Float" | "Bool" | "String" | "Unit" | "Range" | "Duration" | "Db" => 0,
                     "List" | "Option" | "Future" => 1,
                     "Result" => 2,
                     "Map" => 2,
@@ -621,6 +621,7 @@ impl Checker {
                     "Unit" => Ty::Unit,
                     "Range" => Ty::Range,
                     "Duration" => Ty::Duration,
+                    "Db" => Ty::Db,
                     "List" => Ty::list(lowered.remove(0)),
                     "Option" => Ty::option(lowered.remove(0)),
                     "Future" => Ty::future(lowered.remove(0)),

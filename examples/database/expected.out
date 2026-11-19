@@ -1,0 +1,6 @@
+Updated: Ok(1)
+1 Lina 91 lina@example.com
+3 Sara 72 no email
+Average: Some(72.66666666666667)
+Passed: Ok(2)
+rejected: UNIQUE constraint failed: students.name

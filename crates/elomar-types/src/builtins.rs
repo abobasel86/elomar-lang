@@ -27,7 +27,7 @@ pub const BUILTIN_FUNCTIONS: [&str; 13] = [
     "abs",
 ];
 
-pub(crate) const BUILTIN_TYPES: [&str; 16] = [
+pub(crate) const BUILTIN_TYPES: [&str; 19] = [
     "Int",
     "Float",
     "Bool",
@@ -44,6 +44,9 @@ pub(crate) const BUILTIN_TYPES: [&str; 16] = [
     "AIError",
     "FsError",
     "JsonError",
+    "HttpError",
+    "Db",
+    "DbError",
 ];
 
 pub(crate) fn is_builtin_type(name: &str) -> bool {

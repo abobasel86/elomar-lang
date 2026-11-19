@@ -470,6 +470,41 @@ fn main() {
 - حالة الخطأ مثل 404 أو 500 **ليست** `Err`: هي استجابة بـ `status` الخاص بها. `Err` لفشل الاتصال فقط: `Timeout` (30 ثانية) و`Network` و`TooLarge` (أكبر من 10 MB أو ليست نصًا).
 - لتحويل الجسم إلى نوع: `json.parse<Todo>(resp.body)`.
 
+## 4.11.2 قواعد البيانات: `std.db` (SQLite)
+
+```elomar
+use std.db
+
+type Student = { id: Int, name: String, grade: Int, email: Option<String> }
+
+fn top(conn: Db) -> Result<List<Student>, DbError> {
+    return db.query<Student>(conn, "SELECT * FROM students WHERE grade >= :min", { min: 60 })
+}
+
+fn main() {
+    match db.open("data/school.db") {
+        Ok(conn) => {
+            print(db.execute(conn, "CREATE TABLE IF NOT EXISTS students (id INTEGER PRIMARY KEY, name TEXT, grade INTEGER, email TEXT)"))
+            print(top(conn))
+        }
+        Err(e) => print(e.kind(), e.message())
+    }
+}
+```
+
+| الدالة | النوع |
+|---|---|
+| `db.open(path)` | `Result<Db, DbError>`؛ `":memory:"` قاعدة في الذاكرة |
+| `db.execute(conn, sql[, params])` | `Result<Int, DbError>`: عدد الصفوف المتأثرة؛ بلا معاملات يُسمح بعدة جمل مفصولة بـ `;` |
+| `db.query<T>(conn, sql[, params])` | `Result<List<T>, DbError>` |
+| `db.query_one<T>(conn, sql[, params])` | `Result<Option<T>, DbError>`: أول صف إن وُجد |
+
+- كل استدعاء هو تأثير `db`. ملف القاعدة يحتاج إذن `filesystem_write` لمجلده في `elomar.toml` (وإلا `DbError.PolicyDenied`)؛ و`":memory:"` مسموح دائمًا.
+- **المعاملات** سجل تربط حقوله العناصر المسماة في SQL: `{ min: 60 }` يربط `:min`، فلا يُبنى SQL بدمج النصوص (لا حقن SQL). الحقول `Int` و`Float` و`String` و`Bool` و`Option` منها (`None` يصبح `NULL`)؛ والحقل غير المذكور في SQL `DbError.Sql`.
+- **الصف** سجل تُطابق حقوله الأعمدة بالاسم، أو قيمة واحدة لعمود واحد (`db.query<Int>(conn, "SELECT COUNT(*) FROM t")`). العمود `NULL` يحتاج `Option<T>`، و`Bool` يُقرأ من 0/1، و`Float` يقبل الأعداد الصحيحة؛ وغير ذلك `DbError.TypeMismatch`.
+- `DbError`: `PolicyDenied` و`Open` و`Sql` و`Constraint` (مثل `UNIQUE`) و`TypeMismatch`. نوع الصف أو المعاملات غير المناسب `E2021`، ونسيان نوع الصف `E2008`.
+- قيمة `Db` مقبض: نسخها يشير إلى الاتصال نفسه. للمعاملات المتعددة: `db.execute(conn, "BEGIN")` ثم `"COMMIT"` أو `"ROLLBACK"`.
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text
@@ -795,6 +830,7 @@ fn test_greets_by_name() {
 | `E2018` | مفتاح `Map` ليس `String` ولا `Int` |
 | `E2019` | نوع لا ينفذ الواجهة المطلوبة في قيد `<T: Trait>` |
 | `E2020` | تعذر معرفة النوع المطلوب لقيد واجهة في استدعاء |
+| `E2021` | نوع صف أو معاملات غير مناسب لـ `std.db` |
 
 ### أخطاء التأثيرات (`E3xxx`)
 

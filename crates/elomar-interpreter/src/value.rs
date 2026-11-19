@@ -100,6 +100,8 @@ pub enum Value {
     Option(Option<Rc<Value>>),
     Result(Result<Rc<Value>, Rc<Value>>),
     Function(Rc<Function>),
+    /// An open database; copies share the connection.
+    Db(Rc<crate::db::Handle>),
 }
 
 impl Value {
@@ -159,6 +161,7 @@ impl Value {
             }
             (Future(a), Future(b)) => Rc::ptr_eq(a, b),
             (Function(a), Function(b)) => Rc::ptr_eq(a, b),
+            (Db(a), Db(b)) => Rc::ptr_eq(a, b),
             (List(a), List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y))
             }
@@ -322,6 +325,7 @@ impl fmt::Display for Value {
             }
             Value::Future(_) => f.write_str("<future>"),
             Value::Function(_) => f.write_str("<function>"),
+            Value::Db(db) => write!(f, "<db {}>", db.path),
             Value::Option(None) => f.write_str("None"),
             Value::Option(Some(v)) => {
                 f.write_str("Some(")?;

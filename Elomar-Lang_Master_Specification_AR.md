@@ -1007,7 +1007,7 @@ async fn ask_model(text: String)
 | Time | `std.time` | Duration, DateTime, timers | v0.2 |
 | HTTP | `std.http` | Client/server, routing, middleware | **العميل منفذ**: `get` و`post` بتأثير `net` وقائمة `network_hosts`؛ الخادم v0.3 |
 | Network | `std.net` | Network primitives, TLS wrapper | v0.3 |
-| Database | `std.db` | Query, transactions, pooled connections | v0.3 |
+| Database | `std.db` | Query, transactions, pooled connections | **SQLite منفذ**: `open` و`execute` و`query<T>` و`query_one<T>` بمعاملات مسماة وصفوف مطابقة للأنواع وتأثير `db`؛ قواعد أخرى لاحقًا |
 | Crypto | `std.crypto` | Maintained vetted algorithms, hashes, TLS integration | v0.3 |
 | Logging | `std.log` | Structured logs, tracing | v0.2 |
 | CLI | `std.cli` | Args, env, process exit | v0.2 |

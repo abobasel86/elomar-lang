@@ -1,0 +1,53 @@
+// SQLite with `std.db`: typed rows, named parameters, explicit errors.
+// A file database needs `filesystem_write` permission in elomar.toml;
+// this example uses an in-memory one.
+
+use std.db
+
+type Student = { id: Int, name: String, grade: Int, email: Option<String> }
+
+fn setup(conn: Db) -> Result<Int, DbError> {
+    db.execute(conn, "CREATE TABLE students (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, grade INTEGER NOT NULL, email TEXT)")?
+    let rows = [
+        { name: "Lina", grade: 91 },
+        { name: "Omar", grade: 55 },
+        { name: "Sara", grade: 72 }
+    ]
+    for r in rows {
+        db.execute(conn, "INSERT INTO students (name, grade) VALUES (:name, :grade)", r)?
+    }
+    return db.execute(conn, "UPDATE students SET email = :email WHERE name = :name", { email: "lina@example.com", name: "Lina" })
+}
+
+fn report(conn: Db) -> Result<Int, DbError> {
+    let passed = db.query<Student>(conn, "SELECT * FROM students WHERE grade >= :min ORDER BY grade DESC", { min: 60 })?
+    for s in passed {
+        let email = match s.email {
+            Some(e) => e
+            None => "no email"
+        }
+        print(s.id, s.name, s.grade, email)
+    }
+    let avg = db.query_one<Float>(conn, "SELECT AVG(grade) FROM students")?
+    print("Average:", avg)
+    return Ok(passed.length)
+}
+
+fn main() {
+    let conn = match db.open(":memory:") {
+        Ok(c) => c
+        Err(e) => {
+            print("cannot open:", e.message())
+            return
+        }
+    }
+    print("Updated:", setup(conn))
+    print("Passed:", report(conn))
+
+    // A duplicate name breaks the UNIQUE constraint: an error value, not a crash.
+    match db.execute(conn, "INSERT INTO students (name, grade) VALUES ('Lina', 80)") {
+        Ok(n) => print("inserted", n)
+        Err(DbError.Constraint(m)) => print("rejected:", m)
+        Err(e) => print(e.kind(), e.message())
+    }
+}

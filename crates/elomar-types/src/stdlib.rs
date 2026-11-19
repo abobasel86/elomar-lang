@@ -19,6 +19,17 @@ pub(crate) const FS_FUNCTIONS: [&str; 5] = [
 ];
 pub(crate) const JSON_FUNCTIONS: [&str; 3] = ["parse", "stringify", "pretty"];
 pub(crate) const HTTP_FUNCTIONS: [&str; 2] = ["get", "post"];
+pub(crate) const DB_FUNCTIONS: [&str; 4] = ["open", "execute", "query", "query_one"];
+
+/// A value that maps to one SQLite column: `Int`, `Float`, `String`,
+/// `Bool`, or an `Option` of one (NULL).
+fn db_scalar(t: &Ty) -> bool {
+    match t {
+        Ty::Int | Ty::Float | Ty::Str | Ty::Bool | Ty::Error | Ty::Var(_) => true,
+        Ty::Option(inner) => !matches!(**inner, Ty::Option(_)) && db_scalar(inner),
+        _ => false,
+    }
+}
 
 /// What `http.get` and `http.post` return on success.
 pub(crate) fn http_response_ty() -> Ty {
@@ -127,6 +138,131 @@ impl Checker {
             http_response_ty(),
             Ty::Enum(crate::enums::HTTP_ERROR.into(), Vec::new()),
         )
+    }
+
+    /// `db.open(path)`, `db.execute(db, sql[, params])`,
+    /// `db.query<T>(db, sql[, params])`, `db.query_one<T>(...)`: the `db`
+    /// effect, results `Result<_, DbError>`.
+    pub(crate) fn check_db_call(
+        &mut self,
+        func: &Ident,
+        type_args: &mut [TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        if !DB_FUNCTIONS.contains(&func.name.as_str()) {
+            return self.unknown_module_function("db", func, &DB_FUNCTIONS, args);
+        }
+        self.usage.direct.push(("db".into(), func.span));
+        self.reject_named_args(args);
+        let what = format!("db.{}", func.name);
+        let err = Ty::Enum(crate::enums::DB_ERROR.into(), Vec::new());
+        match func.name.as_str() {
+            "open" => {
+                self.no_type_args(&what, type_args);
+                self.typed_args(&what, args, &[Ty::Str], span);
+                Ty::result(Ty::Db, err)
+            }
+            "execute" => {
+                self.no_type_args(&what, type_args);
+                self.db_args(&what, args, span);
+                Ty::result(Ty::Int, err)
+            }
+            _ => {
+                let row = match type_args {
+                    [t] => {
+                        let ty = self.lower_type(t);
+                        let resolved = self.subst.resolve(&ty);
+                        let ok = match &resolved {
+                            Ty::Record(fields) => fields.iter().all(|(_, f)| db_scalar(f)),
+                            other => db_scalar(other) && !matches!(other, Ty::Var(_)),
+                        };
+                        if ok {
+                            *t = crate::ai::type_expr_of(&resolved, t.span);
+                            resolved
+                        } else {
+                            let shown = self.subst.show(&resolved);
+                            self.push(
+                                Diagnostic::error(
+                                    "E2021",
+                                    t.span,
+                                    Text::new(
+                                        format!("`{what}` cannot read rows as `{shown}`"),
+                                        format!("لا يمكن أن تقرأ `{what}` الصفوف بالنوع `{shown}`"),
+                                    ),
+                                )
+                                .with_hint(Text::new(
+                                    "a row is a record of Int, Float, String, Bool or Option of these (matched to columns by name), or one such value for a single column",
+                                    "الصف سجل حقوله Int أو Float أو String أو Bool أو Option منها (تُطابق الأعمدة بالاسم)، أو قيمة واحدة منها لعمود واحد",
+                                )),
+                            );
+                            Ty::Error
+                        }
+                    }
+                    [] => {
+                        self.push(Diagnostic::error(
+                            "E2008",
+                            func.span,
+                            Text::new(
+                                format!(
+                                    "`{what}` needs the row type, e.g. `{what}<Student>(conn, sql)`"
+                                ),
+                                format!(
+                                    "تحتاج `{what}` إلى نوع الصف، مثل `{what}<Student>(conn, sql)`"
+                                ),
+                            ),
+                        ));
+                        Ty::Error
+                    }
+                    _ => {
+                        self.wrong_arg_count(&what, "1 type", type_args.len(), span);
+                        Ty::Error
+                    }
+                };
+                self.db_args(&what, args, span);
+                let out = if func.name == "query" {
+                    Ty::list(row)
+                } else {
+                    Ty::option(row)
+                };
+                Ty::result(out, err)
+            }
+        }
+    }
+
+    /// `(db, sql[, params])`; `params` is a record of column values.
+    fn db_args(&mut self, what: &str, args: &mut [Arg], span: Span) {
+        if !self.arity(what, args, 2, 3, span) {
+            return;
+        }
+        self.check_expr_against(&mut args[0].value, &Ty::Db);
+        self.check_expr_against(&mut args[1].value, &Ty::Str);
+        if let Some(p) = args.get_mut(2) {
+            let t = self.check_expr(&mut p.value, None);
+            let resolved = self.subst.resolve(&t);
+            let ok = match &resolved {
+                Ty::Record(fields) => fields.iter().all(|(_, f)| db_scalar(f)),
+                Ty::Error => true,
+                _ => false,
+            };
+            if !ok {
+                let shown = self.subst.show(&resolved);
+                self.push(
+                    Diagnostic::error(
+                        "E2021",
+                        p.value.span,
+                        Text::new(
+                            format!("query parameters must be a record of column values, not `{shown}`"),
+                            format!("معاملات الاستعلام يجب أن تكون سجلًا من قيم الأعمدة، لا `{shown}`"),
+                        ),
+                    )
+                    .with_hint(Text::new(
+                        "write `{ min: 60 }` and use `:min` in the SQL; fields are Int, Float, String, Bool or Option of these",
+                        "اكتب `{ min: 60 }` واستخدم `:min` في SQL؛ والحقول Int أو Float أو String أو Bool أو Option منها",
+                    )),
+                );
+            }
+        }
     }
 
     /// `json.parse<T>(text)`, `json.stringify(value)`, `json.pretty(value)`.
