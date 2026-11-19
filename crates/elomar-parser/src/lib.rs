@@ -306,11 +306,26 @@ impl Parser {
     fn use_decl(&mut self) -> PResult<UseDecl> {
         let start = self.expect(TokenKind::Use)?;
         let mut path = vec![self.ident()?];
+        let mut names = Vec::new();
         while self.eat(&TokenKind::Dot) {
+            if self.eat(&TokenKind::LBrace) {
+                self.skip_newlines();
+                while !self.at(&TokenKind::RBrace) {
+                    names.push(self.ident()?);
+                    self.skip_newlines();
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                    self.skip_newlines();
+                }
+                self.expect(TokenKind::RBrace)?;
+                break;
+            }
             path.push(self.ident()?);
         }
         Ok(UseDecl {
             path,
+            names,
             module: String::new(),
             span: start.to(self.prev_span()),
         })
@@ -1368,6 +1383,21 @@ mod tests {
         let (_, diags) = parse("impl E {}\ntrait T {}");
         let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
         assert_eq!(codes, vec!["E0103", "E0103"]);
+    }
+
+    #[test]
+    fn named_imports() {
+        let program = parse_ok("use app.school.students.{Student, average}\nuse app.lib");
+        let Item::Use(u) = &program.items[0] else {
+            panic!()
+        };
+        assert_eq!(u.path.len(), 3);
+        let names: Vec<&str> = u.names.iter().map(|n| n.name.as_str()).collect();
+        assert_eq!(names, ["Student", "average"]);
+        let Item::Use(plain) = &program.items[1] else {
+            panic!()
+        };
+        assert!(plain.names.is_empty());
     }
 
     #[test]

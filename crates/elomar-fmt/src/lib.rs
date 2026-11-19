@@ -209,7 +209,10 @@ impl<'a> Printer<'a> {
             {
                 s.push(' ');
             }
-            if tok.kind == TokenKind::LBrace && prev.is_some_and(|p| p.kind == TokenKind::Bang) {
+            // `!{ai, net}` and `use app.x.{a, b}` keep their braces tight.
+            if tok.kind == TokenKind::LBrace
+                && prev.is_some_and(|p| matches!(p.kind, TokenKind::Bang | TokenKind::Dot))
+            {
                 in_effects = true;
             } else if tok.kind == TokenKind::RBrace {
                 in_effects = false;
@@ -395,6 +398,14 @@ mod tests {
                 "pub async fn f(q:String)->Result<T,AIError>!{ ai , net }{\nreturn await ai.infer<T>(\"m\",\"i\",q,timeout:10s)\n}\nfn g() -> Option<Int> {\nlet v=xs.first()?\nreturn Some(v)\n}\n"
             ),
             "pub async fn f(q: String) -> Result<T, AIError> !{ai, net} {\n    return await ai.infer<T>(\"m\", \"i\", q, timeout: 10s)\n}\nfn g() -> Option<Int> {\n    let v = xs.first()?\n    return Some(v)\n}\n"
+        );
+    }
+
+    #[test]
+    fn named_imports_are_tight() {
+        assert_eq!(
+            fmt("use app.students.{ Student ,average }\n"),
+            "use app.students.{Student, average}\n"
         );
     }
 

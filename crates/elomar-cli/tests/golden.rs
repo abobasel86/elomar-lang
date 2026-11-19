@@ -665,3 +665,43 @@ fn repository_elo_files_are_formatted() {
         String::from_utf8_lossy(&out.stdout)
     );
 }
+
+#[test]
+fn named_imports() {
+    let main = module_project(
+        "named-imports",
+        &[
+            ("elomar.toml", ""),
+            (
+                "src/lib.elo",
+                "pub type Point = { x: Int, y: Int }\npub enum Dir {\n    Up\n    Down\n}\npub let ORIGIN: Point = { x: 0, y: 0 }\npub fn moved(p: Point, d: Dir) -> Point {\n    return match d {\n        Dir.Up => ({ x: p.x, y: p.y + 1 })\n        Dir.Down => ({ x: p.x, y: p.y - 1 })\n    }\n}\nfn secret() {}\n",
+            ),
+            (
+                "src/main.elo",
+                "use app.lib.{Point, Dir, ORIGIN, moved}\nfn main() {\n    let p: Point = moved(ORIGIN, Dir.Up)\n    match Dir.Down {\n        Dir.Up => print(\"up\")\n        Dir.Down => print(p)\n    }\n}\n",
+            ),
+        ],
+    );
+    let out = elomar(&["run", main.to_str().unwrap()]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&out.stdout)),
+        "{ x: 0, y: 1 }\n",
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let bad = module_project(
+        "named-imports-bad",
+        &[
+            ("elomar.toml", ""),
+            ("src/lib.elo", "pub fn shout() {}\nfn secret() {}\n"),
+            (
+                "src/main.elo",
+                "use app.lib.{shuot, secret, shout}\nfn shout() {}\nfn main() {}\n",
+            ),
+        ],
+    );
+    let (codes, stderr) = check_codes(&bad);
+    assert_eq!(codes, vec!["E1008", "E1012", "E1002"], "{stderr}");
+    assert!(stderr.contains("did you mean `shout`?"), "{stderr}");
+}

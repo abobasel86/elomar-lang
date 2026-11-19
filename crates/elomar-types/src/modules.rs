@@ -40,6 +40,10 @@ pub(crate) struct ModuleScopes {
     pub public: HashSet<String>,
     /// Full names of declared type aliases.
     pub type_names: HashSet<String>,
+    /// Full names of every top-level item, known before checking starts.
+    pub all_items: HashSet<String>,
+    /// Per module: name → full name, from `use app.x.{name}`.
+    pub imported_names: HashMap<String, HashMap<String, String>>,
 }
 
 impl Checker {
@@ -56,6 +60,7 @@ impl Checker {
                 Item::Const(c) => (&c.name.name, c.is_pub),
                 Item::Use(_) => continue,
             };
+            self.scopes_mod.all_items.insert(name.clone());
             if is_pub {
                 self.scopes_mod.public.insert(name.clone());
             }
@@ -120,6 +125,10 @@ impl Checker {
             );
             return;
         }
+        if !u.names.is_empty() {
+            self.import_names(u, &target);
+            return;
+        }
         let aliases = self
             .scopes_mod
             .app_aliases
@@ -144,6 +153,86 @@ impl Checker {
         aliases.insert(alias.name.clone(), target);
     }
 
+    /// `use app.x.{a, b}`: binds `a` and `b` in the `use`'s module.
+    fn import_names(&mut self, u: &UseDecl, target: &str) {
+        let alias = &u.path[u.path.len() - 1].name;
+        for name in &u.names {
+            let full = format!("{target}.{}", name.name);
+            if !self.scopes_mod.all_items.contains(&full) {
+                let available: Vec<String> = self
+                    .scopes_mod
+                    .public
+                    .iter()
+                    .filter(|n| module_of(n) == target)
+                    .map(|n| base_name(n).to_string())
+                    .collect();
+                let mut diag = Diagnostic::error(
+                    "E1008",
+                    name.span,
+                    Text::new(
+                        format!("module `{alias}` has no item `{}`", name.name),
+                        format!("الوحدة `{alias}` ليس فيها العنصر `{}`", name.name),
+                    ),
+                );
+                if let Some(s) = suggest(&name.name, &available) {
+                    diag = diag.with_hint(Text::new(
+                        format!("did you mean `{s}`?"),
+                        format!("هل تقصد `{s}`؟"),
+                    ));
+                }
+                self.push(diag);
+                continue;
+            }
+            if !self.scopes_mod.public.contains(&full) {
+                self.push(
+                    Diagnostic::error(
+                        "E1012",
+                        name.span,
+                        Text::new(
+                            format!("`{}` is private to module `{alias}`", name.name),
+                            format!("`{}` خاص بالوحدة `{alias}`", name.name),
+                        ),
+                    )
+                    .with_hint(Text::new(
+                        format!(
+                            "mark it `pub` in src/{}.elo to use it from other files",
+                            target.replace('.', "/")
+                        ),
+                        format!(
+                            "علّمه بـ `pub` في src/{}.elo لاستخدامه من ملفات أخرى",
+                            target.replace('.', "/")
+                        ),
+                    )),
+                );
+                continue;
+            }
+            let own = if u.module.is_empty() {
+                name.name.clone()
+            } else {
+                format!("{}.{}", u.module, name.name)
+            };
+            let names = self
+                .scopes_mod
+                .imported_names
+                .entry(u.module.clone())
+                .or_default();
+            let clash = self.scopes_mod.all_items.contains(&own)
+                || names.get(&name.name).is_some_and(|f| *f != full);
+            if clash {
+                self.error(
+                    "E1002",
+                    name.span,
+                    Text::new(
+                        format!("the name `{}` is already defined in this file", name.name),
+                        format!("الاسم `{}` معرّف مسبقًا في هذا الملف", name.name),
+                    ),
+                );
+                continue;
+            }
+            names.insert(name.name.clone(), full);
+        }
+    }
+
     fn item_exists(&self, full: &str) -> bool {
         self.fns.contains_key(full)
             || self.consts.contains_key(full)
@@ -155,15 +244,25 @@ impl Checker {
     /// its own item if it has one, else `name` (prelude or main-file names).
     pub(crate) fn local_item(&self, name: &str) -> String {
         let module = &self.scopes_mod.current;
-        if module.is_empty() || name.contains('.') {
+        if name.contains('.') {
             return name.to_string();
         }
-        let full = format!("{module}.{name}");
-        if self.item_exists(&full) {
-            full
-        } else {
-            name.to_string()
+        if !module.is_empty() {
+            let full = format!("{module}.{name}");
+            if self.item_exists(&full) {
+                return full;
+            }
         }
+        // Names imported with `use app.x.{name}`.
+        if let Some(full) = self
+            .scopes_mod
+            .imported_names
+            .get(module)
+            .and_then(|names| names.get(name))
+        {
+            return full.clone();
+        }
+        name.to_string()
     }
 
     /// The app module that `alias` names here, unless a variable or

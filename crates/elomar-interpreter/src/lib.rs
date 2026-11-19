@@ -428,6 +428,13 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                             }
                         }
                     }
+                    Value::Set(items) => {
+                        for k in items.iter() {
+                            if !run(self, k.to_value())? {
+                                break;
+                            }
+                        }
+                    }
                     Value::Map(entries) => {
                         for (k, v) in entries.iter() {
                             let entry = Value::Record(Rc::new(vec![
@@ -603,6 +610,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         .expect("checked field"),
                     Value::List(items) => Value::Int(items.len() as i64),
                     Value::Map(entries) => Value::Int(entries.len() as i64),
+                    Value::Set(items) => Value::Int(items.len() as i64),
                     Value::Str(s) => Value::Int(builtins::graphemes(&s).count() as i64),
                     _ => unreachable!("checked field access"),
                 }

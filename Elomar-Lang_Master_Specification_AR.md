@@ -538,7 +538,7 @@ fn main() {
 | `Result<T,E>` | `Ok(value)` أو `Err(error)` | v0.1 (مع `match`) |
 | `Range` | `a..b` و`a..=b` للتكرار | v0.1 |
 | `Bytes` | بيانات ثنائية | v0.2 |
-| `Map<K,V>` / `Set<T>` | خرائط ومجموعات | `Map` **منفذ**؛ `Set` في v0.2 |
+| `Map<K,V>` / `Set<T>` | خرائط ومجموعات | **منفذان** (`Map` بـ `["a": 1]`، و`Set` بـ `set([...])`) |
 | `Record` / `type X = {...}` | نوع مهيكل بنيوي ذو حقول محددة | v0.1 |
 | `Enum` | نوع مغلق متعدد الحالات، بقيم اختيارية لكل حالة | **منفذ** (v0.2) |
 | `Duration` / `DateTime` | زمن وفترات | v0.2 |
@@ -646,7 +646,7 @@ fn main() {
 }
 ```
 
-**منفذ:** `use app.students` يحمّل `src/students.elo`، وعناصره المعلّمة بـ `pub` متاحة بالاسم المؤهَّل `students.count()`. التفاصيل في `docs/grammar.md` §4.12.
+**منفذ:** `use app.students` يحمّل `src/students.elo`، وعناصره المعلّمة بـ `pub` متاحة بالاسم المؤهَّل `students.count()`، أو باستيراد أسماء محددة `use app.students.{count, Student}`. التفاصيل في `docs/grammar.md` §4.12.
 
 ## 11.3 أساليب البرمجة المستهدفة
 

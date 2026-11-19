@@ -11,7 +11,7 @@ use crate::{Checker, Ty, suggest};
 pub const KNOWN_EFFECTS: [&str; 6] = ["io", "fs", "net", "ai", "db", "py"];
 
 /// Functions available without `use`.
-pub const BUILTIN_FUNCTIONS: [&str; 12] = [
+pub const BUILTIN_FUNCTIONS: [&str; 13] = [
     "print",
     "input",
     "to_float",
@@ -21,12 +21,13 @@ pub const BUILTIN_FUNCTIONS: [&str; 12] = [
     "parse_float",
     "assert",
     "assert_eq",
+    "set",
     "min",
     "max",
     "abs",
 ];
 
-pub(crate) const BUILTIN_TYPES: [&str; 15] = [
+pub(crate) const BUILTIN_TYPES: [&str; 16] = [
     "Int",
     "Float",
     "Bool",
@@ -39,6 +40,7 @@ pub(crate) const BUILTIN_TYPES: [&str; 15] = [
     "Result",
     "Future",
     "Map",
+    "Set",
     "AIError",
     "FsError",
     "JsonError",
@@ -104,6 +106,18 @@ const MAP_METHODS: &[&str] = &[
     "to_string",
 ];
 const ERROR_METHODS: &[&str] = &["kind", "message", "to_string"];
+const SET_METHODS: &[&str] = &[
+    "contains",
+    "add",
+    "remove",
+    "is_empty",
+    "to_list",
+    "union",
+    "intersection",
+    "difference",
+    "is_subset",
+    "to_string",
+];
 const OTHER_METHODS: &[&str] = &["to_string"];
 
 fn methods_of(ty: &Ty) -> &'static [&'static str] {
@@ -116,6 +130,7 @@ fn methods_of(ty: &Ty) -> &'static [&'static str] {
         Ty::Result(..) => RESULT_METHODS,
         Ty::Duration => DURATION_METHODS,
         Ty::Map(..) => MAP_METHODS,
+        Ty::Set(_) => SET_METHODS,
         Ty::Enum(name) if crate::enums::is_error_enum(name) => ERROR_METHODS,
         _ => OTHER_METHODS,
     }
@@ -263,6 +278,15 @@ impl Checker {
                 }
                 Ty::Unit
             }
+            "set" => {
+                if !self.arity(name, args, 1, 1, span) {
+                    return Ty::Error;
+                }
+                let elem = self.subst.fresh();
+                self.check_expr_against(&mut args[0].value, &Ty::list(elem.clone()));
+                self.check_set_element(&elem, args[0].value.span);
+                Ty::set(elem)
+            }
             "assert_eq" => {
                 if self.arity(name, args, 2, 2, span) {
                     let actual = self.check_expr(&mut args[0].value, None);
@@ -306,7 +330,7 @@ impl Checker {
             self.arity(m, args, 0, 0, span);
             return Ty::Str;
         }
-        if m == "length" && matches!(r, Ty::List(_) | Ty::Str | Ty::Map(..)) {
+        if m == "length" && matches!(r, Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_)) {
             self.push(
                 Diagnostic::error(
                     "E2004",
@@ -333,6 +357,7 @@ impl Checker {
             }
             (Ty::Float, "abs" | "sqrt") => self.no_args(m, args, span, Ty::Float),
             (Ty::Map(k, v), _) => self.map_method(recv, k, v, m, args, span),
+            (Ty::Set(t), _) => self.set_method(recv, t, m, args, span),
             (Ty::Enum(name), "kind" | "message") if crate::enums::is_error_enum(name) => {
                 self.no_args(m, args, span, Ty::Str)
             }
@@ -548,6 +573,51 @@ impl Checker {
             }
             "is_empty" => {
                 self.arity(m, args, 0, 0, span);
+                Ty::Bool
+            }
+            _ => return None,
+        })
+    }
+
+    fn set_method(
+        &mut self,
+        recv: &Expr,
+        elem: &Ty,
+        m: &str,
+        args: &mut [Arg],
+        span: Span,
+    ) -> Option<Ty> {
+        let elem = elem.clone();
+        let set = Ty::set(elem.clone());
+        Some(match m {
+            "contains" => {
+                self.typed_args(m, args, std::slice::from_ref(&elem), span);
+                Ty::Bool
+            }
+            "add" => {
+                self.require_place(recv, m);
+                self.typed_args(m, args, std::slice::from_ref(&elem), span);
+                Ty::Unit
+            }
+            "remove" => {
+                self.require_place(recv, m);
+                self.typed_args(m, args, std::slice::from_ref(&elem), span);
+                Ty::Bool
+            }
+            "is_empty" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::Bool
+            }
+            "to_list" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(elem)
+            }
+            "union" | "intersection" | "difference" => {
+                self.typed_args(m, args, std::slice::from_ref(&set), span);
+                set
+            }
+            "is_subset" => {
+                self.typed_args(m, args, std::slice::from_ref(&set), span);
                 Ty::Bool
             }
             _ => return None,

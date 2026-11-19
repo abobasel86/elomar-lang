@@ -496,6 +496,7 @@ impl Checker {
                     "List" | "Option" | "Future" => 1,
                     "Result" => 2,
                     "Map" => 2,
+                    "Set" => 1,
                     _ => {
                         let Some(resolved) = self.resolve_type_name(name, true) else {
                             return Ty::Error;
@@ -551,6 +552,11 @@ impl Checker {
                     "List" => Ty::list(lowered.remove(0)),
                     "Option" => Ty::option(lowered.remove(0)),
                     "Future" => Ty::future(lowered.remove(0)),
+                    "Set" => {
+                        let elem = lowered.remove(0);
+                        self.check_set_element(&elem, t.span);
+                        Ty::set(elem)
+                    }
                     "Map" => {
                         let v = lowered.pop().expect("arity 2");
                         let k = lowered.pop().expect("arity 2");

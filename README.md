@@ -26,7 +26,9 @@ by the compiler when they are not declared.
 - Files and JSON: `std.fs` (the `fs` effect, default-deny `filesystem_read` /
   `filesystem_write` in `elomar.toml`) and typed `json.parse<T>` /
   `json.stringify`. See [`examples/files`](examples/files).
-- Multi-file programs: `use app.students` loads `src/students.elo`; only `pub`
+- Sets: `set([1, 2])` with `union`, `intersection`, `difference`, `is_subset`.
+- Multi-file programs: `use app.students` loads `src/students.elo` (or
+  `use app.students.{Student, average}` to import names directly); only `pub`
   items are visible to other files. See [`examples/school`](examples/school).
 - **VS Code support** in [`editor/vscode`](editor/vscode): highlighting
   (Arabic names included), errors while typing in English or Arabic, a Run
@@ -169,7 +171,7 @@ and compared with its `expected.out`.
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
-3. 🟡 v0.2: ✅ enums, `Map`, `?`, `std.fs`, `std.json`, modules, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI; ⏳ `Set`, named imports, package tooling, language server.
+3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
 4. HTTP/database support, Python bridge, controlled AI tools and agents.
 5. Bytecode VM, performance work and stable releases.
 

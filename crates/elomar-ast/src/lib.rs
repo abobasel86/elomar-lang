@@ -30,6 +30,9 @@ pub enum Item {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UseDecl {
     pub path: Vec<Ident>,
+    /// `use app.students.{Student, average}`: the names imported directly.
+    /// Empty for a plain `use`, which binds the module name instead.
+    pub names: Vec<Ident>,
     /// The module this `use` appears in; empty for the main file.
     pub module: String,
     pub span: Span,

@@ -473,3 +473,12 @@ fn json_round_trip() {
         "Lina [90, 85] Level.High None 9.5\n{\"grades\":[90,85],\"level\":\"High\",\"name\":\"Lina\",\"note\":null,\"scores\":{\"math\":9.5}}\nErr(JsonError.InvalidJson(\"invalid JSON: EOF while parsing a list at line 1 column 5\"))\nErr(JsonError.TypeMismatch(\"the JSON does not match `List<Int>`: $[1]: expected Int, found \\\"x\\\"\"))\n{\n  \"a\": [\n    1,\n    2\n  ]\n}\n"
     );
 }
+
+#[test]
+fn sets_at_runtime() {
+    let src = "fn main() {\n  var seen = set([3, 1, 3, 2])\n  print(seen, seen.length)\n  seen.add(5)\n  print(seen.remove(1), seen.remove(42), seen)\n  let evens = set([2, 4])\n  print(seen.union(evens), seen.intersection(evens), seen.difference(evens), set([2]).is_subset(seen))\n  for x in set([\"b\", \"a\"]) { print(x) }\n  let copy = seen\n  seen.add(9)\n  print(copy.contains(9), seen.contains(9), set([1, 2]) == set([2, 1]))\n}";
+    assert_eq!(
+        out(src),
+        "set([1, 2, 3]) 3\ntrue false set([2, 3, 5])\nset([2, 3, 4, 5]) set([2]) set([3, 5]) true\na\nb\nfalse true true\n"
+    );
+}

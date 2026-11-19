@@ -636,3 +636,20 @@ fn assert_eq_needs_matching_types() {
         vec!["E2001"]
     );
 }
+
+#[test]
+fn sets() {
+    ok(
+        "fn main() {\n  var tags = set([\"a\", \"b\"])\n  tags.add(\"c\")\n  let removed: Bool = tags.remove(\"a\")\n  let other = set([\"b\"])\n  print(tags.length, tags.contains(\"b\"), tags.union(other), other.is_subset(tags), tags.to_list())\n  for t in tags { print(t.upper()) }\n  let empty: Set<Int> = set([])\n}",
+    );
+    assert_eq!(codes("fn main() {\n  let s = set([1.5])\n}"), vec!["E2018"]);
+    assert_eq!(
+        codes("fn main() {\n  let s = set([1])\n  s.add(2)\n}"),
+        vec!["E1003"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  let s = set([1])\n  print(s.contains(\"x\"))\n}"),
+        vec!["E2001"]
+    );
+    assert_eq!(codes("fn f(s: Set<Float>) {}"), vec!["E2018"]);
+}

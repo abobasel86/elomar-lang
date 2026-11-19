@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::rc::Rc;
 
@@ -80,6 +80,8 @@ pub enum Value {
         fields: Rc<Vec<Value>>,
     },
     Map(Rc<BTreeMap<MapKey, Value>>),
+    /// Elements are `String` or `Int` and iterate in order.
+    Set(Rc<BTreeSet<MapKey>>),
     /// Shared handle: copies of a future refer to the same computation.
     Future(Rc<RefCell<FutureState>>),
     Option(Option<Rc<Value>>),
@@ -137,6 +139,7 @@ impl Value {
                     fields: f2,
                 },
             ) => e1 == e2 && v1 == v2 && f1.iter().zip(f2.iter()).all(|(x, y)| x.equals(y)),
+            (Set(a), Set(b)) => a == b,
             (Map(a), Map(b)) => {
                 a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| v.equals(w)))
             }
@@ -275,6 +278,17 @@ impl fmt::Display for Value {
                     f.write_str(")")?;
                 }
                 Ok(())
+            }
+            // Written the way a set is created: `set([1, 2])`.
+            Value::Set(items) => {
+                f.write_str("set([")?;
+                for (i, k) in items.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    k.to_value().fmt_nested(f)?;
+                }
+                f.write_str("])")
             }
             Value::Map(entries) => {
                 if entries.is_empty() {

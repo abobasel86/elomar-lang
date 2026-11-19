@@ -189,6 +189,7 @@ impl Checker {
             Ty::Range => Ty::Int,
             Ty::Str => Ty::Str,
             Ty::Map(k, v) => Ty::record(vec![("key".into(), *k), ("value".into(), *v)]),
+            Ty::Set(t) => *t,
             Ty::Error => Ty::Error,
             Ty::Var(_) => {
                 self.cannot_infer(span);
@@ -949,7 +950,7 @@ impl Checker {
                 self.no_field(&resolved, name, suggest(&name.name, &names));
                 Ty::Error
             }
-            Ty::List(_) | Ty::Str | Ty::Map(..) if name.name == "length" => Ty::Int,
+            Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_) if name.name == "length" => Ty::Int,
             Ty::Var(_) => {
                 self.cannot_infer(name.span);
                 Ty::Error
@@ -1264,6 +1265,24 @@ impl Checker {
                 "عالج الحالة بـ `match` هنا، أو انقل هذا الكود إلى دالة تُرجع هذا النوع",
             )),
         );
+    }
+
+    /// Set elements must be `String` or `Int`, like map keys.
+    pub(crate) fn check_set_element(&mut self, t: &Ty, span: Span) {
+        match self.subst.shallow(t) {
+            Ty::Str | Ty::Int | Ty::Var(_) | Ty::Error => {}
+            other => {
+                let shown = self.subst.show(&other);
+                self.error(
+                    "E2018",
+                    span,
+                    Text::new(
+                        format!("`Set` elements must be `String` or `Int`, not `{shown}`"),
+                        format!("عناصر `Set` يجب أن تكون `String` أو `Int`، لا `{shown}`"),
+                    ),
+                );
+            }
+        }
     }
 
     /// Map keys must be `String` or `Int` (spec §10.2).

@@ -22,6 +22,8 @@ pub enum Ty {
     Enum(String),
     /// `Map<K, V>`; keys are `String` or `Int`.
     Map(Box<Ty>, Box<Ty>),
+    /// `Set<T>`; elements are `String` or `Int`.
+    Set(Box<Ty>),
     /// An inference variable, index into [`Subst`].
     Var(u32),
     /// Produced after an error has been reported; unifies with anything so
@@ -32,6 +34,10 @@ pub enum Ty {
 impl Ty {
     pub fn list(t: Ty) -> Ty {
         Ty::List(Box::new(t))
+    }
+
+    pub fn set(t: Ty) -> Ty {
+        Ty::Set(Box::new(t))
     }
 
     pub fn map(k: Ty, v: Ty) -> Ty {
@@ -89,6 +95,7 @@ impl Subst {
         match self.shallow(ty) {
             Ty::List(t) => Ty::list(self.resolve(&t)),
             Ty::Future(t) => Ty::future(self.resolve(&t)),
+            Ty::Set(t) => Ty::set(self.resolve(&t)),
             Ty::Option(t) => Ty::option(self.resolve(&t)),
             Ty::Result(t, e) => Ty::result(self.resolve(&t), self.resolve(&e)),
             Ty::Map(k, v) => Ty::map(self.resolve(&k), self.resolve(&v)),
@@ -105,7 +112,7 @@ impl Subst {
     fn occurs(&self, v: u32, ty: &Ty) -> bool {
         match self.shallow(ty) {
             Ty::Var(w) => v == w,
-            Ty::List(t) | Ty::Option(t) | Ty::Future(t) => self.occurs(v, &t),
+            Ty::List(t) | Ty::Option(t) | Ty::Future(t) | Ty::Set(t) => self.occurs(v, &t),
             Ty::Result(t, e) | Ty::Map(t, e) => self.occurs(v, &t) || self.occurs(v, &e),
             Ty::Record(fields) => fields.iter().any(|(_, t)| self.occurs(v, t)),
             _ => false,
@@ -128,7 +135,8 @@ impl Subst {
             }
             (Ty::List(x), Ty::List(y))
             | (Ty::Option(x), Ty::Option(y))
-            | (Ty::Future(x), Ty::Future(y)) => self.unify(x, y),
+            | (Ty::Future(x), Ty::Future(y))
+            | (Ty::Set(x), Ty::Set(y)) => self.unify(x, y),
             (Ty::Result(t1, e1), Ty::Result(t2, e2)) | (Ty::Map(t1, e1), Ty::Map(t2, e2)) => {
                 let ok = self.unify(t1, t2);
                 self.unify(e1, e2) && ok
@@ -164,6 +172,11 @@ impl Subst {
             Ty::Range => out.push_str("Range"),
             Ty::Duration => out.push_str("Duration"),
             Ty::Enum(name) => out.push_str(name),
+            Ty::Set(t) => {
+                out.push_str("Set<");
+                self.write(out, t);
+                out.push('>');
+            }
             Ty::Map(k, v) => {
                 out.push_str("Map<");
                 self.write(out, k);

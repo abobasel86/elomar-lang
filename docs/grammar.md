@@ -147,6 +147,7 @@ pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
 | `Duration` | `500ms` `10s` `2m` `1h` | `+` و`-` والمقارنة؛ `.millis()` و`.seconds()` |
 | `Future<T>` | ناتج استدعاء `async fn` أو `ai.infer` | يُستخرج `T` بـ `await` |
 | `Map<K, V>` | `["a": 1]` و`[:]` | المفاتيح `String` أو `Int`؛ الترتيب بحسب المفتاح |
+| `Set<T>` | `set([1, 2])` | العناصر `String` أو `Int` بلا تكرار، مرتبة؛ تُطبع `set([1, 2])` |
 | أنواع معدودة | `Shape.Circle(1.0)` `Priority.High` | اسمية: `enum` بالحالات نفسها نوع مختلف |
 | `AIError` | `AIError.Timeout("...")` | نوع معدود مدمج؛ كل حالة تحمل رسالة |
 | `FsError` | `NotFound` · `PermissionDenied` · `PolicyDenied` · `InvalidData` · `Other` | لـ `std.fs`؛ كل حالة تحمل رسالة |
@@ -343,6 +344,19 @@ var empty: Map<String, Int> = [:]
 - دلالة القيمة كالقوائم: النسخ مستقل، والتعديل يتطلب `var`.
 - القاموس ليس من أنواع JSON المقبولة في `ai.infer` بعد.
 
+## 4.8.1 المجموعة `Set<T>`
+
+```elomar
+var tags = set(["ai", "web", "ai"])    // set(["ai", "web"])
+tags.add("rust")
+print(tags.contains("web"), tags.length, tags.remove("x"))   // true 3 false
+let both = tags.intersection(set(["web", "mobile"]))          // set(["web"])
+```
+
+- تُنشأ بالدالة `set(list)` (لا صياغة حرفية خاصة)، والعناصر `String` أو `Int` فقط (`E2018`).
+- `contains` و`add`* و`remove`* (تُرجع هل كان العنصر موجودًا) و`is_empty` و`to_list` و`union` و`intersection` و`difference` و`is_subset` و`.length`.
+- `for x in s` بالترتيب، ودلالة القيمة كالقوائم، والمساواة لا تعتمد على ترتيب الإدخال.
+
 ## 4.9 المعامل `?`
 
 ```elomar
@@ -458,7 +472,9 @@ fn main() {
 
 - `use app.a.b` يحمّل الملف `src/a/b.elo` من مجلد المشروع (مجلد `elomar.toml`، أو مجلد البرنامج إن لم يوجد)؛ وإن لم يوجد
   مجلد `src/` يُبحث بجانب `elomar.toml`. الاسم المختصر هو آخر جزء (`b`).
-- الوصول دائمًا بالاسم المؤهَّل: `students.level(s)` و`students.Student` و`grading.Level.Excellent` (في التعابير والأنماط والأنواع).
+- الوصول بالاسم المؤهَّل: `students.level(s)` و`students.Student` و`grading.Level.Excellent` (في التعابير والأنماط والأنواع).
+- أو باستيراد أسماء محددة: `use app.students.{Student, level}` ثم `level(s)` و`Student` مباشرة (ومنها الأنواع المعدودة: `use app.grading.{Level}` ثم `Level.Excellent`).
+  الاسم المستورد الذي يتعارض مع عنصر في الملف نفسه أو مع استيراد آخر `E1002`، وغير الموجود `E1008`، وغير `pub` `E1012`.
 - **الخصوصية افتراضية:** لا يُرى من ملف آخر إلا ما عُلّم بـ `pub` (`pub fn` و`pub type` و`pub enum` و`pub let`)؛ وإلا `E1012`
   مع تلميح بمكان إضافة `pub`. العنصر غير الموجود `E1008` مع اقتراح أقرب اسم.
 - **الاستيرادات خاصة بكل ملف:** `use std.ai` أو `use app.x` في ملف لا تنطبق على ملف آخر.
@@ -536,6 +552,7 @@ fn test_greets_by_name() {
 | `assert(cond)` / `assert(cond, msg)` | `Bool`, `String` → `Unit` (`R0004`) | |
 | `assert_eq(actual, expected)` | قيمتان من النوع نفسه → `Unit` (`R0004` مع عرض القيمتين) | |
 | `min(a, b)` / `max(a, b)` | عددان → `Int` إن كانا صحيحين وإلا `Float` | |
+| `set(list)` | `List<T>` → `Set<T>` (العناصر `String` أو `Int`) | |
 | `abs(x)` | `Int\|Float` → النوع نفسه | |
 
 ### 7.2 الخصائص والدوال التابعة
@@ -550,6 +567,7 @@ fn test_greets_by_name() {
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` |
 | `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` |
+| `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` |
 | `AIError` · `FsError` · `JsonError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
 
 \* يعدّل القائمة، ويتطلب أن تكون في متغير `var`.
@@ -656,5 +674,5 @@ fn test_greets_by_name() {
 ## 9. غير المنفذ بعد (مخطط)
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
-`ai.generate` و`ai.stream` و`ai.embed` · `Set` واستيراد أسماء محددة (`use app.x.{a, b}`) وحذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة (بقية v0.2) ·
+`ai.generate` و`ai.stream` و`ai.embed` · حذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة ·
 الأنواع العامة والدوال كقيم و`trait`/`impl` وتعدد التأثيرات والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي · المعامل `?`.

@@ -217,6 +217,12 @@ pub(crate) fn call_function(
             }
             Value::Unit
         }
+        "set" => match &args[0] {
+            Value::List(items) => Value::Set(Rc::new(
+                items.iter().map(crate::MapKey::from_value).collect(),
+            )),
+            _ => unreachable!("checked argument"),
+        },
         "assert_eq" => {
             if !args[0].equals(&args[1]) {
                 let (actual, expected) = (repr(&args[0]), repr(&args[1]));
@@ -281,7 +287,7 @@ fn parse_float(s: &str) -> Value {
 }
 
 pub(crate) fn is_mutating(method: &str) -> bool {
-    matches!(method, "push" | "pop" | "insert" | "remove")
+    matches!(method, "push" | "pop" | "insert" | "remove" | "add")
 }
 
 /// Methods that change their receiver in place.
@@ -291,6 +297,17 @@ pub(crate) fn call_mutating(
     mut args: Vec<Value>,
     span: Span,
 ) -> R<Value> {
+    if let Value::Set(items) = slot {
+        let key = crate::MapKey::from_value(&args[0]);
+        let items = Rc::make_mut(items);
+        return Ok(match method {
+            "add" => {
+                items.insert(key);
+                Value::Unit
+            }
+            _ => Value::Bool(items.remove(&key)),
+        });
+    }
     if let Value::Map(entries) = slot {
         // The only mutating map method is `remove`.
         let removed = Rc::make_mut(entries).remove(&crate::MapKey::from_value(&args[0]));
@@ -331,6 +348,23 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
     }
     Ok(match (recv, method) {
         (Value::List(items), _) => list_method(&items, method, &args, span)?,
+        (Value::Set(items), _) => {
+            let other = || match &args[0] {
+                Value::Set(o) => o.clone(),
+                _ => unreachable!("checked argument"),
+            };
+            let make = |s: std::collections::BTreeSet<crate::MapKey>| Value::Set(Rc::new(s));
+            match method {
+                "contains" => Value::Bool(items.contains(&crate::MapKey::from_value(&args[0]))),
+                "is_empty" => Value::Bool(items.is_empty()),
+                "to_list" => Value::list(items.iter().map(|k| k.to_value()).collect()),
+                "union" => make(items.union(&other()).cloned().collect()),
+                "intersection" => make(items.intersection(&other()).cloned().collect()),
+                "difference" => make(items.difference(&other()).cloned().collect()),
+                "is_subset" => Value::Bool(items.is_subset(&other())),
+                m => unreachable!("checked set method `{m}`"),
+            }
+        }
         (Value::Map(entries), _) => {
             let key = || crate::MapKey::from_value(&args[0]);
             match method {
