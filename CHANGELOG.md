@@ -18,6 +18,10 @@ change the language.
   trigonometry), `std.random` (`int`, `float`, `choice`, `shuffle`, `seed`),
   `std.time` (`now`, `format`, `parse`, `date`, `make`, `sleep`, `today`)
   and `std.os` (`args`, `env`, `platform`, `exit`).
+- `std.regex` (`is_match`, `find`, `find_all`, `captures`, `replace`,
+  `split`; literal patterns are checked when compiling, `E2023`),
+  `std.encoding` (Base64, hex, URL) and `std.crypto` (`sha256`,
+  `hmac_sha256`, and secure `uuid` and `token`).
 - `elomar run main.elo a b` passes `a b` to the program (`os.args()`), and
   `os.exit(code)` sets the exit code.
 - New methods: strings `index_of`, `slice`, `lines`, `words`,

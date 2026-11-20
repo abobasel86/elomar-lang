@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 elomar-diagnostics.workspace = true
 elomar-ast.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 elomar-parser.workspace = true

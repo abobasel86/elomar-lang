@@ -648,6 +648,32 @@ fn main() {
 - `time.parse` يقبل `YYYY-MM-DD` ثم اختياريًا `THH:MM[:SS[.fff]]` ومنطقة زمنية (`Z` أو `+03:00`)؛ بلا منطقة يُعدّ UTC. التاريخ غير الموجود (مثل 2001-02-29) يعطي `None`، و`time.make` بتاريخ غير صالح خطأ تنفيذي `R0006`.
 - معاملات البرنامج: `elomar run main.elo a b --flag` ثم `os.args()` تعطي `["a", "b", "--flag"]`. و`os.exit(code)` ينهي البرنامج فورًا برمز الخروج (0–255).
 
+## 4.11.5 التعابير النمطية والترميز والتشفير
+
+```elomar
+use std.regex
+use std.encoding
+use std.crypto
+
+fn main() {
+    print(regex.find_all("[0-9]+", "order 12 and 7"))          // ["12", "7"]
+    print(regex.replace("(\\d+)", "order 12", "#$1"))           // order #12
+    print(encoding.base64_encode("مرحبا"), encoding.url_encode("a b"))
+    print(crypto.sha256("abc"), crypto.uuid())
+}
+```
+
+| الوحدة | الدوال |
+|---|---|
+| `std.regex` | `is_match(p, text) -> Bool` · `find(p, text) -> Option<String>` · `find_all(p, text) -> List<String>` · `captures(p, text) -> Option<List<String>>` (العنصر 0 المطابقة كلها ثم المجموعات) · `replace(p, text, with) -> String` (كل المطابقات، و`$1` للمجموعة) · `split(p, text) -> List<String>` |
+| `std.encoding` | `base64_encode` · `hex_encode` · `url_encode` (`String -> String`) · `base64_decode` · `hex_decode` · `url_decode` (`String -> Option<String>`؛ `None` إن لم يكن الإدخال صالحًا أو لم تكن النتيجة UTF-8) |
+| `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (الإصدار 4) · `token(bytes) -> String` (hex، من 1 إلى 1024 بايت) |
+
+- صيغة التعابير النمطية هي صيغة مكتبة Rust `regex` (بلا رجوع للخلف backreferences، وزمن تنفيذ خطي مضمون). الشرطة المائلة تُكتب مضاعفة داخل النص: `"\\d+"`.
+- النمط المكتوب نصًا حرفيًا يُفحص وقت الترجمة (`E2023`)؛ والنمط المبني وقت التشغيل إن كان غير صالح فخطأ تنفيذي `R0006`.
+- `uuid` و`token` من مصدر عشوائي آمن يوفره النظام، فتصلح لمعرّفات الجلسات والمفاتيح، بخلاف `std.random`.
+- لا تخزّن كلمات المرور بـ `sha256` وحده؛ استخدم خوارزمية مخصصة لكلمات المرور (مخطط لها).
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text
@@ -1015,6 +1041,7 @@ fn test_greets_by_name() {
 | `E2020` | تعذر معرفة النوع المطلوب لقيد واجهة في استدعاء |
 | `E2021` | نوع صف أو معاملات غير مناسب لـ `std.db` |
 | `E2022` | أداة غير صالحة في `tools` لـ `ai.run` |
+| `E2023` | تعبير نمطي حرفي غير صالح في `regex.*` |
 
 ### أخطاء التأثيرات (`E3xxx`)
 

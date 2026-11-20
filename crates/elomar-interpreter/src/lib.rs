@@ -836,7 +836,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         }
                         "std.agent" => return Ok(self.run_future(type_args, values, true)),
                         "std.mcp" => return Ok(mcp::call(&mut self.mcp, &name.name, &values)),
-                        "std.math" | "std.random" | "std.time" | "std.os" => {
+                        "std.math" | "std.random" | "std.time" | "std.os" | "std.regex"
+                        | "std.encoding" | "std.crypto" => {
                             return stdextra::call(
                                 module,
                                 &name.name,

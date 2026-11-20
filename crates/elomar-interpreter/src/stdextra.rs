@@ -48,6 +48,9 @@ pub(crate) fn call(
         "std.math" => Ok(math(func, args)),
         "std.random" => random(func, args, span),
         "std.time" => time(func, args, span),
+        "std.regex" => regex_call(func, args, span),
+        "std.encoding" => Ok(encoding(func, args)),
+        "std.crypto" => crypto(func, args, span),
         _ => os(func, args, host),
     }
 }
@@ -399,6 +402,162 @@ fn os(func: &str, args: &[Value], host: &mut dyn Host) -> R<Value> {
             return Err(RuntimeError::exit(code));
         }
         other => unreachable!("checked os function `{other}`"),
+    })
+}
+
+// ----- regex, encoding, crypto ---------------------------------------------
+
+thread_local! {
+    /// Compiled patterns, so a pattern used in a loop is compiled once.
+    static REGEX_CACHE: std::cell::RefCell<std::collections::HashMap<String, regex::Regex>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+fn compile(pattern: &str, span: Span) -> R<regex::Regex> {
+    if let Some(re) = REGEX_CACHE.with(|c| c.borrow().get(pattern).cloned()) {
+        return Ok(re);
+    }
+    match regex::Regex::new(pattern) {
+        Ok(re) => {
+            REGEX_CACHE.with(|c| {
+                let mut cache = c.borrow_mut();
+                if cache.len() > 256 {
+                    cache.clear();
+                }
+                cache.insert(pattern.to_string(), re.clone());
+            });
+            Ok(re)
+        }
+        Err(e) => {
+            let detail = e.to_string();
+            let short = detail.lines().last().unwrap_or("").trim().to_string();
+            Err(invalid(
+                span,
+                format!("invalid regular expression: {short}"),
+                format!("تعبير نمطي غير صالح: {short}"),
+            ))
+        }
+    }
+}
+
+fn regex_call(func: &str, args: &[Value], span: Span) -> R<Value> {
+    let re = compile(text(&args[0]), span)?;
+    let subject = text(&args[1]);
+    let strings = |items: Vec<&str>| Value::list(items.into_iter().map(Value::str).collect());
+    Ok(match func {
+        "is_match" => Value::Bool(re.is_match(subject)),
+        "find" => match re.find(subject) {
+            Some(m) => Value::some(Value::str(m.as_str())),
+            None => Value::none(),
+        },
+        "find_all" => strings(re.find_iter(subject).map(|m| m.as_str()).collect()),
+        "captures" => match re.captures(subject) {
+            Some(c) => Value::some(strings(
+                c.iter().map(|g| g.map_or("", |m| m.as_str())).collect(),
+            )),
+            None => Value::none(),
+        },
+        "replace" => Value::str(re.replace_all(subject, text(&args[2])).into_owned()),
+        "split" => strings(re.split(subject).collect()),
+        other => unreachable!("checked regex function `{other}`"),
+    })
+}
+
+fn encoding(func: &str, args: &[Value]) -> Value {
+    use base64::Engine as _;
+    let input = text(&args[0]);
+    let decoded = |bytes: Option<Vec<u8>>| match bytes.and_then(|b| String::from_utf8(b).ok()) {
+        Some(s) => Value::some(Value::str(s)),
+        None => Value::none(),
+    };
+    match func {
+        "base64_encode" => Value::str(base64::engine::general_purpose::STANDARD.encode(input)),
+        "base64_decode" => decoded(
+            base64::engine::general_purpose::STANDARD
+                .decode(input.trim())
+                .ok(),
+        ),
+        "hex_encode" => Value::str(hex(input.as_bytes())),
+        "hex_decode" => {
+            let clean = input.trim();
+            let bytes = if clean.len().is_multiple_of(2) && clean.is_ascii() {
+                (0..clean.len())
+                    .step_by(2)
+                    .map(|i| u8::from_str_radix(&clean[i..i + 2], 16).ok())
+                    .collect::<Option<Vec<u8>>>()
+            } else {
+                None
+            };
+            decoded(bytes)
+        }
+        "url_encode" => Value::str(
+            percent_encoding::utf8_percent_encode(input, percent_encoding::NON_ALPHANUMERIC)
+                .to_string()
+                .replace("%2D", "-")
+                .replace("%2E", ".")
+                .replace("%5F", "_")
+                .replace("%7E", "~"),
+        ),
+        "url_decode" => decoded(Some(
+            percent_encoding::percent_decode_str(&input.replace('+', " ")).collect(),
+        )),
+        other => unreachable!("checked encoding function `{other}`"),
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn secure_bytes(n: usize, span: Span) -> R<Vec<u8>> {
+    let mut buf = vec![0u8; n];
+    getrandom::getrandom(&mut buf).map_err(|e| {
+        invalid(
+            span,
+            format!("the system could not provide random bytes: {e}"),
+            format!("تعذّر الحصول على بايتات عشوائية من النظام: {e}"),
+        )
+    })?;
+    Ok(buf)
+}
+
+fn crypto(func: &str, args: &[Value], span: Span) -> R<Value> {
+    use sha2::Digest as _;
+    Ok(match func {
+        "sha256" => Value::str(hex(&sha2::Sha256::digest(text(&args[0]).as_bytes()))),
+        "hmac_sha256" => {
+            use hmac::Mac as _;
+            let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(text(&args[0]).as_bytes())
+                .expect("HMAC accepts keys of any length");
+            mac.update(text(&args[1]).as_bytes());
+            Value::str(hex(&mac.finalize().into_bytes()))
+        }
+        "uuid" => {
+            let mut b = secure_bytes(16, span)?;
+            b[6] = (b[6] & 0x0f) | 0x40;
+            b[8] = (b[8] & 0x3f) | 0x80;
+            let h = hex(&b);
+            Value::str(format!(
+                "{}-{}-{}-{}-{}",
+                &h[..8],
+                &h[8..12],
+                &h[12..16],
+                &h[16..20],
+                &h[20..]
+            ))
+        }
+        "token" => {
+            let n = int(&args[0]);
+            if !(1..=1024).contains(&n) {
+                return Err(invalid(
+                    span,
+                    format!("`crypto.token` needs 1 to 1024 bytes, got {n}"),
+                    format!("`crypto.token` تحتاج من 1 إلى 1024 بايت، والموجود {n}"),
+                ));
+            }
+            Value::str(hex(&secure_bytes(n as usize, span)?))
+        }
+        other => unreachable!("checked crypto function `{other}`"),
     })
 }
 

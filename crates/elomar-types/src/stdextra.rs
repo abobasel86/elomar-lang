@@ -217,3 +217,108 @@ impl Checker {
         }
     }
 }
+
+pub(crate) const REGEX_FUNCTIONS: [&str; 6] = [
+    "is_match", "find", "find_all", "captures", "replace", "split",
+];
+pub(crate) const ENCODING_FUNCTIONS: [&str; 6] = [
+    "base64_encode",
+    "base64_decode",
+    "hex_encode",
+    "hex_decode",
+    "url_encode",
+    "url_decode",
+];
+pub(crate) const CRYPTO_FUNCTIONS: [&str; 4] = ["sha256", "hmac_sha256", "uuid", "token"];
+
+impl Checker {
+    /// `regex.*(pattern, text, ...)`. A pattern written as a literal is
+    /// compiled here, so a mistake in it is reported before the program runs.
+    pub(crate) fn check_regex_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        let name = func.name.as_str();
+        if !REGEX_FUNCTIONS.contains(&name) {
+            return self.unknown_module_function("regex", func, &REGEX_FUNCTIONS, args);
+        }
+        let what = format!("regex.{name}");
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        let n = if name == "replace" { 3 } else { 2 };
+        let params = vec![Ty::Str; n];
+        if self.typed_args(&what, args, &params, span)
+            && let ExprKind::Str(pattern) = &args[0].value.kind
+            && let Err(e) = regex::Regex::new(pattern)
+        {
+            let detail = e.to_string();
+            let short = detail.lines().last().unwrap_or("").trim().to_string();
+            self.error(
+                "E2023",
+                args[0].value.span,
+                elomar_diagnostics::Text::new(
+                    format!("invalid regular expression: {short}"),
+                    format!("تعبير نمطي غير صالح: {short}"),
+                ),
+            );
+        }
+        match name {
+            "is_match" => Ty::Bool,
+            "find" => Ty::option(Ty::Str),
+            "find_all" | "split" => Ty::list(Ty::Str),
+            "captures" => Ty::option(Ty::list(Ty::Str)),
+            _ => Ty::Str,
+        }
+    }
+
+    /// `encoding.*`: text to and from Base64, hex and URL encoding.
+    pub(crate) fn check_encoding_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        let name = func.name.as_str();
+        if !ENCODING_FUNCTIONS.contains(&name) {
+            return self.unknown_module_function("encoding", func, &ENCODING_FUNCTIONS, args);
+        }
+        let what = format!("encoding.{name}");
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        self.typed_args(&what, args, &[Ty::Str], span);
+        if name.ends_with("_decode") {
+            Ty::option(Ty::Str)
+        } else {
+            Ty::Str
+        }
+    }
+
+    /// `crypto.*`: SHA-256, HMAC and secure random values.
+    pub(crate) fn check_crypto_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        let name = func.name.as_str();
+        if !CRYPTO_FUNCTIONS.contains(&name) {
+            return self.unknown_module_function("crypto", func, &CRYPTO_FUNCTIONS, args);
+        }
+        let what = format!("crypto.{name}");
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        let params: &[Ty] = match name {
+            "sha256" => &[Ty::Str],
+            "hmac_sha256" => &[Ty::Str, Ty::Str],
+            "token" => &[Ty::Int],
+            _ => &[],
+        };
+        self.typed_args(&what, args, params, span);
+        Ty::Str
+    }
+}

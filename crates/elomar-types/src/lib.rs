@@ -58,6 +58,9 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "random" => &stdextra::RANDOM_FUNCTIONS,
         "time" => &stdextra::TIME_FUNCTIONS,
         "os" => &stdextra::OS_FUNCTIONS,
+        "regex" => &stdextra::REGEX_FUNCTIONS,
+        "encoding" => &stdextra::ENCODING_FUNCTIONS,
+        "crypto" => &stdextra::CRYPTO_FUNCTIONS,
         _ => &[],
     }
 }

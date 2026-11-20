@@ -1108,3 +1108,12 @@ fn interpolation_is_checked() {
     let span = d[0].label.span;
     assert_eq!(&src[span.start as usize..span.end as usize], "n + true");
 }
+
+#[test]
+fn literal_regex_is_checked() {
+    assert_eq!(
+        codes("use std.regex\nfn main() {\n  print(regex.is_match(\"(a\", \"a\"))\n}"),
+        vec!["E2023"]
+    );
+    ok("use std.regex\nfn main() {\n  print(regex.is_match(\"(a)\", \"a\"))\n}");
+}

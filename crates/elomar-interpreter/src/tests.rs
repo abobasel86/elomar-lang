@@ -875,3 +875,37 @@ fn main() {
          [\"--name\", \"Lina\"] None true\n"
     );
 }
+
+#[test]
+fn regex_encoding_crypto() {
+    let src = r##"use std.regex
+use std.encoding
+use std.crypto
+fn main() {
+  let text = "Order 12 shipped, order 7 pending"
+  print(regex.is_match("[0-9]+", text), regex.find("[0-9]+", text), regex.find_all("[0-9]+", text))
+  print(regex.captures("(\\w+)@(\\w+)\\.com", "mail lina@example.com now"), regex.captures("x", "y"))
+  print(regex.replace("(\\d+)", text, "#$1"), regex.split("\\s*,\\s*", "a , b,c"))
+  let pattern = "["
+  print(encoding.base64_encode("مرحبا"), encoding.base64_decode("2YXYsdit2KjYpw=="), encoding.base64_decode("!!"))
+  print(encoding.hex_encode("Hi"), encoding.hex_decode("4869"), encoding.url_encode("a b&c=د"), encoding.url_decode("a+b%26c"))
+  print(crypto.sha256("abc"))
+  print(crypto.hmac_sha256("key", "The quick brown fox jumps over the lazy dog"))
+  let id = crypto.uuid()
+  print(id.length, id.slice(14, 15), crypto.token(16).length, crypto.uuid() != id)
+  print(regex.is_match(pattern, "x"))
+}"##;
+    assert_eq!(err_code(src), "R0006");
+    let src = src.replace("  print(regex.is_match(pattern, \"x\"))\n", "");
+    assert_eq!(
+        out(&src),
+        "true Some(\"12\") [\"12\", \"7\"]\n\
+         Some([\"lina@example.com\", \"lina\", \"example\"]) None\n\
+         Order #12 shipped, order #7 pending [\"a\", \"b\", \"c\"]\n\
+         2YXYsdit2KjYpw== Some(\"مرحبا\") None\n\
+         4869 Some(\"Hi\") a%20b%26c%3D%D8%AF Some(\"a b&c\")\n\
+         ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\n\
+         f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8\n\
+         36 4 32 true\n"
+    );
+}
