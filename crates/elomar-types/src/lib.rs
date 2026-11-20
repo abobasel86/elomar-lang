@@ -51,6 +51,8 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "http" => &stdlib::HTTP_FUNCTIONS,
         "db" => &stdlib::DB_FUNCTIONS,
         "py" => &stdlib::PY_FUNCTIONS,
+        "mcp" => &stdlib::MCP_FUNCTIONS,
+        "agent" => &["run"],
         _ => &[],
     }
 }

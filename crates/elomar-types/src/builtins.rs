@@ -8,7 +8,7 @@ use crate::expr::place_root;
 use crate::{Checker, Ty, suggest};
 
 /// Effects a function may declare in `!{...}` (spec §16.2).
-pub const KNOWN_EFFECTS: [&str; 6] = ["io", "fs", "net", "ai", "db", "py"];
+pub const KNOWN_EFFECTS: [&str; 7] = ["io", "fs", "net", "ai", "db", "py", "mcp"];
 
 /// Functions available without `use`.
 pub const BUILTIN_FUNCTIONS: [&str; 13] = [
@@ -27,7 +27,7 @@ pub const BUILTIN_FUNCTIONS: [&str; 13] = [
     "abs",
 ];
 
-pub(crate) const BUILTIN_TYPES: [&str; 20] = [
+pub(crate) const BUILTIN_TYPES: [&str; 21] = [
     "Int",
     "Float",
     "Bool",
@@ -48,6 +48,7 @@ pub(crate) const BUILTIN_TYPES: [&str; 20] = [
     "Db",
     "DbError",
     "PyError",
+    "McpError",
 ];
 
 pub(crate) fn is_builtin_type(name: &str) -> bool {

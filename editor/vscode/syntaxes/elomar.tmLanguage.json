@@ -160,7 +160,7 @@
       "patterns": [
         {
           "name": "support.type.builtin.elomar",
-          "match": "\\b(?:Int|Float|Bool|String|Unit|Range|Duration|List|Map|Set|Option|Result|Future|AIError|FsError|JsonError|HttpError|DbError|PyError|Db)\\b"
+          "match": "\\b(?:Int|Float|Bool|String|Unit|Range|Duration|List|Map|Set|Option|Result|Future|AIError|FsError|JsonError|HttpError|DbError|PyError|McpError|Db)\\b"
         },
         {
           "comment": "Capitalized names are types, enums or their variants",

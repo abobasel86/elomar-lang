@@ -61,6 +61,11 @@ by the compiler when they are not declared.
   lets the model call only the functions you list; results go back to the
   model and the final answer is validated against `Answer`. Tools' effects
   count for the caller. See [`examples/ai-tools`](examples/ai-tools).
+- **Agents and MCP:** `agent.run<Answer>(..., tools: [...], mcp: ["notes"],
+  require_approval: ["notes.delete_all"], approve: |call| ..., on_step: |step| ...)`
+  lets a model use your functions and the tools of MCP servers listed in
+  `elomar.toml`, with approval in code and a log of every step; `mcp.call`
+  calls MCP tools directly. See [`examples/agents`](examples/agents).
 - **Python bridge:** `py.call<Stats>("grades", "describe", { grades: xs })` runs a
   function from `python/grades.py` (or any installed package) in a
   subprocess, with typed results, the `py` effect and an explicit
@@ -203,7 +208,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`); ⏳ agents and MCP, a package registry.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`), agents and MCP (`agent.run`, `std.mcp`); ⏳ a package registry.
 5. Bytecode VM, performance work and stable releases.
 
 ## Editors

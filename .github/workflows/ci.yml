@@ -43,6 +43,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      # `python` for the std.py and MCP tests (a fixture server is in Python).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # The tests need no network and no API keys: AI calls go to the mock

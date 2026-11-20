@@ -34,12 +34,18 @@ pub struct RunTool {
     pub ret: Option<Schema>,
 }
 
-/// A pending `ai.run` call.
+/// A pending `ai.run` or `agent.run` call.
 #[derive(Debug, Clone)]
 pub struct RunCall {
     pub infer: InferCall,
     pub tools: Vec<RunTool>,
     pub max_steps: i64,
+    /// MCP servers whose tools the model may use (`agent.run`).
+    pub servers: Vec<String>,
+    /// Tools that need `approve`; `None` means all of them.
+    pub require_approval: Option<Vec<String>>,
+    pub approve: Option<Rc<crate::value::Function>>,
+    pub on_step: Option<Rc<crate::value::Function>>,
 }
 
 impl InferCall {

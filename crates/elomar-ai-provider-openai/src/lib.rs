@@ -143,14 +143,18 @@ impl OpenAiProvider {
         body["tools"] = tools
             .iter()
             .map(|t| {
-                json!({
-                    "type": "function",
-                    "function": {
+                let mut function = match &t.raw_schema {
+                    Some(schema) => json!({ "name": t.name, "parameters": schema }),
+                    None => json!({
                         "name": t.name,
                         "parameters": t.params.json_schema_strict(),
                         "strict": true,
-                    },
-                })
+                    }),
+                };
+                if !t.description.is_empty() {
+                    function["description"] = json!(t.description);
+                }
+                json!({ "type": "function", "function": function })
             })
             .collect();
         let messages = body["messages"].as_array_mut().expect("messages");

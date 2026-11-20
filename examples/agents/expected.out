@@ -1,0 +1,12 @@
+tool: add_note - Adds a note to the list
+tool: count_notes - How many notes there are
+tool: delete_all - Deletes every note
+direct call: added note 1
+agent:
+  step: owner_name => "Lina"
+  approve? notes.add_note {"text":"Review chapter 3"} -> true
+  step: notes.add_note => added note 2
+  approve? notes.delete_all {} -> false
+  step: notes.delete_all => {"error":"the user did not approve this call"}
+  step: notes.count_notes => 2
+A: Added your note. You now have 2 notes.

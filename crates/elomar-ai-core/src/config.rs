@@ -11,6 +11,31 @@ pub struct ProjectConfig {
     pub ai: AiConfig,
     #[serde(default)]
     pub permissions: Permissions,
+    #[serde(default)]
+    pub mcp: McpConfig,
+}
+
+/// `[mcp.servers.NAME]`: the MCP servers the program may start. A server
+/// that is not listed cannot be used.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct McpConfig {
+    #[serde(default)]
+    pub servers: BTreeMap<String, McpServerConfig>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct McpServerConfig {
+    /// The program to run, e.g. `python` or `npx`.
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Extra environment variables for the server.
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
+    /// Limit for each request to the server (default 30 s).
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 /// `[permissions]` (spec §14.4, §16.3). Everything not listed is denied.
@@ -161,6 +186,31 @@ mod tests {
         assert!(!p.allows_host("evil.example", 443));
         assert!(!Permissions::default().allows_host("api.openai.com", 443));
         assert_eq!(p.filesystem_read, vec!["./data".to_string()]);
+    }
+
+    #[test]
+    fn parses_mcp_servers() {
+        let cfg = parse_config(
+            "[mcp.servers.notes]
+command = \"python\"
+args = [\"mcp/notes.py\"]
+env = { LEVEL = \"1\" }
+",
+        )
+        .unwrap();
+        let s = &cfg.mcp.servers["notes"];
+        assert_eq!(s.command, "python");
+        assert_eq!(s.args, vec!["mcp/notes.py".to_string()]);
+        assert_eq!(s.env["LEVEL"], "1");
+        assert!(
+            parse_config(
+                "[mcp.servers.x]
+command = \"a\"
+arg = []
+"
+            )
+            .is_err()
+        );
     }
 
     #[test]

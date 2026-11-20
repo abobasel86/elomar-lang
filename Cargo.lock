@@ -237,6 +237,7 @@ dependencies = [
  "elomar-ai-provider-mock",
  "elomar-ast",
  "elomar-diagnostics",
+ "elomar-mcp",
  "elomar-parser",
  "elomar-policy",
  "elomar-types",
@@ -264,6 +265,13 @@ dependencies = [
  "elomar-diagnostics",
  "elomar-parser",
  "elomar-pkg",
+]
+
+[[package]]
+name = "elomar-mcp"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

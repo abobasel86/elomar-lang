@@ -276,10 +276,20 @@ fn runtime_enforces_permissions_and_validates() {
 
 #[test]
 fn tool_calling_steps() {
-    let tools = [ToolSpec {
-        name: "find_student".into(),
-        params: Schema::Record(vec![("name".into(), Schema::String)]),
-    }];
+    let tools = [
+        ToolSpec {
+            name: "find_student".into(),
+            params: Schema::Record(vec![("name".into(), Schema::String)]),
+            description: String::new(),
+            raw_schema: None,
+        },
+        ToolSpec {
+            name: "notes__add_note".into(),
+            params: Schema::Record(Vec::new()),
+            description: "Adds a note".into(),
+            raw_schema: Some(json!({"type": "object", "properties": {"text": {"type": "string"}}})),
+        },
+    ];
     // The model asks for a tool call.
     let reply = json!({
         "choices": [{ "message": { "role": "assistant", "content": null, "tool_calls": [
@@ -300,6 +310,14 @@ fn tool_calling_steps() {
     let body: Value = serde_json::from_str(&raw[raw.find("\r\n\r\n").unwrap() + 4..]).unwrap();
     assert_eq!(body["tools"][0]["function"]["name"], "find_student");
     assert_eq!(body["tools"][0]["function"]["strict"], true);
+    // An MCP tool keeps the server's schema and is not strict.
+    let mcp_tool = &body["tools"][1]["function"];
+    assert_eq!(mcp_tool["description"], "Adds a note");
+    assert_eq!(
+        mcp_tool["parameters"]["properties"]["text"]["type"],
+        "string"
+    );
+    assert!(mcp_tool.get("strict").is_none());
 
     // Then it answers, after seeing the result.
     let (url, rx) = fake_openai(200, completion("Lina has 91"), Duration::ZERO);

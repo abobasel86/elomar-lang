@@ -12,7 +12,7 @@ use crate::{Checker, Ty, suggest};
 
 /// Modules that `use` accepts, with the short name they bind (if any).
 /// `std.io` is accepted for compatibility; its functions are in the prelude.
-const KNOWN_MODULES: [(&str, Option<&str>); 7] = [
+const KNOWN_MODULES: [(&str, Option<&str>); 9] = [
     ("std.io", None),
     ("std.ai", Some("ai")),
     ("std.fs", Some("fs")),
@@ -20,6 +20,8 @@ const KNOWN_MODULES: [(&str, Option<&str>); 7] = [
     ("std.http", Some("http")),
     ("std.db", Some("db")),
     ("std.py", Some("py")),
+    ("std.mcp", Some("mcp")),
+    ("std.agent", Some("agent")),
 ];
 
 /// Where a value crosses into JSON, for error messages.
@@ -48,6 +50,38 @@ const RUN_PARAMS: [(&str, bool); 6] = [
     ("max_steps", false),
     ("timeout", false),
 ];
+
+/// Parameters of `agent.run`: (name, required).
+const AGENT_PARAMS: [(&str, bool); 10] = [
+    ("model", true),
+    ("instructions", true),
+    ("input", true),
+    ("tools", false),
+    ("mcp", false),
+    ("require_approval", false),
+    ("approve", false),
+    ("on_step", false),
+    ("max_steps", false),
+    ("timeout", false),
+];
+
+/// What `approve` receives in `agent.run`.
+pub(crate) fn tool_request_ty() -> Ty {
+    Ty::record(vec![
+        ("tool".into(), Ty::Str),
+        ("arguments".into(), Ty::Str),
+    ])
+}
+
+/// What `on_step` receives in `agent.run`.
+pub(crate) fn agent_step_ty() -> Ty {
+    Ty::record(vec![
+        ("tool".into(), Ty::Str),
+        ("arguments".into(), Ty::Str),
+        ("result".into(), Ty::Str),
+        ("approved".into(), Ty::Bool),
+    ])
+}
 
 /// `AIError` is a built-in enum; every variant carries a message.
 pub(crate) fn ai_error_ty() -> Ty {
@@ -181,34 +215,42 @@ impl Checker {
             "std.http" => self.check_http_call(func, type_args, args, span),
             "std.db" => self.check_db_call(func, type_args, args, span),
             "std.py" => self.check_py_call(func, type_args, args, span),
+            "std.mcp" => self.check_mcp_call(func, type_args, args, span),
+            "std.agent" if func.name == "run" => {
+                self.check_ai_call("agent.run", func.span, type_args, args, span)
+            }
+            "std.agent" => self.unknown_module_function("agent", func, &["run"], args),
             _ if func.name == "infer" || func.name == "run" => {
-                let name = func.name.clone();
-                self.check_ai_call(&name, func.span, type_args, args, span)
+                let what = format!("ai.{}", func.name);
+                self.check_ai_call(&what, func.span, type_args, args, span)
             }
             _ => self.unknown_module_function("ai", func, &["infer", "run"], args),
         })
     }
 
-    /// `ai.infer<T>(model, instructions, input[, timeout])` and
-    /// `ai.run<T>(model, instructions, input, tools[, max_steps][, timeout])`.
+    /// `ai.infer<T>(model, instructions, input[, timeout])`,
+    /// `ai.run<T>(model, instructions, input, tools[, max_steps][, timeout])`
+    /// and `agent.run<T>(...)` (see [`AGENT_PARAMS`]).
     ///
     /// Arguments are reordered into the full parameter list with names
-    /// removed; for `ai.run` missing optional ones are filled in
-    /// (`max_steps: 5`, and `false` for "no timeout"), and the parameter and
-    /// result types of each tool are appended to the type arguments.
+    /// removed; for `ai.run` and `agent.run` missing optional ones are
+    /// filled in (`max_steps` 5 or 10, empty lists, and `false` for "not
+    /// given"), and the parameter and result types of each tool are
+    /// appended to the type arguments.
     fn check_ai_call(
         &mut self,
-        func: &str,
+        what: &str,
         callee_span: Span,
         type_args: &mut Vec<TypeExpr>,
         args: &mut Vec<Arg>,
         span: Span,
     ) -> Ty {
-        let what = format!("ai.{func}");
-        let params: &[(&str, bool)] = if func == "run" {
-            &RUN_PARAMS
-        } else {
-            &INFER_PARAMS
+        let is_run = what != "ai.infer";
+        let is_agent = what == "agent.run";
+        let params: &[(&str, bool)] = match what {
+            "ai.run" => &RUN_PARAMS,
+            "agent.run" => &AGENT_PARAMS,
+            _ => &INFER_PARAMS,
         };
         self.usage.direct.push(("ai".into(), callee_span));
 
@@ -242,12 +284,12 @@ impl Checker {
                 Ty::Error
             }
             _ => {
-                self.wrong_arg_count(&what, "1 type", type_args.len(), span);
+                self.wrong_arg_count(what, "1 type", type_args.len(), span);
                 Ty::Error
             }
         };
 
-        let slots = self.bind_named_args(&what, params, args, span);
+        let slots = self.bind_named_args(what, params, args, span);
         // A cloud model also sends data over the network (spec §13.1). If the
         // model name is not a literal, assume the worst when any cloud model
         // is configured.
@@ -261,6 +303,9 @@ impl Checker {
             self.usage.direct.push(("net".into(), site));
         }
         let mut tools = Vec::new();
+        // Literal server names of `mcp:` (`None` if not a literal list).
+        let mut servers: Option<Vec<String>> = Some(Vec::new());
+        let mut approvals: Vec<(String, Span)> = Vec::new();
         for (i, arg) in args.iter_mut().enumerate() {
             let param = slots
                 .iter()
@@ -276,11 +321,56 @@ impl Checker {
                     }
                 }
                 Some("tools") => tools = self.check_tools(&mut arg.value),
+                Some("mcp") => {
+                    self.check_expr_against(&mut arg.value, &Ty::list(Ty::Str));
+                    servers = literal_strings(&arg.value)
+                        .map(|v| v.into_iter().map(|(s, _)| s).collect());
+                    if servers.as_ref().is_none_or(|s| !s.is_empty()) {
+                        self.usage.direct.push(("mcp".into(), arg.value.span));
+                    }
+                }
+                Some("require_approval") => {
+                    self.check_expr_against(&mut arg.value, &Ty::list(Ty::Str));
+                    approvals = literal_strings(&arg.value).unwrap_or_default();
+                }
+                Some("approve") => self.check_expr_against(
+                    &mut arg.value,
+                    &Ty::Fn(vec![tool_request_ty()], Box::new(Ty::Bool)),
+                ),
+                Some("on_step") => self.check_expr_against(
+                    &mut arg.value,
+                    &Ty::Fn(vec![agent_step_ty()], Box::new(Ty::Unit)),
+                ),
                 Some("max_steps") => self.check_expr_against(&mut arg.value, &Ty::Int),
                 Some(_) => self.check_expr_against(&mut arg.value, &Ty::Duration),
                 None => {
                     self.check_expr(&mut arg.value, None);
                 }
+            }
+        }
+        for (name, at) in approvals {
+            let known = tools.iter().any(|(n, _, _)| *n == name)
+                || name.split_once('.').is_some_and(|(server, tool)| {
+                    !tool.is_empty()
+                        && servers
+                            .as_ref()
+                            .is_none_or(|s| s.iter().any(|x| x == server))
+                });
+            if !known {
+                self.push(
+                    Diagnostic::error(
+                        "E2022",
+                        at,
+                        Text::new(
+                            format!("`{name}` is not one of the tools of this call"),
+                            format!("`{name}` ليست من أدوات هذا الاستدعاء"),
+                        ),
+                    )
+                    .with_hint(Text::new(
+                        "name a function from `tools`, or an MCP tool as `server.tool` with the server in `mcp`",
+                        "اذكر دالة من `tools`، أو أداة MCP بالصيغة `server.tool` والخادم مذكور في `mcp`",
+                    )),
+                );
             }
         }
         let required = params.iter().filter(|(_, r)| *r).count();
@@ -294,14 +384,14 @@ impl Checker {
                         arg
                     }
                     // `ai.infer` keeps its old shape: no placeholders.
-                    None if func != "run" => continue,
+                    None if !is_run => continue,
                     None => Arg {
                         name: None,
                         value: Expr {
-                            kind: if params[j].0 == "max_steps" {
-                                ExprKind::Int(5)
-                            } else {
-                                ExprKind::Bool(false)
+                            kind: match params[j].0 {
+                                "max_steps" => ExprKind::Int(if is_agent { 10 } else { 5 }),
+                                "tools" | "mcp" => ExprKind::List(Vec::new()),
+                                _ => ExprKind::Bool(false),
                             },
                             span: callee_span,
                         },
@@ -310,8 +400,8 @@ impl Checker {
                 args.push(arg);
             }
         }
-        if func == "run" && type_args.len() == 1 {
-            for (params, ret) in tools {
+        if is_run && type_args.len() == 1 {
+            for (_, params, ret) in tools {
                 let unit = TypeExpr {
                     kind: TypeExprKind::Named {
                         name: Ident {
@@ -337,7 +427,7 @@ impl Checker {
     /// parameters and result are JSON data. Returns each tool's parameter
     /// types and result type. Using a function here charges its effects to
     /// the caller, as for any function value.
-    fn check_tools(&mut self, e: &mut Expr) -> Vec<(Vec<(String, Ty)>, Ty)> {
+    fn check_tools(&mut self, e: &mut Expr) -> Vec<Tool> {
         let ExprKind::List(items) = &mut e.kind else {
             self.check_expr(e, None);
             self.push(Diagnostic::error(
@@ -421,8 +511,8 @@ impl Checker {
             if bad {
                 continue;
             }
-            names.push(tool);
-            out.push((sig.params.clone(), sig.ret.clone()));
+            names.push(tool.clone());
+            out.push((tool, sig.params.clone(), sig.ret.clone()));
         }
         out
     }
@@ -568,6 +658,23 @@ impl Checker {
         )));
     }
 }
+
+/// The strings of a list literal of string literals, with their spans.
+fn literal_strings(e: &Expr) -> Option<Vec<(String, Span)>> {
+    let ExprKind::List(items) = &e.kind else {
+        return None;
+    };
+    items
+        .iter()
+        .map(|i| match &i.kind {
+            ExprKind::Str(s) => Some((s.to_string(), i.span)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A checked tool: its name, parameters and result type.
+type Tool = (String, Vec<(String, Ty)>, Ty);
 
 /// Writes a resolved type back as syntax, with aliases expanded.
 pub(crate) fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {

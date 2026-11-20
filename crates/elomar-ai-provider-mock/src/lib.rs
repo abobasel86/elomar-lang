@@ -288,6 +288,8 @@ mod tool_tests {
         let tools = [ToolSpec {
             name: "lookup".into(),
             params: Schema::Record(vec![("name".into(), Schema::String)]),
+            description: String::new(),
+            raw_schema: None,
         }];
         let Turn::ToolCalls(calls) = m.step(&request, &tools, &[]).unwrap() else {
             panic!("expected a tool call")

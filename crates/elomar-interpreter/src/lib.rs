@@ -8,6 +8,7 @@ mod ai;
 mod builtins;
 mod db;
 mod http;
+mod mcp;
 mod py;
 mod stdlib;
 mod value;
@@ -234,6 +235,8 @@ struct Interpreter<'p, 'h> {
     unit_enums: HashMap<String, Vec<String>>,
     /// Closure expressions that have been evaluated, by address.
     lambdas: HashMap<usize, &'p Expr>,
+    /// MCP servers started so far; stopped when the run ends.
+    mcp: mcp::McpHub,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -251,8 +254,10 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 _ => None,
             })
             .collect();
+        let mcp = mcp::McpHub::new(ai.mcp().clone(), fs.base().to_path_buf());
         Interpreter {
             fns,
+            mcp,
             globals: HashMap::new(),
             frames: vec![vec![Vec::new()]],
             host,
@@ -780,8 +785,10 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 if let ExprKind::Name(module) = &target.kind {
                     match module.as_str() {
                         "std.ai" if name.name == "run" => {
-                            return Ok(self.run_future(type_args, values));
+                            return Ok(self.run_future(type_args, values, false));
                         }
+                        "std.agent" => return Ok(self.run_future(type_args, values, true)),
+                        "std.mcp" => return Ok(mcp::call(&mut self.mcp, &name.name, &values)),
                         "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
                         "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
                         "std.db" => {
@@ -1018,9 +1025,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     /// The future for `ai.run<T>(model, instructions, input, tools,
-    /// max_steps, timeout)`; the checker put the arguments in this order
-    /// and appended each tool's parameter and result types to `type_args`.
-    fn run_future(&self, type_args: &[TypeExpr], args: Vec<Value>) -> Value {
+    /// max_steps, timeout)` or `agent.run<T>(model, instructions, input,
+    /// tools, mcp, require_approval, approve, on_step, max_steps,
+    /// timeout)`; the checker put the arguments in this order and appended
+    /// each tool's parameter and result types to `type_args`.
+    fn run_future(&self, type_args: &[TypeExpr], args: Vec<Value>, agent: bool) -> Value {
         let mut args = args.into_iter();
         let mut text = || match args.next() {
             Some(Value::Str(s)) => s.to_string(),
@@ -1032,6 +1041,32 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         let tool_values = match args.next() {
             Some(Value::List(items)) => items,
             _ => Rc::new(Vec::new()),
+        };
+        let strings = |v: &Value| match v {
+            Value::Str(s) => s.to_string(),
+            _ => String::new(),
+        };
+        let function = |v: Option<Value>| match v {
+            Some(Value::Function(f)) => Some(f),
+            _ => None,
+        };
+        let (servers, require_approval, approve, on_step) = if agent {
+            let servers = match args.next() {
+                Some(Value::List(items)) => items.iter().map(strings).collect(),
+                _ => Vec::new(),
+            };
+            let require = match args.next() {
+                Some(Value::List(items)) => Some(items.iter().map(strings).collect()),
+                _ => None,
+            };
+            (
+                servers,
+                require,
+                function(args.next()),
+                function(args.next()),
+            )
+        } else {
+            (Vec::new(), None, None, None)
         };
         let max_steps = match args.next() {
             Some(Value::Int(n)) => n,
@@ -1087,22 +1122,69 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             },
             tools,
             max_steps,
+            servers,
+            require_approval,
+            approve,
+            on_step,
         })))
     }
 
     /// The `ai.run` loop: ask the model, run the tools it asks for, send
     /// back their results, until it answers or `max_steps` is reached.
     fn run_agent(&mut self, call: &RunCall, span: Span) -> Exec<Value> {
-        use elomar_ai_core::{Message, Step, ToolSpec};
+        use elomar_ai_core::{AiError, AiErrorKind, Message, Step, ToolSpec};
         let request = call.infer.request(self.ai);
-        let specs: Vec<ToolSpec> = call
+        let mut specs: Vec<ToolSpec> = call
             .tools
             .iter()
             .map(|t| ToolSpec {
                 name: t.name.clone(),
                 params: Schema::Record(t.params.clone()),
+                description: String::new(),
+                raw_schema: None,
             })
             .collect();
+        // The model sees an MCP tool as `server__tool`; the program as
+        // `server.tool`.
+        let mut remote: HashMap<String, (String, String)> = HashMap::new();
+        for server in &call.servers {
+            let tools = match self.mcp.tools(server) {
+                Ok(tools) => tools,
+                Err((kind, message)) => {
+                    let kind = if kind == "NotConfigured" {
+                        AiErrorKind::PolicyDenied
+                    } else {
+                        AiErrorKind::ProviderUnavailable
+                    };
+                    return Ok(Value::Result(Err(Rc::new(ai::ai_error_value(
+                        &AiError::new(kind, message),
+                    )))));
+                }
+            };
+            for t in tools {
+                let name: String = format!("{server}__{}", t.name)
+                    .chars()
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
+                    .take(64)
+                    .collect();
+                if remote.contains_key(&name) || specs.iter().any(|s| s.name == name) {
+                    continue;
+                }
+                specs.push(ToolSpec {
+                    name: name.clone(),
+                    params: Schema::Record(Vec::new()),
+                    description: t.description,
+                    raw_schema: Some(t.input_schema),
+                });
+                remote.insert(name, (server.clone(), t.name));
+            }
+        }
         let mut history = Vec::new();
         for _ in 0..call.max_steps.max(1) {
             match self.ai.step(&request, &specs, &history) {
@@ -1116,7 +1198,55 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 Ok(Step::ToolCalls(calls)) => {
                     history.push(Message::ToolCalls(calls.clone()));
                     for c in calls {
-                        let content = self.run_tool(call, &c, span)?;
+                        let shown = match remote.get(&c.name) {
+                            Some((server, tool)) => format!("{server}.{tool}"),
+                            None => c.name.clone(),
+                        };
+                        let arguments = c.arguments.to_string();
+                        let needs_approval = call.approve.is_some()
+                            && call
+                                .require_approval
+                                .as_ref()
+                                .is_none_or(|list| list.contains(&shown));
+                        let approved = match (&call.approve, needs_approval) {
+                            (Some(f), true) => {
+                                let request = Value::Record(Rc::new(vec![
+                                    (Rc::from("tool"), Value::str(shown.as_str())),
+                                    (Rc::from("arguments"), Value::str(arguments.as_str())),
+                                ]));
+                                matches!(
+                                    self.call_value(f, vec![request], span)?,
+                                    Value::Bool(true)
+                                )
+                            }
+                            _ => true,
+                        };
+                        let content = if !approved {
+                            serde_json::json!({ "error": "the user did not approve this call" })
+                                .to_string()
+                        } else if let Some((server, tool)) = remote.get(&c.name) {
+                            let arguments = match &c.arguments {
+                                serde_json::Value::Object(_) => c.arguments.clone(),
+                                _ => serde_json::json!({}),
+                            };
+                            match self.mcp.call(server, tool, arguments) {
+                                Ok(text) => text,
+                                Err((_, message)) => {
+                                    serde_json::json!({ "error": message }).to_string()
+                                }
+                            }
+                        } else {
+                            self.run_tool(call, &c, span)?
+                        };
+                        if let Some(f) = &call.on_step {
+                            let step = Value::Record(Rc::new(vec![
+                                (Rc::from("tool"), Value::str(shown.as_str())),
+                                (Rc::from("arguments"), Value::str(arguments.as_str())),
+                                (Rc::from("result"), Value::str(content.as_str())),
+                                (Rc::from("approved"), Value::Bool(approved)),
+                            ]));
+                            self.call_value(f, vec![step], span)?;
+                        }
                         history.push(Message::ToolResult { id: c.id, content });
                     }
                 }

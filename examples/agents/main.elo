@@ -1,0 +1,56 @@
+// Agents and MCP: a model that may use your functions and the tools of an
+// MCP server, with approval before actions that change things. Every tool
+// call is shown as it happens.
+
+use std.agent
+use std.mcp
+
+type Answer = { summary: String }
+
+// A local tool: an ordinary function.
+fn owner_name() -> String {
+    return "Lina"
+}
+
+// The program decides, not the model: anything that deletes is refused.
+fn approve(call: { tool: String, arguments: String }) -> Bool {
+    let ok = !call.tool.contains("delete")
+    print("  approve?", call.tool, call.arguments, "->", ok)
+    return ok
+}
+
+async fn assist(request: String) -> Result<Answer, AIError> !{ai, io, mcp} {
+    return await agent.run<Answer>(
+        model: "assistant",
+        instructions: "Help the user with their notes.",
+        input: request,
+        tools: [owner_name],
+        mcp: ["notes"],
+        require_approval: ["notes.add_note", "notes.delete_all"],
+        approve: approve,
+        on_step: |step| print("  step:", step.tool, "=>", step.result),
+        max_steps: 8
+    )
+}
+
+async fn main() {
+    // MCP tools can also be called directly.
+    match mcp.tools("notes") {
+        Ok(tools) => {
+            for t in tools {
+                print("tool:", t.name, "-", t.description)
+            }
+        }
+        Err(e) => print("cannot list tools:", e.message())
+    }
+    match mcp.call("notes", "add_note", { text: "Buy milk" }) {
+        Ok(text) => print("direct call:", text)
+        Err(e) => print("failed:", e.kind(), e.message())
+    }
+
+    print("agent:")
+    match await assist("Add 'Review chapter 3' to my notes, then clean up.") {
+        Ok(a) => print("A:", a.summary)
+        Err(e) => print("failed:", e.kind(), e.message())
+    }
+}

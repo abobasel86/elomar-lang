@@ -76,6 +76,21 @@
     ],
     "description": "Typed AI call (needs `use std.ai`)"
   },
+  "agent.run": {
+    "prefix": "agent",
+    "body": [
+      "await agent.run<${1:T}>(",
+      "\tmodel: \"${2:assistant}\",",
+      "\tinstructions: \"${3:Describe the task.}\",",
+      "\tinput: ${4:text},",
+      "\ttools: [${5}],",
+      "\tmcp: [${6}],",
+      "\tapprove: |call| ${7:true},",
+      "\ton_step: |step| print(step.tool, step.result)",
+      ")"
+    ],
+    "description": "AI agent with tools, MCP servers and approval (needs `use std.agent`)"
+  },
   "read JSON file": {
     "prefix": "readjson",
     "body": [

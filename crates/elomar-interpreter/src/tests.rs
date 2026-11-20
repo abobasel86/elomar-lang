@@ -678,6 +678,51 @@ fn ai_run_reports_bad_tool_calls_to_the_model_and_limits_steps() {
     );
 }
 
+// ----- agent.run and std.mcp ------------------------------------------------------------
+
+const AGENT_RUN: &str = "use std.agent
+use std.mcp
+fn add(n: Int) -> Int {
+  return n + 1
+}
+fn wipe() -> String {
+  print(\"wiped!\")
+  return \"done\"
+}
+async fn main() {
+  let r = await agent.run<String>(
+    model: \"support\", instructions: \"i\", input: \"q\",
+    tools: [add, wipe],
+    require_approval: [\"wipe\"],
+    approve: |c| { print(\"approve?\", c.tool, c.arguments); return false },
+    on_step: |s| print(\"step:\", s.tool, s.result, s.approved)
+  )
+  print(r)
+  print(await agent.run<String>(model: \"support\", instructions: \"i\", input: \"q\", mcp: [\"nowhere\"]))
+  print(mcp.call(\"nowhere\", \"t\", {}))
+}";
+
+#[test]
+fn agent_run_asks_for_approval_and_reports_steps() {
+    let rules = vec![
+        tool_rule("add", serde_json::json!({ "n": 1 })),
+        tool_rule("wipe", serde_json::json!({})),
+        rule(None, Some("\"finished\""), None),
+    ];
+    let out = run_ai(AGENT_RUN, rules, AiPolicy::default());
+    assert_eq!(
+        out.lines().collect::<Vec<_>>(),
+        [
+            "step: add 2 true",
+            "approve? wipe {}",
+            "step: wipe {\"error\":\"the user did not approve this call\"} false",
+            "Ok(\"finished\")",
+            "Err(AIError.PolicyDenied(\"MCP server `nowhere` is not configured; add `[mcp.servers.nowhere]` with its `command` to elomar.toml\"))",
+            "Err(McpError.NotConfigured(\"MCP server `nowhere` is not configured; add `[mcp.servers.nowhere]` with its `command` to elomar.toml\"))",
+        ]
+    );
+}
+
 // ----- std.py --------------------------------------------------------------------------
 
 fn run_py(src: &str, allow: bool) -> String {

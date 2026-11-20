@@ -783,7 +783,7 @@ AIError.Cancelled(message)
 | Classification | قالب مبني على `infer<T>` | v0.2 |
 | Model Selection | `ai.registry` | v0.3 |
 | Tool Calling | `ai.run<T>(..., tools: [f, g], max_steps: n)` | **منفذ** (mock وOpenAI) |
-| Agents | `agent` أو مكتبة `std.agent` | v0.4 |
+| Agents | مكتبة `std.agent` (`agent.run`) و`std.mcp` | **منفذ** |
 | Multimodal | صور/صوت/ملفات حسب قدرات الموصل | v0.5+ |
 | Local Models | موصلات محلية مناسبة لكل نوع نموذج | v0.4+ |
 | Evaluation | `ai.eval` ومجموعات اختبارات | v0.3+ |
@@ -891,6 +891,8 @@ agent SupportAssistant {
 
 تصميم Syntax الوكلاء نفسه **لم يُحسم**؛ قد يكون من الأفضل تنفيذها أولًا كمكتبة `std.agent` بدل كلمات محجوزة جديدة، لتفادي تضخيم Grammar.
 
+**منفذ (مكتبة لا كلمات محجوزة):** `agent.run<T>(model, instructions, input, tools, mcp, require_approval, approve, on_step, max_steps, timeout)` في `std.agent`: أدوات محلية وأدوات MCP، وحد للخطوات، وموافقة تقررها دالة في البرنامج قبل الأدوات المذكورة، ودالة `on_step` لسجل التدقيق. انظر `docs/grammar.md` §4.6.3 و`examples/agents`.
+
 ## 15.2 قواعد أدوات Agent
 
 1. كل أداة لها اسم ونطاق صلاحية وSchema واضح للمدخلات والمخرجات.
@@ -904,6 +906,8 @@ agent SupportAssistant {
 ## 15.3 MCP
 
 يدعم Elomar-Lang مستقبلًا الاتصال بمزوّدي الأدوات من خلال **Model Context Protocol**؛ تستخدم مكوّنات `MCP Client Adapter` اكتشاف الأدوات واستدعاءها بمخططات مدخلات مضبوطة وفق النسخة المعتمدة من البروتوكول.
+
+**منفذ:** `std.mcp` (`mcp.tools` و`mcp.call`) ودعم MCP في `agent.run`، بعميل stdio للإصدار 2026-07-28 مع التراجع إلى مصافحة `initialize` للخوادم الأقدم. الخوادم المسموح بها فقط هي المذكورة تحت `[mcp.servers]` في `elomar.toml`، والتأثير `mcp`. لم يُنفذ بعد: نقل Streamable HTTP، وelicitation، والموارد والقوالب (resources/prompts).
 
 **مرجع النسخة عند إعداد الوثيقة:** مواصفة MCP بتاريخ **2026-07-28** تتضمن أدوات `tools/list` و`tools/call` وقواعد ثقة وسلامة؛ يُعاد التحقق من النسخة قبل تنفيذ الموصل: [MCP Tools Specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools).
 
@@ -1013,7 +1017,7 @@ async fn ask_model(text: String)
 | CLI | `std.cli` | Args, env, process exit | v0.2 |
 | Async | `std.async` | Tasks, cancel, timers, channels | v0.3 |
 | AI | `std.ai` | infer, generate, structured output | v0.1/v0.2 |
-| AI Tools | `std.ai` (`ai.run`) ثم `std.agent` | Agent runtime, tool permission, steps | **الأدوات منفذة**: قائمة صريحة وحد للخطوات وتأثيرات الأدوات على المستدعي؛ الوكلاء الكاملون وMCP في v0.4 |
+| AI Tools | `std.ai` (`ai.run`) ثم `std.agent` | Agent runtime, tool permission, steps | **الأدوات منفذة**: قائمة صريحة وحد للخطوات وتأثيرات الأدوات على المستدعي؛ و**الوكلاء وMCP منفذون** (`agent.run`، `std.mcp`) |
 | Data | `std.data` | CSV, table interfaces, external analytics | v0.4 |
 | Testing | `std.test` | Assert, mock, coverage hooks | v0.1/v0.2 |
 | Security | `std.security` | Secret values, policy interfaces | v0.2/v0.4 |

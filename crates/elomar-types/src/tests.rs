@@ -979,6 +979,81 @@ fn py_module() {
     );
 }
 
+// ----- std.mcp and agent.run -----------------------------------------------------------
+
+#[test]
+fn mcp_module() {
+    ok(
+        "use std.mcp\nfn main() {\n  let tools: Result<List<{ name: String, description: String }>, McpError> = mcp.tools(\"notes\")\n  match mcp.call(\"notes\", \"add\", { text: \"hi\" }) {\n    Ok(t) => print(t.upper())\n    Err(McpError.ToolFailed(m)) => print(m)\n    Err(e) => print(e.kind(), e.message())\n  }\n  let none = mcp.call(\"notes\", \"count\", {})\n}",
+    );
+    assert_eq!(
+        codes("use std.mcp\npub fn f() -> Bool {\n  return mcp.tools(\"x\").is_ok()\n}"),
+        vec!["E3002"]
+    );
+    ok("use std.mcp\npub fn f() -> Bool !{mcp} {\n  return mcp.tools(\"x\").is_ok()\n}");
+    assert_eq!(
+        codes("use std.mcp\nfn f() {\n  print(mcp.call(\"s\", \"t\", 1))\n}"),
+        vec!["E2001"]
+    );
+    assert_eq!(
+        codes("use std.mcp\nfn f() {\n  print(mcp.connect(\"s\"))\n}"),
+        vec!["E1008"]
+    );
+    assert_eq!(
+        codes("fn f() {\n  print(mcp.tools(\"s\"))\n}"),
+        vec!["E1001"]
+    );
+}
+
+const AGENT: &str = "use std.agent
+fn lookup(name: String) -> Option<Int> {
+  return None
+}
+";
+
+#[test]
+fn agent_run() {
+    ok(&format!(
+        "{AGENT}async fn main() {{\n  let r: Result<String, AIError> = await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", tools: [lookup], mcp: [\"notes\"], require_approval: [\"lookup\", \"notes.add\"], approve: |c| c.tool != \"x\", on_step: |s| print(s.tool, s.arguments, s.result, s.approved), max_steps: 4, timeout: 5s)\n  let s = await agent.run<String>(\"m\", \"i\", \"q\")\n}}"
+    ));
+    // MCP servers are the `mcp` effect; an empty list is not.
+    assert_eq!(
+        codes(&format!(
+            "{AGENT}pub async fn ask() -> Result<String, AIError> !{{ai}} {{\n  return await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", mcp: [\"notes\"])\n}}"
+        )),
+        vec!["E3001"]
+    );
+    ok(&format!(
+        "{AGENT}pub async fn ask() -> Result<String, AIError> !{{ai}} {{\n  return await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", mcp: [])\n}}"
+    ));
+    // Approval names must be tools of the call.
+    assert_eq!(
+        codes(&format!(
+            "{AGENT}async fn main() {{\n  let r = await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", tools: [lookup], mcp: [\"notes\"], require_approval: [\"lookup2\", \"other.add\", \"notes.add\"])\n}}"
+        )),
+        vec!["E2022", "E2022"]
+    );
+    // `approve` must return Bool.
+    assert_eq!(
+        codes(&format!(
+            "{AGENT}async fn main() {{\n  let r = await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", approve: |c| c.tool)\n}}"
+        )),
+        vec!["E2001"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{AGENT}async fn main() {{\n  let r = await agent.run<String>(model: \"m\", instructions: \"i\", input: \"q\", servers: [])\n}}"
+        )),
+        vec!["E2010"]
+    );
+    assert_eq!(
+        codes(&format!(
+            "{AGENT}async fn main() {{\n  let r = await agent.start(\"m\")\n}}"
+        )),
+        vec!["E1008"]
+    );
+}
+
 // ----- editor information (elomar lsp) ------------------------------------------------
 
 #[test]

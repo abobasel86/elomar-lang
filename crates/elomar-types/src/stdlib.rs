@@ -21,6 +21,15 @@ pub(crate) const JSON_FUNCTIONS: [&str; 3] = ["parse", "stringify", "pretty"];
 pub(crate) const HTTP_FUNCTIONS: [&str; 2] = ["get", "post"];
 pub(crate) const DB_FUNCTIONS: [&str; 4] = ["open", "execute", "query", "query_one"];
 pub(crate) const PY_FUNCTIONS: [&str; 1] = ["call"];
+pub(crate) const MCP_FUNCTIONS: [&str; 2] = ["tools", "call"];
+
+/// What `mcp.tools` lists.
+pub(crate) fn mcp_tool_ty() -> Ty {
+    Ty::record(vec![
+        ("name".into(), Ty::Str),
+        ("description".into(), Ty::Str),
+    ])
+}
 
 /// A value that maps to one SQLite column: `Int`, `Float`, `String`,
 /// `Bool`, or an `Option` of one (NULL).
@@ -321,6 +330,59 @@ impl Checker {
             }
         }
         Ty::result(out, Ty::Enum(crate::enums::PY_ERROR.into(), Vec::new()))
+    }
+
+    /// `mcp.tools(server)` and `mcp.call(server, tool, arguments)`: the
+    /// `mcp` effect, `Result<_, McpError>`. Arguments are JSON data,
+    /// usually a record; the answer of a call is its text.
+    pub(crate) fn check_mcp_call(
+        &mut self,
+        func: &Ident,
+        type_args: &mut [TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        if !MCP_FUNCTIONS.contains(&func.name.as_str()) {
+            return self.unknown_module_function("mcp", func, &MCP_FUNCTIONS, args);
+        }
+        self.usage.direct.push(("mcp".into(), func.span));
+        self.reject_named_args(args);
+        let what = format!("mcp.{}", func.name);
+        self.no_type_args(&what, type_args);
+        let error = Ty::Enum(crate::enums::MCP_ERROR.into(), Vec::new());
+        if func.name == "tools" {
+            self.typed_args(&what, args, &[Ty::Str], span);
+            return Ty::result(Ty::list(mcp_tool_ty()), error);
+        }
+        if self.arity(&what, args, 3, 3, span) {
+            self.check_expr_against(&mut args[0].value, &Ty::Str);
+            self.check_expr_against(&mut args[1].value, &Ty::Str);
+            let t = self.check_expr(&mut args[2].value, None);
+            let resolved = self.subst.resolve(&t);
+            if !matches!(
+                resolved,
+                Ty::Record(_) | Ty::Map(..) | Ty::Error | Ty::Var(_)
+            ) {
+                let shown = self.subst.show(&resolved);
+                self.push(
+                    Diagnostic::error(
+                        "E2001",
+                        args[2].value.span,
+                        Text::new(
+                            format!("the arguments of an MCP tool must be a record, not `{shown}`"),
+                            format!("معاملات أداة MCP يجب أن تكون سجلًا، لا `{shown}`"),
+                        ),
+                    )
+                    .with_hint(Text::new(
+                        "e.g. `mcp.call(\"notes\", \"add_note\", { text: \"hi\" })`; use `{}` for none",
+                        "مثل `mcp.call(\"notes\", \"add_note\", { text: \"hi\" })`؛ واستخدم `{}` إن لم توجد",
+                    )),
+                );
+            } else if let Some(bad) = self.non_json_part(&resolved, true) {
+                self.not_json_data(&resolved, &bad, args[2].value.span, DataRole::JsonValue);
+            }
+        }
+        Ty::result(Ty::Str, error)
     }
 
     /// `json.parse<T>(text)`, `json.stringify(value)`, `json.pretty(value)`.

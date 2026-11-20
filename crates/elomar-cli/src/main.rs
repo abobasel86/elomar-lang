@@ -365,8 +365,9 @@ pub(crate) fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, Strin
         &config.permissions.filesystem_read,
         &config.permissions.filesystem_write,
     );
-    let mut runtime =
-        AiRuntime::new(config.ai.policy.clone()).with_permissions(config.permissions.clone());
+    let mut runtime = AiRuntime::new(config.ai.policy.clone())
+        .with_permissions(config.permissions.clone())
+        .with_mcp(config.mcp.clone());
     runtime.register(
         "mock",
         Box::new(MockProvider::new(Vec::new()).expect("no rules to validate")),

@@ -339,6 +339,49 @@ async fn ask(q: String) -> Result<Answer, AIError> !{ai} {
 - النموذج الوهمي `mock` يتبع نصًا مكتوبًا: القواعد المطابقة لـ `input` تُستخدم بالترتيب، خطوة لكل قاعدة؛ القاعدة `tool = "find_student"` و`arguments = { name = "Lina" }` تطلب أداة، والقاعدة `response` تجيب، و`{{last_tool_result}}` فيها يُستبدل بآخر ناتج. مزود OpenAI يستخدم Tool Calling بالوضع الصارم.
 - أخطاء الأدوات `E2022`: ليست قائمة أسماء، أو دالة مجهولة أو عامة أو `async`، أو اسم غير لاتيني، أو أداة مكررة؛ ونوع معامل بلا JSON `E2015`.
 
+### 4.6.3 الوكلاء وMCP: `agent.run` و`std.mcp`
+
+```toml
+# elomar.toml: خوادم MCP المسموح بتشغيلها؛ ذكر الخادم هنا هو الإذن
+[mcp.servers.notes]
+command = "python"                 # أو npx أو أي برنامج
+args = ["mcp/notes_server.py"]
+env = { LEVEL = "1" }              # اختياري
+timeout_ms = 30000                 # اختياري، لكل طلب
+```
+
+```elomar
+use std.agent
+use std.mcp
+
+// استدعاء مباشر لأدوات خادم MCP (التأثير mcp)
+let tools = mcp.tools("notes")                          // Result<List<{ name, description }>, McpError>
+let r = mcp.call("notes", "add_note", { text: "hi" })   // Result<String, McpError>
+
+// وكيل: نموذج يستخدم دوالك وأدوات خوادم MCP، بموافقة قبل الأفعال الحساسة
+async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
+    return await agent.run<Answer>(
+        model: "assistant",
+        instructions: "Help the user with their notes.",
+        input: q,
+        tools: [owner_name],                                    // اختياري
+        mcp: ["notes"],                                         // اختياري: خوادم MCP
+        require_approval: ["notes.add_note", "notes.delete_all"], // اختياري
+        approve: |call| !call.tool.contains("delete"),          // fn({ tool, arguments }) -> Bool
+        on_step: |step| print(step.tool, step.result),          // fn({ tool, arguments, result, approved })
+        max_steps: 8                                            // اختياري، الافتراضي 10
+    )
+}
+```
+
+- `agent.run` مثل `ai.run` (4.6.1) مع: أدوات خوادم MCP المذكورة في `mcp`، والموافقة، وسجل الخطوات. يرى النموذج أداة MCP باسم `server__tool`، ويراها البرنامج `server.tool`.
+- **الموافقة:** قبل تنفيذ أداة مذكورة في `require_approval` (أو كل أداة إن لم تُذكر القائمة) تُستدعى `approve` بـ `{ tool, arguments }` (`arguments` نص JSON)؛ إن أرجعت `false` لا تُنفَّذ الأداة ويُبلَّغ النموذج أن المستخدم رفضها. القرار في الشيفرة وليس في نص التعليمات (المواصفة §15.2). أسماء `require_approval` الحرفية يجب أن تكون أدوات الاستدعاء (`E2022`).
+- **السجل:** `on_step` تُستدعى بعد كل استدعاء أداة بـ `{ tool, arguments, result, approved }` للتدقيق.
+- **الصلاحيات:** لا يُشغَّل إلا خادم مذكور تحت `[mcp.servers]`؛ برنامج الخادم يعمل بصلاحيات المستخدم كاملة (مثل `std.py`). يبدأ الخادم عند أول استخدام في مجلد المشروع ويبقى حتى نهاية التشغيل.
+- **التأثيرات:** `mcp.*` وقائمة `mcp` غير الفارغة تعني `mcp`؛ وتأثيرات الأدوات والدوال `approve`/`on_step` تُحسب على المستدعي، إضافة إلى `ai` (و`net` للنماذج السحابية).
+- **البروتوكول:** عميل stdio لـ MCP بإصدار 2026-07-28 (بلا مصافحة، و`_meta` في كل طلب)، ويتراجع تلقائيًا إلى `initialize` مع الخوادم الأقدم (2025-11-25 وما قبلها). يدعم `tools/list` و`tools/call`؛ النتيجة نص المحتوى. الأدوات التي تطلب إدخالًا إضافيًا من المستخدم (elicitation) غير مدعومة بعد.
+- `McpError`: `NotConfigured` (خادم غير مذكور) و`Unavailable` (تعذّر التشغيل أو توقف الخادم أو انتهت المهلة) و`Protocol` (خطأ JSON-RPC مثل أداة غير موجودة) و`ToolFailed` (الأداة أبلغت `isError`). في `agent.run` يصبح خادم غير مذكور `AIError.PolicyDenied` وتعذّر تشغيله `AIError.ProviderUnavailable`، وأخطاء الأدوات تُعاد إلى النموذج ليتصرف.
+
 ## 4.7 الأنواع المعدودة (`enum`)
 
 ```elomar
@@ -777,7 +820,7 @@ fn test_greets_by_name() {
 
 ## 5. التأثيرات (Effects)
 
-التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
+التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py` `mcp`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
 و`net` (`ai.infer` على نموذج سحابي، انظر 4.6.2) و`fs` (`std.fs`، انظر 4.10).
 
 | القاعدة | الرمز |

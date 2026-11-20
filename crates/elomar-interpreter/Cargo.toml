@@ -10,6 +10,7 @@ publish.workspace = true
 elomar-diagnostics.workspace = true
 elomar-ast.workspace = true
 elomar-ai-core.workspace = true
+elomar-mcp.workspace = true
 elomar-policy.workspace = true
 serde_json.workspace = true
 unicode-segmentation.workspace = true

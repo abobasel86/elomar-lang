@@ -12,7 +12,8 @@ mod schema;
 use std::collections::HashMap;
 
 pub use config::{
-    AiConfig, AiPolicy, MockRule, ModelConfig, Permissions, ProjectConfig, parse_config,
+    AiConfig, AiPolicy, McpConfig, McpServerConfig, MockRule, ModelConfig, Permissions,
+    ProjectConfig, parse_config,
 };
 pub use schema::Schema;
 
@@ -114,6 +115,12 @@ pub struct ToolSpec {
     pub name: String,
     /// Always a record: the tool's parameters by name.
     pub params: Schema,
+    /// Shown to the model; may be empty.
+    pub description: String,
+    /// A JSON Schema written by someone else (an MCP server), used instead
+    /// of `params`. Such tools are not strict: the server checks the
+    /// arguments.
+    pub raw_schema: Option<serde_json::Value>,
 }
 
 /// The model's request to call a tool.
@@ -222,6 +229,7 @@ pub struct AiRuntime {
     models: HashMap<String, Box<dyn ModelProvider>>,
     policy: AiPolicy,
     permissions: Permissions,
+    mcp: McpConfig,
     calls: u64,
 }
 
@@ -231,6 +239,7 @@ impl AiRuntime {
             models: HashMap::new(),
             policy,
             permissions: Permissions::default(),
+            mcp: McpConfig::default(),
             calls: 0,
         }
     }
@@ -239,6 +248,17 @@ impl AiRuntime {
     pub fn with_permissions(mut self, permissions: Permissions) -> Self {
         self.permissions = permissions;
         self
+    }
+
+    /// Sets the MCP servers the program may start.
+    pub fn with_mcp(mut self, mcp: McpConfig) -> Self {
+        self.mcp = mcp;
+        self
+    }
+
+    /// `[mcp.servers]` of the run.
+    pub fn mcp(&self) -> &McpConfig {
+        &self.mcp
     }
 
     pub fn register(&mut self, model: impl Into<String>, provider: Box<dyn ModelProvider>) {

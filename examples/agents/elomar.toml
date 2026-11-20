@@ -1,0 +1,34 @@
+[package]
+name = "agents"
+
+# The MCP servers the program may start. Listing a server here is the
+# permission to run it: a server that is not listed cannot be used.
+# (On Linux and macOS you may need `command = "python3"`.)
+[mcp.servers.notes]
+command = "python"
+args = ["mcp/notes_server.py"]
+
+# An offline mock model with a scripted conversation. The model sees an MCP
+# tool as `server__tool`. Swap in `provider = "openai"` (see
+# examples/ai-openai) to let a real model decide which tools to call.
+[ai.models.assistant]
+provider = "mock"
+
+[[ai.models.assistant.mock]]
+tool = "owner_name"
+
+[[ai.models.assistant.mock]]
+tool = "notes__add_note"
+arguments = { text = "Review chapter 3" }
+
+[[ai.models.assistant.mock]]
+tool = "notes__delete_all"
+
+[[ai.models.assistant.mock]]
+tool = "notes__count_notes"
+
+[[ai.models.assistant.mock]]
+response = '{"summary": "Added your note. You now have {{last_tool_result}} notes."}'
+
+[ai.policy]
+max_calls_per_run = 10
