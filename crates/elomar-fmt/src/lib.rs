@@ -99,6 +99,29 @@ fn is_binary(k: &TokenKind) -> bool {
     )
 }
 
+/// Operators that, at the start of a line, continue the previous line
+/// (the lexer's rule): such a line is indented one more level.
+fn starts_continuation(k: &TokenKind) -> bool {
+    use TokenKind::*;
+    matches!(
+        k,
+        OrOr | AndAnd
+            | Plus
+            | Star
+            | Slash
+            | Percent
+            | Div
+            | EqEq
+            | BangEq
+            | Lt
+            | Le
+            | Gt
+            | Ge
+            | DotDot
+            | DotDotEq
+    )
+}
+
 /// Whether a `-` or `!` after `prev` is a prefix operator.
 fn starts_operand(prev: Option<&TokenKind>) -> bool {
     use TokenKind::*;
@@ -150,7 +173,10 @@ impl<'a> Printer<'a> {
 
     fn print(&self, tokens: &[Token]) -> String {
         let mut out = String::new();
-        let mut depth: i32 = 0;
+        // One entry per open bracket: whether it added an indent level.
+        // Only the outermost bracket left open by a line adds one, so
+        // `f([` followed by items indents them once, not twice.
+        let mut open: Vec<bool> = Vec::new();
         let mut blank = false;
         let mut prev_last: Option<TokenKind> = None;
         let mut prev_opened = false;
@@ -161,10 +187,12 @@ impl<'a> Printer<'a> {
                 blank = !out.is_empty();
                 continue;
             }
-            let leading_closers = code.iter().take_while(|t| is_closer(&t.kind)).count() as i32;
-            let mut indent = (depth - leading_closers).max(0);
+            let leading_closers = code.iter().take_while(|t| is_closer(&t.kind)).count();
+            let still_open = open.len().saturating_sub(leading_closers);
+            let mut indent = open[..still_open].iter().filter(|added| **added).count() as i32;
             let continues = prev_last.as_ref().is_some_and(is_binary) && !prev_opened
-                || code[0].kind == TokenKind::Dot;
+                || code[0].kind == TokenKind::Dot
+                || starts_continuation(&code[0].kind);
             if continues && leading_closers == 0 {
                 indent += 1;
             }
@@ -178,15 +206,19 @@ impl<'a> Printer<'a> {
             out.push_str(&self.line(&code));
             out.push('\n');
 
-            let start_depth = depth;
+            let mut lowest = open.len();
             for t in &code {
                 if is_opener(&t.kind) {
-                    depth += 1;
+                    open.push(false);
                 } else if is_closer(&t.kind) {
-                    depth -= 1;
+                    open.pop();
+                    lowest = lowest.min(open.len());
                 }
             }
-            prev_opened = depth > start_depth;
+            prev_opened = open.len() > lowest;
+            if let Some(first_new) = open.get_mut(lowest) {
+                *first_new = true;
+            }
             prev_last = code
                 .iter()
                 .rev()
@@ -492,5 +524,44 @@ mod tests {
             format("let s = \"open\n"),
             Err(FormatError::Lex(_))
         ));
+    }
+
+    #[test]
+    fn continuation_lines_and_nested_brackets() {
+        assert_eq!(
+            fmt("fn f(s: String) -> Bool {
+let ok = s.contains(\"a\")
+|| s.contains(\"b\")
+&& s.length > 2
+return ok
+}
+"),
+            "fn f(s: String) -> Bool {
+    let ok = s.contains(\"a\")
+        || s.contains(\"b\")
+        && s.length > 2
+    return ok
+}
+"
+        );
+        // Two brackets opened on one line indent their contents once.
+        assert_eq!(
+            fmt("fn main() {
+let xs = f([
+1,
+2
+])
+print(xs)
+}
+"),
+            "fn main() {
+    let xs = f([
+        1,
+        2
+    ])
+    print(xs)
+}
+"
+        );
     }
 }

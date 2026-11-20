@@ -59,6 +59,10 @@ change the language.
 
 ### Changed
 
+- `elomar fmt` indents a line that starts with `||`, `&&` or another
+  binary operator one level deeper, and indents the contents of several
+  brackets opened on one line (`f([`) once instead of once per bracket.
+
 - A `{` inside a string now starts an interpolation. Write `\{` for a
   literal brace, for example in JSON text: `"\{\"a\": 1}"`.
 
