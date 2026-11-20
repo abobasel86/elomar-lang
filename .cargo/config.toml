@@ -1,0 +1,5 @@
+# The browser playground (crates/elomar-playground): a tree-walking
+# interpreter needs a deep stack for recursive programs; WebAssembly's
+# default is 1 MiB.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-zstack-size=33554432"]

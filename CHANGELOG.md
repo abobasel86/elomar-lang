@@ -57,6 +57,13 @@ change the language.
   publishes it on version tags once the store tokens are set
   (`docs/releasing.md`).
 
+- A playground on the website: write and run Elomar-Lang in the browser,
+  with examples and share links. The interpreter is compiled to
+  WebAssembly (`crates/elomar-playground`); files, databases, HTTP, servers,
+  Python and processes are not available there, and AI calls use `mock`.
+- The interpreter's SQLite and HTTP support is behind a `native` feature
+  (on for the `elomar` command), so it can be built for the browser.
+
 ### Changed
 
 - `elomar fmt` indents a line that starts with `||`, `&&` or another

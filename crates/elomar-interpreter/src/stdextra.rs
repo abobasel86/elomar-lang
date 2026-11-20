@@ -3,6 +3,7 @@
 
 use std::cell::Cell;
 use std::rc::Rc;
+#[cfg(not(target_family = "wasm"))]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use elomar_ast::Span;
@@ -92,11 +93,7 @@ fn next_u64() -> u64 {
     RNG.with(|state| {
         let mut x = state.get();
         if x == 0 {
-            x = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos() as u64)
-                .unwrap_or(0x9E37_79B9_7F4A_7C15)
-                | 1;
+            x = (now_ms() as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
         }
         x ^= x >> 12;
         x ^= x << 25;
@@ -308,11 +305,27 @@ pub(crate) fn parse_time(text: &str) -> Option<i64> {
     Some(days * DAY_MS + hour * 3_600_000 + minute * 60_000 + second * 1000 + millis - offset)
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+// In WebAssembly the page provides the clock and random bytes (see
+// `site/playground/worker.js`), since the standard library has none there.
+#[cfg(target_family = "wasm")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn elomar_now_ms() -> f64;
+    fn elomar_random_fill(ptr: *mut u8, len: usize);
+}
+
+#[cfg(target_family = "wasm")]
+fn now_ms() -> i64 {
+    // SAFETY: a plain function provided by the page; it takes no pointers.
+    unsafe { elomar_now_ms() as i64 }
 }
 
 fn record(fields: Vec<(&str, Value)>) -> Value {
@@ -327,7 +340,11 @@ fn time(func: &str, args: &[Value], span: Span) -> R<Value> {
         "today" => Value::str(format_time(now_ms())[..10].to_string()),
         "sleep" => {
             if let Value::Duration(ms) = &args[0] {
+                // WebAssembly cannot block; there `sleep` returns at once.
+                #[cfg(not(target_family = "wasm"))]
                 std::thread::sleep(Duration::from_millis((*ms).max(0) as u64));
+                #[cfg(target_family = "wasm")]
+                let _ = ms;
             }
             Value::Unit
         }
@@ -509,6 +526,7 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+#[cfg(feature = "native")]
 fn secure_bytes(n: usize, span: Span) -> R<Vec<u8>> {
     let mut buf = vec![0u8; n];
     getrandom::getrandom(&mut buf).map_err(|e| {
@@ -519,6 +537,24 @@ fn secure_bytes(n: usize, span: Span) -> R<Vec<u8>> {
         )
     })?;
     Ok(buf)
+}
+
+/// In the browser: `crypto.getRandomValues` through the page.
+#[cfg(all(not(feature = "native"), target_family = "wasm"))]
+fn secure_bytes(n: usize, _span: Span) -> R<Vec<u8>> {
+    let mut buf = vec![0u8; n];
+    // SAFETY: the page writes exactly `len` bytes at `ptr`, inside `buf`.
+    unsafe { elomar_random_fill(buf.as_mut_ptr(), buf.len()) };
+    Ok(buf)
+}
+
+#[cfg(all(not(feature = "native"), not(target_family = "wasm")))]
+fn secure_bytes(_n: usize, span: Span) -> R<Vec<u8>> {
+    Err(invalid(
+        span,
+        "secure random numbers are not available in this build".into(),
+        "الأعداد العشوائية الآمنة غير متاحة في هذا الإصدار".into(),
+    ))
 }
 
 fn crypto(func: &str, args: &[Value], span: Span) -> R<Value> {

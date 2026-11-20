@@ -17,6 +17,7 @@ members = [
     "crates/elomar-ai-provider-anthropic",
     "crates/elomar-interpreter",
     "crates/elomar-cli",
+    "crates/elomar-playground",
 ]
 
 [workspace.package]
@@ -38,11 +39,13 @@ elomar-mcp = { path = "crates/elomar-mcp" }
 elomar-fmt = { path = "crates/elomar-fmt" }
 elomar-types = { path = "crates/elomar-types" }
 elomar-policy = { path = "crates/elomar-policy" }
-elomar-interpreter = { path = "crates/elomar-interpreter" }
+# Without its default `native` feature; crates that need SQLite and HTTP turn it on.
+elomar-interpreter = { path = "crates/elomar-interpreter", default-features = false }
 elomar-ai-core = { path = "crates/elomar-ai-core" }
 elomar-ai-provider-mock = { path = "crates/elomar-ai-provider-mock" }
 elomar-ai-provider-openai = { path = "crates/elomar-ai-provider-openai" }
 elomar-ai-provider-anthropic = { path = "crates/elomar-ai-provider-anthropic" }
+elomar-playground = { path = "crates/elomar-playground" }
 
 unicode-ident = "1"
 unicode-normalization = "0.1"

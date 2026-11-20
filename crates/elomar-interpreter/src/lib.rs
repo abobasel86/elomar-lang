@@ -6,7 +6,9 @@
 
 mod ai;
 mod builtins;
+#[cfg_attr(not(feature = "native"), path = "stubs/db.rs")]
 mod db;
+#[cfg_attr(not(feature = "native"), path = "stubs/http.rs")]
 mod http;
 mod mcp;
 mod process;
@@ -123,7 +125,13 @@ impl RuntimeError {
 }
 
 /// Maximum depth of nested function calls before `R0005`.
+#[cfg(not(target_family = "wasm"))]
 pub const MAX_CALL_DEPTH: usize = 3_000;
+
+/// In the browser the stack is set by the browser and is much smaller
+/// (about 300-450 calls in Chrome), so stop early with a clear `R0005`.
+#[cfg(target_family = "wasm")]
+pub const MAX_CALL_DEPTH: usize = 200;
 
 /// Stack size for the thread that runs a program. A tree-walking
 /// interpreter uses several Rust frames per call, so [`MAX_CALL_DEPTH`]
@@ -131,6 +139,7 @@ pub const MAX_CALL_DEPTH: usize = 3_000;
 pub const STACK_SIZE: usize = 256 * 1024 * 1024;
 
 /// Runs `f` on a thread with a [`STACK_SIZE`] stack and waits for it.
+#[cfg(not(target_family = "wasm"))]
 pub fn with_large_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
     std::thread::scope(|s| {
         std::thread::Builder::new()
@@ -140,6 +149,12 @@ pub fn with_large_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
             .join()
             .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
     })
+}
+
+/// WebAssembly has no threads; the stack size is set when linking instead.
+#[cfg(target_family = "wasm")]
+pub fn with_large_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    f()
 }
 
 /// Runs a checked program: evaluates file-level constants in order, then

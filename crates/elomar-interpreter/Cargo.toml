@@ -8,6 +8,12 @@ publish.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# SQLite (`std.db`), HTTP requests (`std.http`) and secure random numbers.
+# Turn off for targets without them, such as the browser playground.
+default = ["native"]
+native = ["dep:rusqlite", "dep:ureq", "dep:getrandom"]
+
 [dependencies]
 elomar-diagnostics.workspace = true
 elomar-ast.workspace = true
@@ -16,14 +22,14 @@ elomar-mcp.workspace = true
 elomar-policy.workspace = true
 serde_json.workspace = true
 unicode-segmentation.workspace = true
-rusqlite.workspace = true
-ureq.workspace = true
+rusqlite = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
 url.workspace = true
 regex.workspace = true
 sha2.workspace = true
 hmac.workspace = true
 base64.workspace = true
-getrandom.workspace = true
+getrandom = { workspace = true, optional = true }
 percent-encoding.workspace = true
 
 [dev-dependencies]

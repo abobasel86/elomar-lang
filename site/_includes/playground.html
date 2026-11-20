@@ -1,0 +1,27 @@
+<div id="playground" class="playground"
+     data-lang="{{ include.lang }}"
+     data-base="{{ '/' | relative_url }}"
+     data-text="{{ include.text | jsonify | escape }}">
+  <div class="pg-bar">
+    <button id="pg-run" type="button" class="pg-run">▶ {{ include.text.run }}</button>
+    <select id="pg-examples" aria-label="{{ include.text.examples }}">
+      <option value="">{{ include.text.examples }}…</option>
+    </select>
+    <button id="pg-share" type="button">{{ include.text.share }}</button>
+    <span id="pg-status" class="pg-status" role="status"></span>
+  </div>
+  <div class="pg-panes">
+    <div class="pg-pane">
+      <label for="pg-code">{{ include.text.code }}</label>
+      <textarea id="pg-code" spellcheck="false" autocapitalize="off" autocomplete="off" dir="ltr"></textarea>
+      <label for="pg-input">{{ include.text.input }}</label>
+      <textarea id="pg-input" class="pg-input" spellcheck="false" dir="auto"></textarea>
+    </div>
+    <div class="pg-pane">
+      <label for="pg-output">{{ include.text.output }}</label>
+      <pre id="pg-output" class="pg-output" dir="auto" aria-live="polite"></pre>
+    </div>
+  </div>
+  <p class="pg-note">{{ include.text.note }}</p>
+</div>
+<script src="{{ '/assets/playground.js' | relative_url }}?v={{ site.time | date: '%s' }}"></script>

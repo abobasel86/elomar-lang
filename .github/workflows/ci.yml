@@ -53,3 +53,19 @@ jobs:
       # provider or to a fake OpenAI server on 127.0.0.1.
       - name: Tests
         run: cargo test --workspace --locked
+
+  playground:
+    name: Playground (WebAssembly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Builds the interpreter without SQLite and HTTP, as the website does.
+      - name: Clippy
+        run: cargo clippy --locked -p elomar-playground --target wasm32-unknown-unknown -- -D warnings
+      - name: Tests (native, same code paths)
+        run: cargo test --locked -p elomar-playground

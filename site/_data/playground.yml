@@ -1,0 +1,40 @@
+en:
+  run: Run
+  examples: Examples
+  share: Share link
+  code: Program
+  input: "Input for input(), one line per call"
+  output: Output
+  loading: Loading Elomar-Lang…
+  running: Running…
+  done: Done.
+  failed: Finished with errors.
+  noOutput: (no output)
+  timeout: "Stopped: the program ran longer than 10 seconds."
+  crashed: "The program stopped unexpectedly (for example, too deep a recursion)."
+  copied: Link copied.
+  linkReady: The link is in the address bar.
+  note: >-
+    Programs run in your browser, offline. Files, databases, HTTP, web servers, Python and
+    external programs are not available here; AI calls use the offline model "mock".
+    Ctrl+Enter runs the program.
+ar:
+  run: تشغيل
+  examples: أمثلة
+  share: رابط للمشاركة
+  code: البرنامج
+  input: "مدخلات input()، سطر لكل استدعاء"
+  output: المخرجات
+  loading: جارٍ تحميل Elomar-Lang…
+  running: جارٍ التشغيل…
+  done: تم.
+  failed: انتهى مع أخطاء.
+  noOutput: (لا توجد مخرجات)
+  timeout: "توقف: استغرق البرنامج أكثر من 10 ثوانٍ."
+  crashed: "توقف البرنامج بشكل غير متوقع (مثلًا: استدعاء ذاتي عميق جدًا)."
+  copied: تم نسخ الرابط.
+  linkReady: الرابط في شريط العنوان.
+  note: >-
+    تعمل البرامج في متصفحك دون إنترنت. الملفات وقواعد البيانات وHTTP وخوادم الويب وPython
+    والبرامج الخارجية غير متاحة هنا؛ واستدعاءات الذكاء الاصطناعي تستخدم النموذج التجريبي "mock".
+    اختصار التشغيل Ctrl+Enter.

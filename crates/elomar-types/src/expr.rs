@@ -1169,8 +1169,8 @@ impl Checker {
                     && let Some(d) = self.diags.last_mut()
                 {
                     d.hint = Some(Text::new(
-                        "to join text with a value, convert it first: `\"Total: \" + to_string(n)`, or use `print(\"Total:\", n)`",
-                        "لدمج نص مع قيمة حوّلها أولًا: `\"Total: \" + to_string(n)`، أو استخدم `print(\"Total:\", n)`",
+                        "to put a value in text, write it inside the text: `\"Total: {n}\"`, or convert it: `\"Total: \" + to_string(n)`",
+                        "لوضع قيمة داخل نص اكتبها بين قوسين داخله: `\"المجموع: {n}\"`، أو حوّلها: `\"المجموع: \" + to_string(n)`",
                     ));
                 }
                 Ty::Error

@@ -1,0 +1,22 @@
+[package]
+name = "elomar-playground"
+description = "Elomar-Lang compiled to WebAssembly for the browser playground"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+elomar-diagnostics.workspace = true
+elomar-parser.workspace = true
+elomar-types.workspace = true
+elomar-ai-core.workspace = true
+elomar-ai-provider-mock.workspace = true
+elomar-policy.workspace = true
+elomar-interpreter.workspace = true
+serde_json.workspace = true

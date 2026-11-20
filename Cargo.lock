@@ -358,6 +358,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "elomar-playground"
+version = "0.1.0"
+dependencies = [
+ "elomar-ai-core",
+ "elomar-ai-provider-mock",
+ "elomar-diagnostics",
+ "elomar-interpreter",
+ "elomar-parser",
+ "elomar-policy",
+ "elomar-types",
+ "serde_json",
+]
+
+[[package]]
 name = "elomar-policy"
 version = "0.1.0"
 

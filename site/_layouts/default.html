@@ -16,18 +16,20 @@
     <nav>
       {% if lang == "ar" %}
         <a href="{{ '/ar/' | relative_url }}">الدروس</a>
+        <a href="{{ '/ar/playground.html' | relative_url }}">جرّب</a>
         <a href="https://github.com/abobasel86/elomar-lang/releases/latest">التنزيل</a>
         <a href="https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md">المرجع</a>
-        <a href="{{ '/en/' | relative_url }}{% if page.slug %}{{ page.slug }}.html{% endif %}" lang="en">English</a>
+        <a href="{{ '/' | relative_url }}{% if page.other %}{{ page.other }}{% else %}en/{% if page.slug %}{{ page.slug }}.html{% endif %}{% endif %}" lang="en">English</a>
       {% else %}
         <a href="{{ '/en/' | relative_url }}">Tutorial</a>
+        <a href="{{ '/en/playground.html' | relative_url }}">Playground</a>
         <a href="https://github.com/abobasel86/elomar-lang/releases/latest">Download</a>
         <a href="https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md">Reference</a>
-        <a href="{{ '/ar/' | relative_url }}{% if page.slug %}{{ page.slug }}.html{% endif %}" lang="ar">العربية</a>
+        <a href="{{ '/' | relative_url }}{% if page.other %}{{ page.other }}{% else %}ar/{% if page.slug %}{{ page.slug }}.html{% endif %}{% endif %}" lang="ar">العربية</a>
       {% endif %}
     </nav>
   </header>
-  <div class="page">
+  <div class="page{% if page.wide %} wide{% endif %}">
     {% if page.slug %}
     <aside class="toc">
       <ol>

@@ -149,6 +149,10 @@ The **[tutorial](https://abobasel86.github.io/elomar-lang/)** has ten short
 lessons in English and Arabic, from a first program to web servers and AI.
 Every program in it is checked by the test suite.
 
+Or try it without installing anything in the
+**[playground](https://abobasel86.github.io/elomar-lang/en/playground.html)**,
+which runs Elomar-Lang in your browser.
+
 ## Getting started
 
 Download `elomar` for your system from the

@@ -1,11 +1,13 @@
-# Publishes the tutorial in `site/` to GitHub Pages
-# (https://abobasel86.github.io/elomar-lang/) when it changes on main.
+# Publishes the website in `site/` to GitHub Pages
+# (https://abobasel86.github.io/elomar-lang/): the tutorial, and the
+# playground, which runs Elomar-Lang compiled to WebAssembly. It is rebuilt
+# when the site or the language changes on main.
 name: Website
 
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "crates/**", "Cargo.toml", "Cargo.lock", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Build the playground (WebAssembly)
+        run: |
+          cargo build --release --locked -p elomar-playground --target wasm32-unknown-unknown
+          mkdir -p site/playground
+          cp target/wasm32-unknown-unknown/release/elomar_playground.wasm site/playground/elomar.wasm
+          ls -l site/playground
       - uses: actions/configure-pages@v5
       - uses: actions/jekyll-build-pages@v1
         with:

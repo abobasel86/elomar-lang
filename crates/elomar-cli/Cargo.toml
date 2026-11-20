@@ -20,7 +20,7 @@ elomar-loader.workspace = true
 elomar-pkg.workspace = true
 elomar-fmt.workspace = true
 elomar-types.workspace = true
-elomar-interpreter.workspace = true
+elomar-interpreter = { workspace = true, features = ["native"] }
 clap.workspace = true
 serde_json.workspace = true
 elomar-ai-core.workspace = true
