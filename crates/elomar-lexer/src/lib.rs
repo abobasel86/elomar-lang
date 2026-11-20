@@ -337,6 +337,11 @@ impl<'a> Lexer<'a> {
                 }
                 '/' if self.peek_at(1) == Some('*') => self.block_comment(start),
                 '"' => self.string(start),
+                'r' if self.peek_at(1) == Some('"')
+                    || (self.peek_at(1) == Some('#') && self.peek_at(2) == Some('"')) =>
+                {
+                    self.raw_string(start)
+                }
                 c if c.is_ascii_digit() => self.number(start),
                 c if is_ident_start(c) => self.ident(start),
                 _ => self.punct(start, c),
@@ -447,6 +452,41 @@ impl<'a> Lexer<'a> {
                 parts.push(StrPart::Lit(value));
             }
             self.push(TokenKind::Template(parts), start);
+        }
+    }
+
+    /// `r"..."` and `r#"..."#`: no escapes and no `{}` parts, for regular
+    /// expressions and Windows paths. With `#`, the text may contain `"`.
+    /// Like other strings, a raw string stays on one line.
+    fn raw_string(&mut self, start: usize) {
+        self.bump(); // r
+        let hashed = self.peek() == Some('#');
+        if hashed {
+            self.bump();
+        }
+        self.bump(); // "
+        let content_start = self.pos;
+        loop {
+            match self.peek() {
+                None | Some('\n') => {
+                    self.unterminated_string(start);
+                    let value = self.src[content_start..self.pos].to_string();
+                    self.push(TokenKind::Str(value), start);
+                    return;
+                }
+                Some('"') if !hashed || self.peek_at(1) == Some('#') => {
+                    let value = self.src[content_start..self.pos].to_string();
+                    self.bump();
+                    if hashed {
+                        self.bump();
+                    }
+                    self.push(TokenKind::Str(value), start);
+                    return;
+                }
+                Some(_) => {
+                    self.bump();
+                }
+            }
         }
     }
 
@@ -1004,5 +1044,25 @@ mod tests {
         assert_eq!(diags.len(), 1, "{diags:?}");
         assert_eq!(diags[0].code, "E0007");
         assert!(toks.iter().any(|t| t.kind == Ident("t".into())));
+    }
+
+    #[test]
+    fn raw_strings() {
+        assert_eq!(
+            kinds(r##"r"\p{L}+\d" r#"say "hi" {x}"# r"#;""##),
+            vec![
+                Str(r"\p{L}+\d".into()),
+                Str(r#"say "hi" {x}"#.into()),
+                Str("#;".into()),
+                Eof
+            ]
+        );
+        // A plain `r` is still a name.
+        assert_eq!(
+            kinds("let r = 1"),
+            vec![Let, Ident("r".into()), Eq, Int(1), Eof]
+        );
+        let (_, diags) = lex("r\"open");
+        assert_eq!(diags[0].code, "E0002");
     }
 }

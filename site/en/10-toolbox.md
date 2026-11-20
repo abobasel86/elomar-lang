@@ -51,7 +51,7 @@ use std.crypto
 
 fn main() {
     print(regex.find_all("[0-9]+", "rooms 12 and 7"))
-    print(regex.replace("(\\w+)@", "write to lina@example.com", "***@"))
+    print(regex.replace(r"(\w+)@", "write to lina@example.com", "***@"))
     print(encoding.base64_encode("مرحبا"))
     print(encoding.url_encode("a b&c"))
     print(crypto.sha256("hello"))
@@ -59,7 +59,9 @@ fn main() {
 }
 ```
 
-In patterns, a backslash is written twice: `"\\d+"`.
+Write patterns as *raw strings*, `r"..."`: inside them a backslash and
+`{` mean themselves, so `r"\d{2,4}"` is exactly the pattern. (In a normal
+string, `{` starts interpolation and a backslash must be doubled.)
 
 ## The command line
 

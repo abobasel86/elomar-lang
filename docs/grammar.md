@@ -20,6 +20,7 @@
 | أعداد عشرية | `3.14`، `2.5e3`، `1e-3` → `Float`. `1..5` نطاق وليس `1.` |
 | مدد زمنية | `500ms`، `10s`، `2m`، `1h` → `Duration`. أي لاحقة أخرى ملتصقة بعدد خطأ `E0006` |
 | نصوص | `"..."` في سطر واحد، والهروب: `\n \t \r \0 \" \\ \{ \} \u{XXXX}` |
+| نصوص خام | `r"\d+"` و`r#"قال "نعم""#`: بلا هروب ولا إدراج، فكل حرف يبقى كما هو. مناسبة للتعابير النمطية ومسارات Windows. بـ `#` يمكن أن يحتوي النص على `"` |
 | إدراج القيم | `"مرحبا {name}، عمرك {age + 1}"`: أي تعبير بين `{` و`}` يُحسب ويُعرض كما يعرضه `print`، والنتيجة `String`. لقوس حرفي اكتب `\{` (مثلًا JSON: `"\{\"a\": 1}"`). داخل التعبير يمكن استعمال نصوص وأقواس (`"{m["k"]}"`). لا يُقبل نمط `match` بنص فيه إدراج |
 | كلمات محجوزة | `let var fn return if else while for in break continue true false type enum match use pub async await trait impl self as div` |
 | أسماء الـ Prelude | `Some None Ok Err` ودوال القسم 7 — ليست كلمات محجوزة لكن لا يجوز إعادة تعريفها |
@@ -659,7 +660,7 @@ use std.crypto
 
 fn main() {
     print(regex.find_all("[0-9]+", "order 12 and 7"))          // ["12", "7"]
-    print(regex.replace("(\\d+)", "order 12", "#$1"))           // order #12
+    print(regex.replace(r"(\d+)", "order 12", "#$1"))            // order #12
     print(encoding.base64_encode("مرحبا"), encoding.url_encode("a b"))
     print(crypto.sha256("abc"), crypto.uuid())
 }
@@ -671,7 +672,7 @@ fn main() {
 | `std.encoding` | `base64_encode` · `hex_encode` · `url_encode` (`String -> String`) · `base64_decode` · `hex_decode` · `url_decode` (`String -> Option<String>`؛ `None` إن لم يكن الإدخال صالحًا أو لم تكن النتيجة UTF-8) |
 | `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (الإصدار 4) · `token(bytes) -> String` (hex، من 1 إلى 1024 بايت) |
 
-- صيغة التعابير النمطية هي صيغة مكتبة Rust `regex` (بلا رجوع للخلف backreferences، وزمن تنفيذ خطي مضمون). الشرطة المائلة تُكتب مضاعفة داخل النص: `"\\d+"`.
+- صيغة التعابير النمطية هي صيغة مكتبة Rust `regex` (بلا رجوع للخلف backreferences، وزمن تنفيذ خطي مضمون). اكتب الأنماط نصوصًا خامًا: `r"\d{2,4}"`، لأن `{` في النص العادي يبدأ إدراجًا والشرطة المائلة تحتاج مضاعفة.
 - النمط المكتوب نصًا حرفيًا يُفحص وقت الترجمة (`E2023`)؛ والنمط المبني وقت التشغيل إن كان غير صالح فخطأ تنفيذي `R0006`.
 - `uuid` و`token` من مصدر عشوائي آمن يوفره النظام، فتصلح لمعرّفات الجلسات والمفاتيح، بخلاف `std.random`.
 - لا تخزّن كلمات المرور بـ `sha256` وحده؛ استخدم خوارزمية مخصصة لكلمات المرور (مخطط لها).

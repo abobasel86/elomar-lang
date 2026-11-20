@@ -5,6 +5,7 @@
   "fileTypes": ["elo"],
   "patterns": [
     { "include": "#comments" },
+    { "include": "#raw-strings" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#effects" },
@@ -28,6 +29,12 @@
           "begin": "/\\*",
           "end": "\\*/"
         }
+      ]
+    },
+    "raw-strings": {
+      "patterns": [
+        { "name": "string.quoted.raw.elomar", "begin": "\\br#\"", "end": "\"#|$" },
+        { "name": "string.quoted.raw.elomar", "begin": "\\br\"", "end": "\"|$" }
       ]
     },
     "strings": {

@@ -18,6 +18,9 @@ change the language.
   trigonometry), `std.random` (`int`, `float`, `choice`, `shuffle`, `seed`),
   `std.time` (`now`, `format`, `parse`, `date`, `make`, `sleep`, `today`)
   and `std.os` (`args`, `env`, `platform`, `exit`).
+- Raw strings: `r"\d{2,4}"` and `r#"say "hi""#` keep every character as
+  written (no escapes, no interpolation), for regular expressions and
+  Windows paths.
 - `std.regex` (`is_match`, `find`, `find_all`, `captures`, `replace`,
   `split`; literal patterns are checked when compiling, `E2023`),
   `std.encoding` (Base64, hex, URL) and `std.crypto` (`sha256`,

@@ -50,7 +50,7 @@ use std.crypto
 
 fn main() {
     print(regex.find_all("[0-9]+", "الغرف 12 و7"))
-    print(regex.replace("(\\w+)@", "راسل lina@example.com", "***@"))
+    print(regex.replace(r"(\w+)@", "راسل lina@example.com", "***@"))
     print(encoding.base64_encode("مرحبا"))
     print(encoding.url_encode("a b&c"))
     print(crypto.sha256("hello"))
@@ -58,7 +58,9 @@ fn main() {
 }
 ```
 
-في الأنماط تُكتب الشرطة المائلة مرتين: `"\\d+"`.
+اكتب الأنماط **نصوصًا خامًا** `r"..."`: داخلها تبقى الشرطة المائلة و`{` كما هي،
+فـ `r"\d{2,4}"` هو النمط تمامًا. (في النص العادي يبدأ `{` إدراجًا، وتحتاج الشرطة
+المائلة إلى المضاعفة.)
 
 ## سطر الأوامر
 
