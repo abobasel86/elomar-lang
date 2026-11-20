@@ -39,7 +39,7 @@ fn apply(stock: Map<String, Item>, name: String, change: Change) -> Result<Map<S
         }
         Change.Sell(n) => {
             if n > item.quantity {
-                return Err("not enough " + name + ": have " + to_string(item.quantity) + ", asked " + to_string(n))
+                return Err("not enough {name}: have {item.quantity}, asked {n}")
             }
             item.quantity -= n
         }

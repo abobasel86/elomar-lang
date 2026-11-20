@@ -47,7 +47,7 @@ fn read_students(path: String) -> Result<List<Student>, String> {
     let text = text_of(fs.read_text(path))?
     return match json.parse<List<Student>>(text) {
         Ok(students) => Ok(students)
-        Err(e) => Err("bad data in " + path + " (" + e.kind() + ")")
+        Err(e) => Err("bad data in {path} ({e.kind()})")
     }
 }
 
@@ -59,7 +59,7 @@ fn main() {
             for s in students {
                 let avg = average(s.grades)
                 let name = label(level(avg))
-                lines.push(s.name + ": " + to_string(avg) + " (" + name + ")")
+                lines.push("{s.name}: {avg} ({name})")
                 counts[name] = counts.get(name).unwrap_or(0) + 1
             }
             print(fs.write_text("output/report.txt", lines.join("\n") + "\n"))

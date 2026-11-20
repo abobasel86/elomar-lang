@@ -333,6 +333,15 @@ impl Checker {
             ExprKind::Int(_) => unreachable!("handled above"),
             ExprKind::Float(_) => Ty::Float,
             ExprKind::Str(_) => Ty::Str,
+            ExprKind::Interp(parts) => {
+                // Any value can be shown as text, as with `to_string`.
+                for part in parts {
+                    if let InterpPart::Expr(inner) = part {
+                        self.check_expr(inner, None);
+                    }
+                }
+                Ty::Str
+            }
             ExprKind::Bool(_) => Ty::Bool,
             ExprKind::Name(name) => {
                 let name = name.clone();

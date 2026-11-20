@@ -20,7 +20,7 @@ pub async fn classify(message: String) -> Result<Ticket, AIError> !{ai, net} {
 async fn main() {
     let message = input("Describe your problem: ")
     match await classify(message) {
-        Ok(t) => print("[" + t.priority + "] " + t.category + ": " + t.summary)
-        Err(e) => print("AI request failed (" + e.kind() + "): " + e.message())
+        Ok(t) => print("[{t.priority}] {t.category}: {t.summary}")
+        Err(e) => print("AI request failed ({e.kind()}): {e.message()}")
     }
 }

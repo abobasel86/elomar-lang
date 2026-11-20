@@ -295,6 +295,8 @@ pub enum ExprKind {
     Int(i64),
     Float(f64),
     Str(String),
+    /// `"Hello {name}"`: literal text and expressions, joined as text.
+    Interp(Vec<InterpPart>),
     Bool(bool),
     /// A duration literal, in milliseconds.
     Duration(i64),
@@ -403,3 +405,10 @@ pub enum PatternKind {
 
 /// Names of the prelude's value constructors.
 pub const CONSTRUCTORS: [&str; 4] = ["Some", "None", "Ok", "Err"];
+
+/// A piece of an interpolated string.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterpPart {
+    Lit(String),
+    Expr(Expr),
+}

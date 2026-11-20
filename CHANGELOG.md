@@ -4,6 +4,18 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- String interpolation: `"Hello {name}, next year {age + 1}"`. Any
+  expression goes between `{` and `}` and is shown as `print` shows it.
+
+### Changed
+
+- A `{` inside a string now starts an interpolation. Write `\{` for a
+  literal brace, for example in JSON text: `"\{\"a\": 1}"`.
+
 ## [0.1.0] - 2026-11-20
 
 The first public release: an interpreter, tools and editor support for the

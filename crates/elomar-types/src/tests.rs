@@ -597,7 +597,7 @@ fn fs_functions_are_typed_and_perform_fs() {
 #[test]
 fn json_parse_and_stringify() {
     ok(
-        "use std.json\ntype Student = { name: String, grades: List<Int>, extra: Map<String, Bool> }\nfn main() {\n  match json.parse<Student>(\"{}\") {\n    Ok(s) => print(json.stringify(s), json.pretty(s.grades))\n    Err(JsonError.InvalidJson(m)) => print(m)\n    Err(e) => print(e.kind())\n  }\n}",
+        "use std.json\ntype Student = { name: String, grades: List<Int>, extra: Map<String, Bool> }\nfn main() {\n  match json.parse<Student>(\"\\{}\") {\n    Ok(s) => print(json.stringify(s), json.pretty(s.grades))\n    Err(JsonError.InvalidJson(m)) => print(m)\n    Err(e) => print(e.kind())\n  }\n}",
     );
     // json is pure: no effect needed on a public function.
     ok("use std.json\npub fn encode(xs: List<Int>) -> String {\n  return json.stringify(xs)\n}");
@@ -744,7 +744,7 @@ fn closure_effects_belong_to_their_creator() {
 #[test]
 fn http_module() {
     ok(
-        "use std.http\nfn main() {\n  match http.get(\"https://example.com\") {\n    Ok(r) => print(r.status, r.body.length)\n    Err(HttpError.PolicyDenied(m)) => print(m)\n    Err(e) => print(e.kind(), e.message())\n  }\n  let r: Result<{ status: Int, body: String }, HttpError> = http.post(\"https://example.com\", \"{}\", \"application/json\")\n}",
+        "use std.http\nfn main() {\n  match http.get(\"https://example.com\") {\n    Ok(r) => print(r.status, r.body.length)\n    Err(HttpError.PolicyDenied(m)) => print(m)\n    Err(e) => print(e.kind(), e.message())\n  }\n  let r: Result<{ status: Int, body: String }, HttpError> = http.post(\"https://example.com\", \"\\{}\", \"application/json\")\n}",
     );
     ok(
         "use std.http\npub fn fetch(url: String) -> Bool !{net} {\n  return http.get(url).is_ok()\n}",
@@ -1094,4 +1094,17 @@ fn analyze_records_hovers_and_definitions() {
             .iter()
             .any(|(u, d)| u.start == use_at && d.start == def_at)
     );
+}
+
+#[test]
+fn interpolation_is_checked() {
+    ok("fn main() {\n  let n = 3\n  let s: String = \"n = {n * 2}\"\n  print(s)\n}");
+    assert_eq!(
+        codes("fn main() {\n  print(\"{missing}\")\n}"),
+        vec!["E1001"]
+    );
+    let d = diags("fn main() {\n  let n = 1\n  print(\"x {n + true}\")\n}");
+    let src = "fn main() {\n  let n = 1\n  print(\"x {n + true}\")\n}";
+    let span = d[0].label.span;
+    assert_eq!(&src[span.start as usize..span.end as usize], "n + true");
 }

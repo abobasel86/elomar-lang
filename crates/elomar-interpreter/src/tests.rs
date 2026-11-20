@@ -466,7 +466,7 @@ fn files_are_denied_by_default() {
 
 #[test]
 fn json_round_trip() {
-    let src = "use std.json\nenum Level { Low, High }\ntype Student = { name: String, grades: List<Int>, level: Level, note: Option<String>, scores: Map<String, Float> }\nfn main() {\n  let text = \"{\\\"name\\\": \\\"Lina\\\", \\\"grades\\\": [90, 85], \\\"level\\\": \\\"High\\\", \\\"scores\\\": {\\\"math\\\": 9.5}}\"\n  match json.parse<Student>(text) {\n    Ok(s) => {\n      print(s.name, s.grades, s.level, s.note, s.scores[\"math\"])\n      print(json.stringify(s))\n    }\n    Err(e) => print(e)\n  }\n  print(json.parse<List<Int>>(\"[1, 2\"))\n  print(json.parse<List<Int>>(\"[1, \\\"x\\\"]\"))\n  print(json.pretty([\"a\": [1, 2]]))\n}";
+    let src = "use std.json\nenum Level { Low, High }\ntype Student = { name: String, grades: List<Int>, level: Level, note: Option<String>, scores: Map<String, Float> }\nfn main() {\n  let text = \"\\{\\\"name\\\": \\\"Lina\\\", \\\"grades\\\": [90, 85], \\\"level\\\": \\\"High\\\", \\\"scores\\\": \\{\\\"math\\\": 9.5}}\"\n  match json.parse<Student>(text) {\n    Ok(s) => {\n      print(s.name, s.grades, s.level, s.note, s.scores[\"math\"])\n      print(json.stringify(s))\n    }\n    Err(e) => print(e)\n  }\n  print(json.parse<List<Int>>(\"[1, 2\"))\n  print(json.parse<List<Int>>(\"[1, \\\"x\\\"]\"))\n  print(json.pretty([\"a\": [1, 2]]))\n}";
     assert_eq!(
         out(src),
         // Record types are structural, so parsed records list fields alphabetically.
@@ -556,7 +556,7 @@ fn http_requests() {
     let port = test_server(4);
     let base = format!("http://127.0.0.1:{port}");
     let src = format!(
-        "use std.http\nfn show(r: Result<{{ status: Int, body: String }}, HttpError>) {{\n  match r {{\n    Ok(resp) => print(resp.status, resp.body)\n    Err(e) => print(e.kind())\n  }}\n}}\nfn main() {{\n  show(http.get(\"{base}/hello\"))\n  show(http.post(\"{base}/items\", \"{{\\\"a\\\": 1}}\"))\n  show(http.get(\"{base}/missing\"))\n  show(http.get(\"{base}/redirect\"))\n  show(http.get(\"http://127.0.0.1:1/other-port\"))\n  show(http.get(\"http://example.com/\"))\n  show(http.get(\"not a url\"))\n}}"
+        "use std.http\nfn show(r: Result<{{ status: Int, body: String }}, HttpError>) {{\n  match r {{\n    Ok(resp) => print(resp.status, resp.body)\n    Err(e) => print(e.kind())\n  }}\n}}\nfn main() {{\n  show(http.get(\"{base}/hello\"))\n  show(http.post(\"{base}/items\", \"\\{{\\\"a\\\": 1}}\"))\n  show(http.get(\"{base}/missing\"))\n  show(http.get(\"{base}/redirect\"))\n  show(http.get(\"http://127.0.0.1:1/other-port\"))\n  show(http.get(\"http://example.com/\"))\n  show(http.get(\"not a url\"))\n}}"
     );
     let (mut program, diags) = elomar_parser::parse(&src);
     assert!(diags.is_empty(), "{diags:#?}");
@@ -762,4 +762,21 @@ fn python_calls() {
 #[test]
 fn python_needs_permission() {
     assert!(run_py(PY_SRC, false).starts_with("Err(PyError.PolicyDenied("));
+}
+
+#[test]
+fn string_interpolation() {
+    let src = r#"type P = { name: String, age: Int }
+fn main() {
+  let p: P = { name: "Lina", age: 30 }
+  let xs = [1, 2]
+  let m = ["k": 2.5]
+  print("Hi {p.name}, next year {p.age + 1}.")
+  print("{xs} {m["k"]} {xs.length > 1} {Some(3)} \{literal\}")
+  print("مرحبا {p.name}! {"nested {p.age}"}")
+}"#;
+    assert_eq!(
+        out(src),
+        "Hi Lina, next year 31.\n[1, 2] 2.5 true Some(3) {literal}\nمرحبا Lina! nested 30\n"
+    );
 }

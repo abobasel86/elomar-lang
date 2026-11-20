@@ -37,13 +37,27 @@
       "patterns": [
         {
           "name": "constant.character.escape.elomar",
-          "match": "\\\\(?:[ntr0\"\\\\]|u\\{[0-9A-Fa-f]{1,6}\\})"
+          "match": "\\\\(?:[ntr0\"\\\\{}]|u\\{[0-9A-Fa-f]{1,6}\\})"
         },
         {
           "name": "invalid.illegal.escape.elomar",
           "match": "\\\\."
+        },
+        {
+          "name": "meta.interpolation.elomar",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.elomar" } },
+          "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.elomar" } },
+          "contentName": "source.elomar.embedded",
+          "patterns": [{ "include": "#interpolation-braces" }, { "include": "$self" }]
         }
       ]
+    },
+    "interpolation-braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#interpolation-braces" }, { "include": "$self" }]
     },
     "numbers": {
       "patterns": [

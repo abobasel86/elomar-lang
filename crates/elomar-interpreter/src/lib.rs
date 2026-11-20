@@ -565,6 +565,20 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ExprKind::Int(n) => Value::Int(*n),
             ExprKind::Float(x) => Value::Float(*x),
             ExprKind::Str(s) => Value::str(s.as_str()),
+            ExprKind::Interp(parts) => {
+                let mut out = String::new();
+                for part in parts {
+                    match part {
+                        InterpPart::Lit(text) => out.push_str(text),
+                        InterpPart::Expr(inner) => {
+                            use std::fmt::Write as _;
+                            let v = self.eval(inner)?;
+                            let _ = write!(out, "{v}");
+                        }
+                    }
+                }
+                Value::str(out)
+            }
             ExprKind::Bool(b) => Value::Bool(*b),
             ExprKind::Name(n) => self.lookup(n, e.span)?,
             ExprKind::List(items) => {

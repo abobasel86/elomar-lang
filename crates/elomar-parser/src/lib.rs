@@ -8,7 +8,7 @@
 
 use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Span, Text};
-use elomar_lexer::{Token, TokenKind};
+use elomar_lexer::{StrPart, Token, TokenKind};
 
 /// Lexes and parses a source file. Lexical and syntax errors are both
 /// returned; the program contains every item that parsed successfully.
@@ -921,6 +921,54 @@ impl Parser {
 
     // ----- expressions -----------------------------------------------------
 
+    /// Parses the `{expr}` parts of an interpolated string token.
+    fn interpolation(&mut self, span: Span, parts: Vec<StrPart>) -> Vec<InterpPart> {
+        let mut out = Vec::new();
+        for part in parts {
+            match part {
+                StrPart::Lit(text) => out.push(InterpPart::Lit(text)),
+                StrPart::Code { src, offset } => {
+                    let (tokens, lex_diags) =
+                        elomar_lexer::lex_at(&src, span.start as usize + offset);
+                    self.diags.extend(lex_diags);
+                    let mut sub = Parser {
+                        tokens,
+                        pos: 0,
+                        diags: Vec::new(),
+                        self_ty: self.self_ty.clone(),
+                    };
+                    sub.skip_newlines();
+                    match sub.expr() {
+                        Ok(e) => {
+                            sub.skip_newlines();
+                            if *sub.peek() != TokenKind::Eof {
+                                let found = sub.span();
+                                sub.diags.push(Diagnostic::error(
+                                    "E0101",
+                                    found,
+                                    Text::new(
+                                        format!(
+                                            "expected `}}` after the expression in the string, found {}",
+                                            sub.peek().describe()
+                                        ),
+                                        format!(
+                                            "المتوقع `}}` بعد التعبير داخل النص، ووُجد {}",
+                                            sub.peek().describe_ar()
+                                        ),
+                                    ),
+                                ));
+                            }
+                            out.push(InterpPart::Expr(e));
+                        }
+                        Err(d) => sub.diags.push(d),
+                    }
+                    self.diags.extend(sub.diags);
+                }
+            }
+        }
+        out
+    }
+
     fn expr(&mut self) -> PResult<Expr> {
         self.expr_bp(0)
     }
@@ -1100,6 +1148,10 @@ impl Parser {
             TokenKind::Str(s) => {
                 self.bump();
                 ExprKind::Str(s)
+            }
+            TokenKind::Template(parts) => {
+                self.bump();
+                ExprKind::Interp(self.interpolation(span, parts))
             }
             TokenKind::True => {
                 self.bump();
@@ -1543,6 +1595,16 @@ mod tests {
                 format!("(match {} {})", sexp(scrutinee), arms.len())
             }
             ExprKind::Duration(ms) => format!("{ms}ms"),
+            ExprKind::Interp(parts) => {
+                let parts: Vec<_> = parts
+                    .iter()
+                    .map(|p| match p {
+                        InterpPart::Lit(t) => format!("{t:?}"),
+                        InterpPart::Expr(e) => sexp(e),
+                    })
+                    .collect();
+                format!("(str {})", parts.join(" "))
+            }
             ExprKind::Await(e) => format!("(await {})", sexp(e)),
             ExprKind::Try(e) => format!("(? {})", sexp(e)),
             ExprKind::Lambda { params, body } => format!(
@@ -1849,5 +1911,19 @@ fn f(x: lib.Level) {
             "(await (. (call<1> (. ai infer) input:x timeout:10000ms) len))"
         );
         assert_eq!(sexp(&first_expr("-await f()")), "(- (await (call f )))");
+    }
+
+    #[test]
+    fn interpolated_strings() {
+        assert_eq!(
+            sexp(&first_expr("\"a {x + 1} b {f(y)}\"")),
+            "(str \"a \" (+ x 1) \" b \" (call f y))"
+        );
+        let (_, diags) = parse(
+            "fn main() {
+  print(\"{x y}\")
+}",
+        );
+        assert_eq!(diags[0].code, "E0101");
     }
 }

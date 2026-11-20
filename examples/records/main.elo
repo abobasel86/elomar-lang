@@ -7,7 +7,7 @@ type Student = {
 }
 
 fn describe(s: Student) -> String {
-    return s.name + " (#" + to_string(s.id) + ")"
+    return "{s.name} (#{s.id})"
 }
 
 fn with_grade(s: Student, grade: Int) -> Student {

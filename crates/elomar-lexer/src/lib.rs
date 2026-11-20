@@ -7,6 +7,17 @@
 use elomar_diagnostics::{Diagnostic, Span, Text};
 use unicode_normalization::UnicodeNormalization;
 
+/// A piece of an interpolated string literal (`"Hello {name}"`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum StrPart {
+    /// Literal text, with escapes already applied.
+    Lit(String),
+    /// The source of an embedded expression. `offset` is its position
+    /// relative to the start of the string token, so the parser can lex it
+    /// with correct spans while the token itself stays position-independent.
+    Code { src: String, offset: usize },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Int(i64),
@@ -14,6 +25,8 @@ pub enum TokenKind {
     /// `500ms`, `10s`, `2m`, `1h`, in milliseconds.
     Duration(i64),
     Str(String),
+    /// A string literal with at least one `{expr}` part.
+    Template(Vec<StrPart>),
     Ident(String),
 
     // Keywords
@@ -97,7 +110,7 @@ impl TokenKind {
             Int(n) => return n.to_string(),
             Duration(ms) => return format!("{ms}ms"),
             Float(f) => return f.to_string(),
-            Str(_) => return "string literal".into(),
+            Str(_) | Template(_) => return "string literal".into(),
             Ident(name) => return name.clone(),
             Newline => return "end of line".into(),
             Comment => return "comment".into(),
@@ -169,7 +182,7 @@ impl TokenKind {
     /// Arabic rendering of [`TokenKind::describe`] for the few non-symbol cases.
     pub fn describe_ar(&self) -> String {
         match self {
-            TokenKind::Str(_) => "نص حرفي".into(),
+            TokenKind::Str(_) | TokenKind::Template(_) => "نص حرفي".into(),
             TokenKind::Newline => "نهاية السطر".into(),
             TokenKind::Eof => "نهاية الملف".into(),
             other => other.describe(),
@@ -185,6 +198,7 @@ impl TokenKind {
                 | Float(_)
                 | Duration(_)
                 | Str(_)
+                | Template(_)
                 | Ident(_)
                 | True
                 | False
@@ -373,6 +387,7 @@ impl<'a> Lexer<'a> {
     fn string(&mut self, start: usize) {
         self.bump();
         let mut value = String::new();
+        let mut parts: Vec<StrPart> = Vec::new();
         loop {
             let Some(c) = self.peek() else {
                 self.unterminated_string(start);
@@ -397,6 +412,8 @@ impl<'a> Lexer<'a> {
                         Some('0') => value.push('\0'),
                         Some('"') => value.push('"'),
                         Some('\\') => value.push('\\'),
+                        Some('{') => value.push('{'),
+                        Some('}') => value.push('}'),
                         Some('u') => {
                             if let Some(ch) = self.unicode_escape() {
                                 value.push(ch);
@@ -407,13 +424,96 @@ impl<'a> Lexer<'a> {
                         _ => self.invalid_escape(esc_start),
                     }
                 }
+                '{' => {
+                    if !value.is_empty() {
+                        parts.push(StrPart::Lit(std::mem::take(&mut value)));
+                    }
+                    if let Some(part) = self.interpolation(start) {
+                        parts.push(part);
+                    } else {
+                        break;
+                    }
+                }
                 _ => {
                     value.push(c);
                     self.bump();
                 }
             }
         }
-        self.push(TokenKind::Str(value), start);
+        if parts.is_empty() {
+            self.push(TokenKind::Str(value), start);
+        } else {
+            if !value.is_empty() {
+                parts.push(StrPart::Lit(value));
+            }
+            self.push(TokenKind::Template(parts), start);
+        }
+    }
+
+    /// Reads `{expr}` inside a string, at the `{`. Braces inside the
+    /// expression nest, and string literals inside it are skipped whole, so
+    /// `"{m["key"]}"` and `"{ {a: 1}.a }"` work. Reports an error and
+    /// returns `None` when the part is not closed on this line.
+    fn interpolation(&mut self, string_start: usize) -> Option<StrPart> {
+        let open = self.pos;
+        self.bump();
+        let code_start = self.pos;
+        let mut depth = 0usize;
+        loop {
+            match self.peek() {
+                None | Some('\n') => {
+                    self.error(
+                        "E0007",
+                        open,
+                        open + 1,
+                        Text::new(
+                            "`{` in a string is not closed; write `\\{` for a literal brace",
+                            "القوس `{` داخل النص غير مغلق؛ اكتب `\\{` لقوس حرفي",
+                        ),
+                    );
+                    return None;
+                }
+                Some('{') => depth += 1,
+                Some('}') if depth == 0 => break,
+                Some('}') => depth -= 1,
+                Some('"') => {
+                    // A string inside the expression: skip to its end.
+                    self.bump();
+                    while let Some(c) = self.peek() {
+                        if c == '"' || c == '\n' {
+                            break;
+                        }
+                        if c == '\\' {
+                            self.bump();
+                        }
+                        self.bump();
+                    }
+                    if self.peek() != Some('"') {
+                        continue;
+                    }
+                }
+                _ => {}
+            }
+            self.bump();
+        }
+        let src = self.src[code_start..self.pos].to_string();
+        self.bump();
+        if src.trim().is_empty() {
+            self.error(
+                "E0007",
+                open,
+                self.pos,
+                Text::new(
+                    "empty `{}` in a string; put an expression inside, or write `\\{` for a literal brace",
+                    "`{}` فارغ داخل النص؛ ضع تعبيرًا داخله، أو اكتب `\\{` لقوس حرفي",
+                ),
+            );
+            return Some(StrPart::Lit(String::new()));
+        }
+        Some(StrPart::Code {
+            src,
+            offset: code_start - string_start,
+        })
     }
 
     /// Parses the `{XXXX}` part of a `\u{XXXX}` escape.
@@ -830,5 +930,47 @@ mod tests {
         assert_eq!(codes, vec!["E0002", "E0001"]);
         let (_, diags) = lex("99999999999999999999");
         assert_eq!(diags[0].code, "E0005");
+    }
+
+    #[test]
+    fn interpolated_strings() {
+        assert_eq!(
+            kinds(r#""Hi {name}!""#),
+            vec![
+                Template(vec![
+                    StrPart::Lit("Hi ".into()),
+                    StrPart::Code {
+                        src: "name".into(),
+                        offset: 5
+                    },
+                    StrPart::Lit("!".into()),
+                ]),
+                Eof
+            ]
+        );
+        // Nested braces and strings stay inside the expression.
+        assert_eq!(
+            kinds(r#""{m["k"]} {{a: 1}.a}""#),
+            vec![
+                Template(vec![
+                    StrPart::Code {
+                        src: r#"m["k"]"#.into(),
+                        offset: 2
+                    },
+                    StrPart::Lit(" ".into()),
+                    StrPart::Code {
+                        src: "{a: 1}.a".into(),
+                        offset: 11
+                    },
+                ]),
+                Eof
+            ]
+        );
+        // `\{` and `\}` are literal braces; a lone `}` is literal too.
+        assert_eq!(kinds(r#""\{x\} }""#), vec![Str("{x} }".into()), Eof]);
+        for bad in [r#""{x""#, r#""{}""#, "\"{x\n}\""] {
+            let (_, diags) = lex(bad);
+            assert_eq!(diags[0].code, "E0007", "{bad}");
+        }
     }
 }

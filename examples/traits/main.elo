@@ -17,15 +17,15 @@ enum Shape {
 
 impl Describe for Student {
     fn describe(self) -> String {
-        return self.name + ": " + to_string(self.grade)
+        return "{self.name}: {self.grade}"
     }
 }
 
 impl Describe for Shape {
     fn describe(self) -> String {
         return match self {
-            Shape.Circle(r) => "circle r=" + to_string(r)
-            Shape.Rect(w, h) => "rect " + to_string(w) + "x" + to_string(h)
+            Shape.Circle(r) => "circle r={r}"
+            Shape.Rect(w, h) => "rect {w}x{h}"
         }
     }
 }
