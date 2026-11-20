@@ -867,9 +867,31 @@ pub fn apply_newline_rules(raw: Vec<Token>) -> Vec<Token> {
         let inside_parens = stack.last() == Some(&Delim::Paren);
         let prev_ends = out.last().is_some_and(|t| t.kind.can_end_statement());
         let next = raw.get(i).map(|t| &t.kind);
+        // A line that starts with `.`, `else`, or an operator that cannot
+        // begin an expression (`||`, `&&`, `+`, `*`, `==`, ...) continues
+        // the previous one. `-` and `!` can begin one, so they do not.
         let continues = matches!(
             next,
-            Some(TokenKind::Dot | TokenKind::Else | TokenKind::Eof) | None
+            Some(
+                TokenKind::Dot
+                    | TokenKind::Else
+                    | TokenKind::Eof
+                    | TokenKind::OrOr
+                    | TokenKind::AndAnd
+                    | TokenKind::Plus
+                    | TokenKind::Star
+                    | TokenKind::Slash
+                    | TokenKind::Percent
+                    | TokenKind::Div
+                    | TokenKind::EqEq
+                    | TokenKind::BangEq
+                    | TokenKind::Lt
+                    | TokenKind::Le
+                    | TokenKind::Gt
+                    | TokenKind::Ge
+                    | TokenKind::DotDot
+                    | TokenKind::DotDotEq
+            ) | None
         );
         if !inside_parens && prev_ends && !continues {
             out.push(raw[first].clone());
@@ -887,6 +909,44 @@ mod tests {
         let (toks, diags) = lex(src);
         assert!(diags.is_empty(), "unexpected diagnostics: {diags:?}");
         toks.into_iter().map(|t| t.kind).collect()
+    }
+
+    #[test]
+    fn leading_operators_continue_the_line() {
+        assert_eq!(
+            kinds("let ok = a\n    || b\n    && c + d\n    == e\nf"),
+            vec![
+                Let,
+                Ident("ok".into()),
+                Eq,
+                Ident("a".into()),
+                OrOr,
+                Ident("b".into()),
+                AndAnd,
+                Ident("c".into()),
+                Plus,
+                Ident("d".into()),
+                EqEq,
+                Ident("e".into()),
+                Newline,
+                Ident("f".into()),
+                Eof
+            ]
+        );
+        // `-` and `!` can start an expression, so they start a new statement.
+        assert_eq!(
+            kinds("a\n-b\n!c"),
+            vec![
+                Ident("a".into()),
+                Newline,
+                Minus,
+                Ident("b".into()),
+                Newline,
+                Bang,
+                Ident("c".into()),
+                Eof
+            ]
+        );
     }
 
     #[test]

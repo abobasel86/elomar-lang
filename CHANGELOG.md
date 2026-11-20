@@ -33,6 +33,10 @@ change the language.
 - `std.process`: `process.run(command, args[, timeout])` runs a program
   listed in `[permissions] commands`, without a shell, and returns its exit
   status and output. New effect `process`, new error `ProcessError`.
+- A line that starts with a binary operator that cannot begin an
+  expression (`||`, `&&`, `+`, `*`, `==`, `<`, ...) continues the previous
+  line. Before, `let ok = a` followed by a line `|| b` silently ignored the
+  second line.
 - A `match` arm may be `return x`, `break` or `continue`:
   `None => return 0`.
 - `match` coverage understands nested patterns (`Ok(Some(x))`, `Ok(None)`,
