@@ -1,5 +1,9 @@
 # Elomar-Lang for VS Code
 
+[Elomar-Lang](https://github.com/abobasel86/elomar-lang) is a simple, typed
+programming language with AI built in, in Arabic and English.
+
+
 - **Syntax highlighting** for `.elo` files, including Arabic names.
 - **Errors while you type**, in English or Arabic, in the file where they
   occur (also inside imported modules), with hints and related locations.
@@ -19,18 +23,14 @@
 
 ## Setup
 
-1. Install the `elomar` command (from the repository root):
-
-   ```bash
-   cargo install --path crates/elomar-cli
-   ```
-
-2. Install this extension from the folder: copy `editor/vscode` to your VS
-   Code extensions folder as `abobasel86.elomar-lang-0.1.0`, then reload VS
-   Code.
-
-   - Windows: `%USERPROFILE%\.vscode\extensions\`
-   - macOS / Linux: `~/.vscode/extensions/`
+1. Install the `elomar` command: download it for your system from the
+   [latest release](https://github.com/abobasel86/elomar-lang/releases/latest)
+   and put it on your `PATH` (or set `elomar.path`).
+2. Install this extension from the Marketplace, or from the
+   `elomar-lang-<version>.vsix` file of the release with
+   **Extensions → … → Install from VSIX**.
+3. Open a folder with `.elo` files. New to the language? Start with the
+   [tutorial](https://abobasel86.github.io/elomar-lang/) in English or Arabic.
 
 ## Settings
 
@@ -47,3 +47,11 @@ standard input/output (the Language Server Protocol), sending the editor's
 current text as you type. The server needs no `main`, so a module file can
 be checked on its own. It restarts automatically if it stops. Formatting
 runs `elomar fmt --stdin`.
+
+## بالعربية
+
+إضافة لغة Elomar-Lang: تلوين الكود، وعرض الأخطاء أثناء الكتابة بالعربية أو الإنجليزية،
+ومعلومات الأنواع عند مرور المؤشر، والانتقال إلى التعريف، والإكمال التلقائي، والتنسيق، وزر
+التشغيل. ثبّت الأمر `elomar` من [صفحة الإصدارات](https://github.com/abobasel86/elomar-lang/releases/latest)،
+وابدأ بـ[الدروس](https://abobasel86.github.io/elomar-lang/ar/). لعرض الأخطاء بالعربية اضبط
+`"elomar.language": "ar"`.

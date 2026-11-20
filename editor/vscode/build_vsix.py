@@ -19,6 +19,9 @@ FILES = [
     "extension.js",
     "language-configuration.json",
     "README.md",
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "images/icon.png",
     "syntaxes/elomar.tmLanguage.json",
     "snippets/elomar.json",
 ]
@@ -38,9 +41,13 @@ def main() -> None:
     <DisplayName>{escape(pkg["displayName"])}</DisplayName>
     <Description xml:space="preserve">{escape(pkg["description"])}</Description>
     <Categories>{escape(",".join(pkg["categories"]))}</Categories>
+    <Tags>{escape(",".join(pkg.get("keywords", [])))}</Tags>
+    <GalleryFlags>Public</GalleryFlags>
     <Properties>
       <Property Id="Microsoft.VisualStudio.Code.Engine" Value="{escape(pkg["engines"]["vscode"])}" />
     </Properties>
+    <License>extension/LICENSE.md</License>
+    <Icon>extension/images/icon.png</Icon>
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Code" />
@@ -49,6 +56,9 @@ def main() -> None:
   <Assets>
     <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true" />
     <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Content.Changelog" Path="extension/CHANGELOG.md" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE.md" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/images/icon.png" Addressable="true" />
   </Assets>
 </PackageManifest>
 """
@@ -57,6 +67,7 @@ def main() -> None:
   <Default Extension=".json" ContentType="application/json" />
   <Default Extension=".js" ContentType="application/javascript" />
   <Default Extension=".md" ContentType="text/markdown" />
+  <Default Extension=".png" ContentType="image/png" />
   <Default Extension=".vsixmanifest" ContentType="text/xml" />
 </Types>
 """

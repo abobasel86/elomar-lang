@@ -52,6 +52,11 @@ change the language.
 - A tutorial website in English and Arabic (`site/`, published to GitHub
   Pages): ten lessons whose programs are type-checked by the test suite.
 
+- The VS Code extension is ready for the Marketplace and Open VSX: an
+  icon, store metadata, and a workflow that checks it with `vsce` and
+  publishes it on version tags once the store tokens are set
+  (`docs/releasing.md`).
+
 ### Changed
 
 - A `{` inside a string now starts an interpolation. Write `\{` for a

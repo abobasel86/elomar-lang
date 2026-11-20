@@ -1,11 +1,32 @@
 {
   "name": "elomar-lang",
   "displayName": "Elomar-Lang",
-  "description": "Language server features for Elomar-Lang: diagnostics (Arabic/English), hover, go to definition, outline, completion, formatting and snippets",
+  "description": "Elomar-Lang support: highlighting, errors while you type (Arabic/English), hover, go to definition, outline, completion, formatting, snippets and a Run button",
   "version": "0.1.0",
   "publisher": "abobasel86",
   "license": "MIT OR Apache-2.0",
-  "private": true,
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#0f6e63",
+    "theme": "dark"
+  },
+  "homepage": "https://abobasel86.github.io/elomar-lang/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abobasel86/elomar-lang",
+    "directory": "editor/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/abobasel86/elomar-lang/issues"
+  },
+  "keywords": [
+    "elomar",
+    "arabic",
+    "عربي",
+    "ai",
+    "language server",
+    "lsp"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -146,7 +167,7 @@
         "elomar.path": {
           "type": "string",
           "default": "elomar",
-          "description": "Path to the `elomar` executable (install it with `cargo install --path crates/elomar-cli`)."
+          "description": "Path to the `elomar` executable, if it is not on PATH. Download it from https://github.com/abobasel86/elomar-lang/releases/latest"
         },
         "elomar.language": {
           "type": "string",
