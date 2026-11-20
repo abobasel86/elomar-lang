@@ -2,11 +2,11 @@
 
 **A general-purpose programming language designed for AI-native applications.**
 
-> **Project status: Phase 2 — early development. Not production-ready.**
-> A working interpreter exists for the language core and for typed AI calls
-> against an offline **mock** provider and **OpenAI**, as described in
-> [`docs/grammar.md`](docs/grammar.md). No modules, packages, file or process
-> permissions, or wider standard library yet.
+> **Project status: v0.1.0, early development. Not production-ready.**
+> A working interpreter for the language, typed AI calls (an offline **mock**
+> provider and **OpenAI**), agents with MCP, a standard library (files, JSON,
+> HTTP, SQLite, Python), packages with a public registry, and editor support.
+> See [`docs/grammar.md`](docs/grammar.md) and the [changelog](CHANGELOG.md).
 
 ## Vision
 
@@ -136,10 +136,28 @@ invalid answers and rate limits simulated by the mock.
 
 ## Getting started
 
-Requires a recent stable Rust toolchain. Install the `elomar` command:
+Download `elomar` for your system from the
+[latest release](https://github.com/abobasel86/elomar-lang/releases/latest):
+
+| System | File |
+|---|---|
+| Windows (x64) | `elomar-<version>-x86_64-pc-windows-msvc.zip` |
+| Linux (x64) | `elomar-<version>-x86_64-unknown-linux-gnu.tar.gz` |
+| macOS (Apple silicon) | `elomar-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS (Intel) | `elomar-<version>-x86_64-apple-darwin.tar.gz` |
+
+Unpack it and put `elomar` (or `elomar.exe`) in a folder on your `PATH`.
+`SHA256SUMS.txt` in the release lists each file's checksum. On macOS, the
+binary is not signed, so the first run may need
+`xattr -d com.apple.quarantine elomar`.
+
+The release also has the VS Code extension: install
+`elomar-lang-<version>.vsix` with **Extensions → … → Install from VSIX**.
+
+Or build from source with a recent stable Rust toolchain:
 
 ```bash
-cargo install --path crates/elomar-cli --locked
+cargo install --git https://github.com/abobasel86/elomar-lang elomar-cli --locked
 ```
 
 Create a project, run it and test it:
@@ -172,8 +190,10 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar new NAME` | Create a project with a program, a module and a passing test |
 | `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
 | `elomar fmt [PATHS] [--check] [--stdin]` | Format `.elo` files (comments kept; never changes meaning) |
-| `elomar add NAME --path DIR` / `--git URL [--tag T]` | Add a dependency and download it |
-| `elomar remove NAME` / `elomar update` | Remove a dependency / refresh git dependencies and `elomar.lock` |
+| `elomar add NAME[@VERSION]` | Add a package from the registry |
+| `elomar add NAME --path DIR` / `--git URL [--tag T]` | Add a dependency from a folder or git |
+| `elomar remove NAME` / `elomar update` | Remove a dependency / move to the newest allowed versions |
+| `elomar search [TEXT]` / `elomar publish --index DIR` | Find packages / add this package's version to a registry index |
 | `elomar lsp` | Language server for editors (LSP on stdio) |
 
 ## Repository layout
@@ -265,7 +285,14 @@ dual licensed as above, without any additional terms or conditions.
 
 **Elomar-Lang** لغة برمجة عامة الأغراض، أصلية التكامل مع الذكاء الاصطناعي. المفسّر الحالي
 ينفذ نواة اللغة: الأنواع والاستنتاج، والسجلات، و`match`، والتأثيرات، ورسائل الأخطاء
-بالعربية والإنجليزية. لتشغيل مثال بالعربية:
+بالعربية والإنجليزية.
+
+**التثبيت:** نزّل ملف `elomar` المناسب لنظامك من
+[آخر إصدار](https://github.com/abobasel86/elomar-lang/releases/latest)، وفك ضغطه،
+وضع `elomar` في مجلد ضمن `PATH`. ومع الإصدار ملف إضافة VS Code (`.vsix`) تثبّته
+من **Extensions → … → Install from VSIX**.
+
+لتشغيل مثال بالعربية من نسخة المصدر:
 
 ```bash
 cargo run -p elomar-cli -- --lang ar run examples/arabic/main.elo

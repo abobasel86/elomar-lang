@@ -26,7 +26,7 @@
    ```
 
 2. Install this extension from the folder: copy `editor/vscode` to your VS
-   Code extensions folder as `abobasel86.elomar-lang-0.0.1`, then reload VS
+   Code extensions folder as `abobasel86.elomar-lang-0.1.0`, then reload VS
    Code.
 
    - Windows: `%USERPROFILE%\.vscode\extensions\`
