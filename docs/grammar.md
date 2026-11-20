@@ -315,6 +315,25 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 ثم تُفك، و`String` يُطلب نصًا حرًا. `instructions` في رسالة النظام مع تنبيه بأن رسالة المستخدم بيانات لا تعليمات، و`input`
 في رسالة المستخدم. إعادة التوجيه (Redirects) لا تُتبع، والمفتاح يُقرأ عند كل استدعاء ويُخفى (`sk-***`) في رسائل الخطأ.
 
+### 4.6.2.1 مزود Anthropic (Claude)
+
+```toml
+[ai.models."support.classifier"]
+provider = "anthropic"
+model = "claude-opus-5-5"             # اختياري؛ هذا هو الافتراضي
+api_key_env = "ANTHROPIC_API_KEY"     # الافتراضي ANTHROPIC_API_KEY
+
+[permissions]
+network_hosts = ["api.anthropic.com"]
+```
+
+القواعد نفسها كما في OpenAI (الصلاحيات، `net`، إخفاء المفتاح، تحويل الأخطاء). الفروق:
+
+- واجهة Messages (`POST /v1/messages`) بإصدار `2026-10-21`. الأنواع تُطلب بـ `output_config.format` (JSON Schema)، والأدوات بـ `strict: true` (أدوات MCP بمخطط الخادم دون `strict`).
+- في حلقة الأدوات يُعاد محتوى المساعد كما وصل تمامًا (ومنه كتل التفكير)، وتُجمع نتائج الخطوة الواحدة في رسالة واحدة.
+- عند رفض النموذج (`stop_reason: "refusal"`) يُرجع `PolicyDenied`. للنماذج `claude-opus-5-5` و`claude-opus-5` و`claude-sonnet-5-5` و`claude-fable-5-1` و`claude-fable-5-2` يُفعَّل التحويل التلقائي إلى نموذج بديل عند الرفض (`fallbacks: "default"`).
+- HTTP 402 → `BudgetExceeded` · 529 (ضغط) → `ProviderUnavailable` · 400 مع «prompt is too long» → `ContextLimitExceeded`.
+
 ### 4.6.1 الأدوات: `ai.run`
 
 ```elomar

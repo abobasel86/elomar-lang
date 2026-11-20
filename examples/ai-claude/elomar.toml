@@ -1,0 +1,18 @@
+# A real Claude model. This example is not part of the automated tests:
+# it needs an API key and each run costs money.
+[package]
+name = "ai-claude"
+version = "0.1.0"
+entry = "main.elo"
+
+[ai.models."support.classifier"]
+provider = "anthropic"
+model = "claude-opus-5-5"            # the default; any current Claude model id works
+api_key_env = "ANTHROPIC_API_KEY"    # the key itself never goes in this file
+
+[ai.policy]
+max_calls_per_run = 5
+
+# Default deny: without this line every request is refused with PolicyDenied.
+[permissions]
+network_hosts = ["api.anthropic.com"]

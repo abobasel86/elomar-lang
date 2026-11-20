@@ -6,6 +6,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use elomar_ai_core::{AiRuntime, ModelProvider, ProjectConfig, UnavailableProvider, parse_config};
+use elomar_ai_provider_anthropic::AnthropicProvider;
 use elomar_ai_provider_mock::MockProvider;
 use elomar_ai_provider_openai::OpenAiProvider;
 use elomar_diagnostics::{Diagnostic, Lang, RenderOptions, SourceMap, render_in};
@@ -405,6 +406,9 @@ pub(crate) fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, Strin
                     .map_err(|e| config_error(format!("model `{name}`: {e}")))?,
             ),
             "openai" => Box::new(OpenAiProvider::from_config(&name, &model).map_err(config_error)?),
+            "anthropic" => {
+                Box::new(AnthropicProvider::from_config(&name, &model).map_err(config_error)?)
+            }
             other => Box::new(UnavailableProvider {
                 provider: other.to_string(),
             }),

@@ -10,6 +10,10 @@ change the language.
 
 - String interpolation: `"Hello {name}, next year {age + 1}"`. Any
   expression goes between `{` and `}` and is shown as `print` shows it.
+- Anthropic Claude provider: `provider = "anthropic"` in `elomar.toml`
+  (default model `claude-opus-5-5`, key in `ANTHROPIC_API_KEY`), for
+  `ai.infer`, `ai.run` and `agent.run`, with structured outputs, strict
+  tools and the server-side fallback on refusals.
 
 ### Changed
 

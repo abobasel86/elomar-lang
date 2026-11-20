@@ -174,6 +174,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elomar-ai-provider-anthropic"
+version = "0.1.0"
+dependencies = [
+ "elomar-ai-core",
+ "serde_json",
+ "ureq",
+ "url",
+]
+
+[[package]]
 name = "elomar-ai-provider-mock"
 version = "0.1.0"
 dependencies = [
@@ -204,6 +214,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "elomar-ai-core",
+ "elomar-ai-provider-anthropic",
  "elomar-ai-provider-mock",
  "elomar-ai-provider-openai",
  "elomar-ast",

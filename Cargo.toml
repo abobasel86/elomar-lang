@@ -14,6 +14,7 @@ members = [
     "crates/elomar-ai-core",
     "crates/elomar-ai-provider-mock",
     "crates/elomar-ai-provider-openai",
+    "crates/elomar-ai-provider-anthropic",
     "crates/elomar-interpreter",
     "crates/elomar-cli",
 ]
@@ -41,6 +42,7 @@ elomar-interpreter = { path = "crates/elomar-interpreter" }
 elomar-ai-core = { path = "crates/elomar-ai-core" }
 elomar-ai-provider-mock = { path = "crates/elomar-ai-provider-mock" }
 elomar-ai-provider-openai = { path = "crates/elomar-ai-provider-openai" }
+elomar-ai-provider-anthropic = { path = "crates/elomar-ai-provider-anthropic" }
 
 unicode-ident = "1"
 unicode-normalization = "0.1"

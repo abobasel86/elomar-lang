@@ -4,7 +4,7 @@
 
 > **Project status: v0.1.0, early development. Not production-ready.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
-> provider and **OpenAI**), agents with MCP, a standard library (files, JSON,
+> provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard library (files, JSON,
 > HTTP, SQLite, Python), packages with a public registry, and editor support.
 > See [`docs/grammar.md`](docs/grammar.md) and the [changelog](CHANGELOG.md).
 
@@ -82,6 +82,9 @@ by the compiler when they are not declared.
   environment variable, a default-deny `[permissions] network_hosts`
   allowlist, and the `net` effect required for cloud models. See
   [`examples/ai-openai`](examples/ai-openai).
+- An **Anthropic Claude provider** (`provider = "anthropic"`, default model
+  `claude-opus-5-5`) with structured outputs and tools. See
+  [`examples/ai-claude`](examples/ai-claude).
 - Arabic identifiers and correct Unicode text handling.
 - **Bilingual diagnostics** (English/Arabic) with source locations and hints.
 
@@ -213,6 +216,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-policy` | File-system permission checks |
 | `crates/elomar-ai-provider-mock` | Deterministic offline model provider |
 | `crates/elomar-ai-provider-openai` | OpenAI Chat Completions provider over HTTPS |
+| `crates/elomar-ai-provider-anthropic` | Anthropic Claude (Messages API) provider over HTTPS |
 | `crates/elomar-cli` | The `elomar` command |
 | `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
