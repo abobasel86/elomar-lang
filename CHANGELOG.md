@@ -6,25 +6,40 @@ change the language.
 
 ## [Unreleased]
 
-### Added
+A larger language and standard library: string interpolation, a web
+server, Claude, and modules for math, time, text patterns, encoding,
+hashing and running programs; plus a tutorial website, a browser
+playground and the first registry packages.
+
+### Language
 
 - String interpolation: `"Hello {name}, next year {age + 1}"`. Any
   expression goes between `{` and `}` and is shown as `print` shows it.
+- Raw strings: `r"\d{2,4}"` and `r#"say "hi""#` keep every character as
+  written (no escapes, no interpolation), for regular expressions and
+  Windows paths.
+- A `match` arm may be `return x`, `break` or `continue`:
+  `None => return 0`.
+- `match` coverage understands nested patterns (`Ok(Some(x))`, `Ok(None)`,
+  `Err(e)`) and names the exact missing case.
+- A line that starts with a binary operator that cannot begin an
+  expression (`||`, `&&`, `+`, `*`, `==`, `<`, ...) continues the previous
+  line. Before, the line `|| b` after `let ok = a` was silently ignored.
+- New methods: strings `index_of`, `slice`, `lines`, `words`,
+  `trim_start`, `trim_end`, `pad_start`, `pad_end`, `reverse`; lists
+  `take`, `skip`, `unique`, `min`, `max`, `enumerate`, `chunks`,
+  `flat_map`, `group_by`; maps `get_or`, `entries`; numbers `pow`, `clamp`,
+  and for `Float` `round_to` and `to_fixed`.
+
+### AI
+
 - Anthropic Claude provider: `provider = "anthropic"` in `elomar.toml`
   (default model `claude-opus-5-5`, key in `ANTHROPIC_API_KEY`), for
   `ai.infer`, `ai.run` and `agent.run`, with structured outputs, strict
   tools and the server-side fallback on refusals.
-- `std.math` (constants such as `math.pi`, roots, powers, logarithms,
-  trigonometry), `std.random` (`int`, `float`, `choice`, `shuffle`, `seed`),
-  `std.time` (`now`, `format`, `parse`, `date`, `make`, `sleep`, `today`)
-  and `std.os` (`args`, `env`, `platform`, `exit`).
-- Raw strings: `r"\d{2,4}"` and `r#"say "hi""#` keep every character as
-  written (no escapes, no interpolation), for regular expressions and
-  Windows paths.
-- `std.regex` (`is_match`, `find`, `find_all`, `captures`, `replace`,
-  `split`; literal patterns are checked when compiling, `E2023`),
-  `std.encoding` (Base64, hex, URL) and `std.crypto` (`sha256`,
-  `hmac_sha256`, and secure `uuid` and `token`).
+
+### Standard library
+
 - `std.server`: an HTTP server for web APIs and pages.
   `server.serve(address, handler)` calls `fn(HttpRequest) -> HttpResponse`
   for each request, with `server.text`, `html`, `json` and `redirect`
@@ -33,45 +48,53 @@ change the language.
 - `std.process`: `process.run(command, args[, timeout])` runs a program
   listed in `[permissions] commands`, without a shell, and returns its exit
   status and output. New effect `process`, new error `ProcessError`.
-- A line that starts with a binary operator that cannot begin an
-  expression (`||`, `&&`, `+`, `*`, `==`, `<`, ...) continues the previous
-  line. Before, `let ok = a` followed by a line `|| b` silently ignored the
-  second line.
-- A `match` arm may be `return x`, `break` or `continue`:
-  `None => return 0`.
-- `match` coverage understands nested patterns (`Ok(Some(x))`, `Ok(None)`,
-  `Err(e)`) and names the exact missing case.
+- `std.math` (constants such as `math.pi`, roots, powers, logarithms,
+  trigonometry), `std.random` (`int`, `float`, `choice`, `shuffle`, `seed`),
+  `std.time` (`now`, `format`, `parse`, `date`, `make`, `sleep`, `today`)
+  and `std.os` (`args`, `env`, `platform`, `exit`).
+- `std.regex` (`is_match`, `find`, `find_all`, `captures`, `replace`,
+  `split`; literal patterns are checked when compiling, `E2023`),
+  `std.encoding` (Base64, hex, URL) and `std.crypto` (`sha256`,
+  `hmac_sha256`, and secure `uuid` and `token`).
+
+### Tools
+
 - `elomar run main.elo a b` passes `a b` to the program (`os.args()`), and
   `os.exit(code)` sets the exit code.
-- New methods: strings `index_of`, `slice`, `lines`, `words`,
-  `trim_start`, `trim_end`, `pad_start`, `pad_end`, `reverse`; lists
-  `take`, `skip`, `unique`, `min`, `max`, `enumerate`, `chunks`,
-  `flat_map`, `group_by`; maps `get_or`, `entries`; numbers `pow`, `clamp`,
-  and for `Float` `round_to` and `to_fixed`.
-
-- A tutorial website in English and Arabic (`site/`, published to GitHub
-  Pages): ten lessons whose programs are type-checked by the test suite.
-
+- `elomar fmt` indents a line that starts with `||`, `&&` or another
+  binary operator one level deeper, and indents the contents of several
+  brackets opened on one line (`f([`) once instead of once per bracket.
+- The first registry packages: `textkit` (text helpers), `csvkit` (CSV)
+  and `validator` (input checks). `elomar add textkit` installs one.
 - The VS Code extension is ready for the Marketplace and Open VSX: an
   icon, store metadata, and a workflow that checks it with `vsce` and
   publishes it on version tags once the store tokens are set
   (`docs/releasing.md`).
 
-- A playground on the website: write and run Elomar-Lang in the browser,
-  with examples and share links. The interpreter is compiled to
-  WebAssembly (`crates/elomar-playground`); files, databases, HTTP, servers,
-  Python and processes are not available there, and AI calls use `mock`.
-- The interpreter's SQLite and HTTP support is behind a `native` feature
-  (on for the `elomar` command), so it can be built for the browser.
+### Website
+
+- A tutorial in English and Arabic (`site/`, published to GitHub Pages):
+  ten lessons whose programs are type-checked by the test suite.
+- A playground: write and run Elomar-Lang in the browser, with examples and
+  share links. The interpreter is compiled to WebAssembly
+  (`crates/elomar-playground`); files, databases, HTTP, servers, Python and
+  processes are not available there, and AI calls use `mock`. The
+  interpreter's SQLite and HTTP support is now behind a `native` feature
+  (on for the `elomar` command).
 
 ### Changed
 
-- `elomar fmt` indents a line that starts with `||`, `&&` or another
-  binary operator one level deeper, and indents the contents of several
-  brackets opened on one line (`f([`) once instead of once per bracket.
-
 - A `{` inside a string now starts an interpolation. Write `\{` for a
-  literal brace, for example in JSON text: `"\{\"a\": 1}"`.
+  literal brace, for example in JSON text: `"\{\"a\": 1}"`, or use a raw
+  string.
+
+### بالعربية
+
+إدراج القيم في النصوص (`"مرحبا {name}"`) والنصوص الخام، وخادم ويب (`std.server`)، ومزود
+Claude، ووحدات للرياضيات والوقت والأعداد العشوائية والتعابير النمطية والترميز والتشفير وتشغيل
+البرامج ومعاملات سطر الأوامر، ودوال جديدة للنصوص والقوائم والقواميس. ومعها موقع دروس بالعربية
+والإنجليزية، وساحة تجربة تشغّل اللغة في المتصفح، وأول ثلاث حزم في السجل العام. تنبيه: `{` داخل
+النص صار يبدأ إدراجًا، فاكتب `\{` للقوس الحرفي.
 
 ## [0.1.0] - 2026-11-20
 
