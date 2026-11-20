@@ -16,7 +16,8 @@
 //! publishing. `yanked = true` hides a version from new resolutions (lock
 //! files that already use it keep working). Which registry a project uses
 //! is set in its elomar.toml, `[registry] index = "<git URL or folder>"`,
-//! or by the `ELOMAR_REGISTRY` environment variable.
+//! or by the `ELOMAR_REGISTRY` environment variable; otherwise it is the
+//! public registry, [`DEFAULT_INDEX`].
 
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,9 @@ use serde::Deserialize;
 use crate::{cache_dir, git, url_key};
 
 pub const REGISTRY_ENV: &str = "ELOMAR_REGISTRY";
+
+/// The public registry, used when a project names none.
+pub const DEFAULT_INDEX: &str = "https://github.com/abobasel86/elomar-registry";
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct IndexVersion {
@@ -80,19 +84,20 @@ struct RegistrySection {
 }
 
 /// Where the project's registry is: a git URL, or an absolute folder.
-pub fn location(project_root: &Path) -> Result<Option<String>, String> {
+pub fn location(project_root: &Path) -> Result<String, String> {
     let path = project_root.join("elomar.toml");
     if let Ok(text) = std::fs::read_to_string(&path) {
         let m: RegistryManifest =
             toml::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
         if let Some(r) = m.registry {
-            return Ok(Some(absolute(project_root, &r.index)));
+            return Ok(absolute(project_root, &r.index));
         }
     }
     Ok(std::env::var(REGISTRY_ENV)
         .ok()
         .filter(|s| !s.trim().is_empty())
-        .map(|s| absolute(&std::env::current_dir().unwrap_or_default(), &s)))
+        .map(|s| absolute(&std::env::current_dir().unwrap_or_default(), &s))
+        .unwrap_or_else(|| DEFAULT_INDEX.to_string()))
 }
 
 fn is_git_url(s: &str) -> bool {
@@ -105,12 +110,6 @@ fn absolute(base: &Path, s: &str) -> String {
     } else {
         base.join(s).to_string_lossy().to_string()
     }
-}
-
-pub fn no_registry_message() -> String {
-    format!(
-        "no package registry is configured; add `[registry]` with `index = \"<git URL or folder>\"` to elomar.toml, or set {REGISTRY_ENV}"
-    )
 }
 
 /// An index on disk.

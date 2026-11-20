@@ -432,12 +432,7 @@ pub fn resolve(project_root: &Path, mode: Mode) -> Result<Vec<Package>, String> 
                     }
                     (None, _) => {
                         if index.is_none() {
-                            let Some(at) = registry::location(project_root)? else {
-                                return Err(format!(
-                                    "package `{name}` (required by {wanted_by}): {}",
-                                    registry::no_registry_message()
-                                ));
-                            };
+                            let at = registry::location(project_root)?;
                             index = Some(Index::open(&at, true)?);
                         }
                         let idx = index.as_ref().expect("opened");
@@ -738,15 +733,10 @@ mod tests {
             Some("1.0.0")
         );
 
-        // Without a registry the message says how to set one.
+        // Without `[registry]` (or ELOMAR_REGISTRY) the public one is used.
         std::fs::write(app.join("elomar.toml"), "[dependencies]\nstrings = \"1\"\n").unwrap();
-        let _ = std::fs::remove_file(app.join(LOCK_FILE));
         if std::env::var_os(registry::REGISTRY_ENV).is_none() {
-            assert!(
-                resolve(&app, Mode::Online)
-                    .unwrap_err()
-                    .contains("no package registry")
-            );
+            assert_eq!(registry::location(&app).unwrap(), registry::DEFAULT_INDEX);
         }
     }
 

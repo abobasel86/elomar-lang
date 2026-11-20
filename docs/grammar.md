@@ -793,8 +793,8 @@ use geometry.shapes.{Rect, area}
 
 ```toml
 # elomar.toml للتطبيق
-[registry]
-index = "https://github.com/<owner>/elomar-registry"   # مستودع git أو مجلد محلي (أو متغير البيئة ELOMAR_REGISTRY)
+[registry]                       # اختياري: الافتراضي السجل العام https://github.com/abobasel86/elomar-registry
+index = "../my-registry"         # مستودع git أو مجلد محلي (أو متغير البيئة ELOMAR_REGISTRY)
 
 [dependencies]
 strings = "1.2"                 # أحدث إصدار يحقق ^1.2 من السجل

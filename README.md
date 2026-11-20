@@ -54,7 +54,8 @@ by the compiler when they are not declared.
   published versions, each pinned to a commit. Depend on `strings = "1.2"`
   (semver ranges), find packages with `elomar search`, add them with
   `elomar add strings`, and publish with `elomar publish --index <clone>`.
-  No server is needed.
+  No server is needed. The default is the public
+  [elomar-registry](https://github.com/abobasel86/elomar-registry).
 - **Language server** `elomar lsp` (LSP over stdio) for any editor; see
   [Editors](#editors).
 - Effect inference with mandatory declarations on `pub` functions.

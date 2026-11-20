@@ -214,7 +214,7 @@ fn registry_requirement(dir: &Path, name: &str, given: Option<&str>) -> Result<S
 }
 
 fn open_registry(dir: &Path) -> Result<Index, String> {
-    let location = registry::location(dir)?.ok_or_else(registry::no_registry_message)?;
+    let location = registry::location(dir)?;
     Index::open(&location, true)
 }
 
@@ -263,7 +263,7 @@ pub(crate) fn publish(index: Option<&str>, git: Option<&str>, reporter: &Reporte
     let folder = match index {
         Some(f) => std::path::absolute(f).unwrap_or_else(|_| PathBuf::from(f)),
         None => match registry::location(&dir) {
-            Ok(Some(l)) if !l.contains("://") && !l.starts_with("git@") => PathBuf::from(l),
+            Ok(l) if !l.contains("://") && !l.starts_with("git@") => PathBuf::from(l),
             Ok(_) => {
                 return fail(
                     "give a local clone of the registry index with `--index <folder>`".into(),
