@@ -248,9 +248,16 @@ document symbols, completion and formatting.
 
 ## License
 
-To be determined before any public release. Apache-2.0 is the proposed
-option, subject to ownership and licensing review. Until a `LICENSE` file is
-added, no license is granted.
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution you intentionally
+submit for inclusion in the work, as defined in the Apache-2.0 license, is
+dual licensed as above, without any additional terms or conditions.
 
 ---
 

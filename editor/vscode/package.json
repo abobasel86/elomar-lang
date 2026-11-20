@@ -4,6 +4,7 @@
   "description": "Language server features for Elomar-Lang: diagnostics (Arabic/English), hover, go to definition, outline, completion, formatting and snippets",
   "version": "0.0.1",
   "publisher": "abobasel86",
+  "license": "MIT OR Apache-2.0",
   "private": true,
   "engines": {
     "vscode": "^1.85.0"
