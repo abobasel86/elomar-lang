@@ -10,6 +10,7 @@ mod db;
 mod http;
 mod mcp;
 mod py;
+mod stdextra;
 mod stdlib;
 mod value;
 
@@ -33,6 +34,10 @@ pub trait Host {
     /// Shows `prompt` and reads one line, without its line terminator.
     /// `None` at end of input.
     fn input(&mut self, prompt: &str) -> Option<String>;
+    /// The program's arguments (`elomar run main.elo -- a b`), for `os.args()`.
+    fn args(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// A [`Host`] that records output and replays canned input; for tests.
@@ -40,6 +45,7 @@ pub trait Host {
 pub struct BufferHost {
     pub output: String,
     pub inputs: Vec<String>,
+    pub args: Vec<String>,
 }
 
 impl Host for BufferHost {
@@ -55,6 +61,10 @@ impl Host for BufferHost {
             Some(self.inputs.remove(0))
         }
     }
+
+    fn args(&self) -> Vec<String> {
+        self.args.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +74,8 @@ pub struct RuntimeError {
     pub span: Span,
     /// Call sites from innermost to outermost: (function name, call span).
     pub trace: Vec<(String, Span)>,
+    /// Set by `os.exit(code)`: not an error, the program asked to stop.
+    pub exit: Option<i32>,
 }
 
 impl RuntimeError {
@@ -73,6 +85,22 @@ impl RuntimeError {
             message,
             span,
             trace: Vec::new(),
+            exit: None,
+        }
+    }
+
+    /// The program called `os.exit(code)`.
+    pub fn exit(code: i32) -> Self {
+        RuntimeError {
+            exit: Some(code),
+            ..RuntimeError::new(
+                "R0000",
+                Span::new(0, 0),
+                Text::new(
+                    format!("the program exited with code {code}"),
+                    format!("أنهى البرنامج التنفيذ بالرمز {code}"),
+                ),
+            )
         }
     }
 
@@ -640,6 +668,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 _ => unreachable!("checker only awaits futures"),
             },
             ExprKind::Field { target, name } => {
+                if let ExprKind::Name(module) = &target.kind
+                    && module == "std.math"
+                {
+                    return Ok(stdextra::math_constant(&name.name));
+                }
                 let v = self.eval(target)?;
                 match v {
                     Value::Record(fields) => fields
@@ -803,6 +836,16 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         }
                         "std.agent" => return Ok(self.run_future(type_args, values, true)),
                         "std.mcp" => return Ok(mcp::call(&mut self.mcp, &name.name, &values)),
+                        "std.math" | "std.random" | "std.time" | "std.os" => {
+                            return stdextra::call(
+                                module,
+                                &name.name,
+                                &values,
+                                &mut *self.host,
+                                span,
+                            )
+                            .map_err(Flow::from);
+                        }
                         "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
                         "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
                         "std.db" => {
@@ -990,6 +1033,32 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     acc = self.call_value(&f, vec![acc, x.clone()], span)?;
                 }
                 acc
+            }
+            "flat_map" => {
+                let mut out = Vec::new();
+                for x in items.iter() {
+                    if let Value::List(part) = self.call_value(&f, vec![x.clone()], span)? {
+                        out.extend(part.iter().cloned());
+                    }
+                }
+                Value::list(out)
+            }
+            "group_by" => {
+                let mut groups: std::collections::BTreeMap<MapKey, Vec<Value>> =
+                    std::collections::BTreeMap::new();
+                for x in items.iter() {
+                    let key = self.call_value(&f, vec![x.clone()], span)?;
+                    groups
+                        .entry(MapKey::from_value(&key))
+                        .or_default()
+                        .push(x.clone());
+                }
+                Value::Map(Rc::new(
+                    groups
+                        .into_iter()
+                        .map(|(k, v)| (k, Value::list(v)))
+                        .collect(),
+                ))
             }
             "sort_by" => {
                 let mut keyed = Vec::with_capacity(items.len());
@@ -1352,7 +1421,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
 /// List methods that take a function argument.
 const HIGHER_ORDER: &[&str] = &[
-    "map", "filter", "any", "all", "find", "count", "fold", "sort_by",
+    "map", "filter", "any", "all", "find", "count", "fold", "sort_by", "flat_map", "group_by",
 ];
 
 /// The future for `ai.infer<T>(model, instructions, input[, timeout])`;

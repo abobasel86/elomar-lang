@@ -78,6 +78,15 @@ const LIST_METHODS: &[&str] = &[
     "count",
     "fold",
     "sort_by",
+    "take",
+    "skip",
+    "unique",
+    "min",
+    "max",
+    "enumerate",
+    "chunks",
+    "flat_map",
+    "group_by",
     "to_string",
 ];
 const STR_METHODS: &[&str] = &[
@@ -94,9 +103,18 @@ const STR_METHODS: &[&str] = &[
     "parse_int",
     "parse_float",
     "is_empty",
+    "index_of",
+    "slice",
+    "lines",
+    "words",
+    "trim_start",
+    "trim_end",
+    "pad_start",
+    "pad_end",
+    "reverse",
     "to_string",
 ];
-const INT_METHODS: &[&str] = &["to_float", "abs", "to_string"];
+const INT_METHODS: &[&str] = &["to_float", "abs", "pow", "clamp", "to_string"];
 const FLOAT_METHODS: &[&str] = &[
     "to_int",
     "round",
@@ -104,6 +122,10 @@ const FLOAT_METHODS: &[&str] = &[
     "ceil",
     "abs",
     "sqrt",
+    "pow",
+    "clamp",
+    "round_to",
+    "to_fixed",
     "to_string",
 ];
 const OPTION_METHODS: &[&str] = &["is_some", "is_none", "unwrap_or", "to_string"];
@@ -111,6 +133,8 @@ const RESULT_METHODS: &[&str] = &["is_ok", "is_err", "unwrap_or", "to_string"];
 const DURATION_METHODS: &[&str] = &["millis", "seconds", "to_string"];
 const MAP_METHODS: &[&str] = &[
     "get",
+    "get_or",
+    "entries",
     "contains_key",
     "remove",
     "keys",
@@ -194,7 +218,7 @@ impl Checker {
     }
 
     /// Checks an argument that must be `Int` or `Float`, returning its type.
-    fn numeric_arg(&mut self, e: &mut Expr) -> Ty {
+    pub(crate) fn numeric_arg(&mut self, e: &mut Expr) -> Ty {
         let t = self.check_expr(e, None);
         match self.subst.shallow(&t) {
             Ty::Int | Ty::Float | Ty::Error => t,
@@ -365,6 +389,30 @@ impl Checker {
             (Ty::Str, _) => self.str_method(m, args, span),
             (Ty::Int, "to_float") => self.no_args(m, args, span, Ty::Float),
             (Ty::Int, "abs") => self.no_args(m, args, span, Ty::Int),
+            (Ty::Int, "pow") => {
+                self.typed_args(m, args, &[Ty::Int], span);
+                Some(Ty::Int)
+            }
+            (Ty::Int, "clamp") => {
+                self.typed_args(m, args, &[Ty::Int, Ty::Int], span);
+                Some(Ty::Int)
+            }
+            (Ty::Float, "pow") => {
+                self.typed_args(m, args, &[Ty::Float], span);
+                Some(Ty::Float)
+            }
+            (Ty::Float, "clamp") => {
+                self.typed_args(m, args, &[Ty::Float, Ty::Float], span);
+                Some(Ty::Float)
+            }
+            (Ty::Float, "round_to") => {
+                self.typed_args(m, args, &[Ty::Int], span);
+                Some(Ty::Float)
+            }
+            (Ty::Float, "to_fixed") => {
+                self.typed_args(m, args, &[Ty::Int], span);
+                Some(Ty::Str)
+            }
             (Ty::Float, "to_int" | "round" | "floor" | "ceil") => {
                 self.no_args(m, args, span, Ty::Int)
             }
@@ -503,12 +551,55 @@ impl Checker {
                 self.typed_args(m, args, &[Ty::Int, Ty::Int], span);
                 list
             }
-            "sorted" | "sum" => {
+            "take" | "skip" => {
+                self.typed_args(m, args, &[Ty::Int], span);
+                list
+            }
+            "unique" => {
+                self.arity(m, args, 0, 0, span);
+                list
+            }
+            "chunks" => {
+                self.typed_args(m, args, &[Ty::Int], span);
+                Ty::list(list)
+            }
+            "enumerate" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(Ty::Record(vec![
+                    ("index".into(), Ty::Int),
+                    ("value".into(), elem),
+                ]))
+            }
+            "flat_map" => {
+                let out = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(Ty::list(out.clone())));
+                self.typed_args(m, args, &[f], span);
+                Ty::list(out)
+            }
+            "group_by" => {
+                let key = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(key.clone()));
+                self.typed_args(m, args, &[f], span);
+                let k = self.subst.shallow(&key);
+                if !matches!(k, Ty::Int | Ty::Str | Ty::Bool | Ty::Error | Ty::Var(_)) {
+                    let shown = self.subst.show(&k);
+                    self.error(
+                        "E2005",
+                        span,
+                        Text::new(
+                            format!("`group_by` needs a key of type `Int`, `String` or `Bool`, not `{shown}`"),
+                            format!("`group_by` تحتاج مفتاحًا من النوع `Int` أو `String` أو `Bool`، لا `{shown}`"),
+                        ),
+                    );
+                }
+                Ty::Map(Box::new(key), Box::new(list))
+            }
+            "sorted" | "sum" | "min" | "max" => {
                 self.arity(m, args, 0, 0, span);
                 let resolved = self.subst.shallow(&elem);
                 let ok = match m {
-                    "sorted" => matches!(resolved, Ty::Int | Ty::Float | Ty::Str | Ty::Error),
-                    _ => matches!(resolved, Ty::Int | Ty::Float | Ty::Error),
+                    "sum" => matches!(resolved, Ty::Int | Ty::Float | Ty::Error),
+                    _ => matches!(resolved, Ty::Int | Ty::Float | Ty::Str | Ty::Error),
                 };
                 if matches!(resolved, Ty::Var(_)) {
                     self.cannot_infer(recv.span);
@@ -516,10 +607,10 @@ impl Checker {
                 }
                 if !ok {
                     let shown = self.subst.show(&list);
-                    let (need_en, need_ar) = if m == "sorted" {
-                        ("numbers or strings", "أعداد أو نصوص")
-                    } else {
+                    let (need_en, need_ar) = if m == "sum" {
                         ("numbers", "أعداد")
+                    } else {
+                        ("numbers or strings", "أعداد أو نصوص")
                     };
                     self.error(
                         "E2005",
@@ -531,7 +622,11 @@ impl Checker {
                     );
                     return Some(Ty::Error);
                 }
-                if m == "sorted" { list } else { elem }
+                match m {
+                    "sorted" => list,
+                    "sum" => elem,
+                    _ => Ty::option(elem),
+                }
             }
             "map" => {
                 let out = self.subst.fresh();
@@ -611,6 +706,14 @@ impl Checker {
                 self.typed_args(m, args, std::slice::from_ref(&k), span);
                 Ty::Bool
             }
+            "get_or" => {
+                self.typed_args(m, args, &[k, v.clone()], span);
+                v
+            }
+            "entries" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(Ty::Record(vec![("key".into(), k), ("value".into(), v)]))
+            }
             "remove" => {
                 self.require_place(recv, m);
                 self.typed_args(m, args, std::slice::from_ref(&k), span);
@@ -679,8 +782,29 @@ impl Checker {
 
     fn str_method(&mut self, m: &str, args: &mut [Arg], span: Span) -> Option<Ty> {
         Some(match m {
-            "upper" | "lower" | "trim" => {
+            "upper" | "lower" | "trim" | "trim_start" | "trim_end" | "reverse" => {
                 self.arity(m, args, 0, 0, span);
+                Ty::Str
+            }
+            "index_of" => {
+                self.typed_args(m, args, &[Ty::Str], span);
+                Ty::option(Ty::Int)
+            }
+            "slice" => {
+                self.typed_args(m, args, &[Ty::Int, Ty::Int], span);
+                Ty::Str
+            }
+            "lines" | "words" => {
+                self.arity(m, args, 0, 0, span);
+                Ty::list(Ty::Str)
+            }
+            "pad_start" | "pad_end" => {
+                if self.arity(m, args, 1, 2, span) {
+                    self.check_expr_against(&mut args[0].value, &Ty::Int);
+                    if let Some(fill) = args.get_mut(1) {
+                        self.check_expr_against(&mut fill.value, &Ty::Str);
+                    }
+                }
                 Ty::Str
             }
             "contains" | "starts_with" | "ends_with" => {

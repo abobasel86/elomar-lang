@@ -14,6 +14,17 @@ change the language.
   (default model `claude-opus-5-5`, key in `ANTHROPIC_API_KEY`), for
   `ai.infer`, `ai.run` and `agent.run`, with structured outputs, strict
   tools and the server-side fallback on refusals.
+- `std.math` (constants such as `math.pi`, roots, powers, logarithms,
+  trigonometry), `std.random` (`int`, `float`, `choice`, `shuffle`, `seed`),
+  `std.time` (`now`, `format`, `parse`, `date`, `make`, `sleep`, `today`)
+  and `std.os` (`args`, `env`, `platform`, `exit`).
+- `elomar run main.elo a b` passes `a b` to the program (`os.args()`), and
+  `os.exit(code)` sets the exit code.
+- New methods: strings `index_of`, `slice`, `lines`, `words`,
+  `trim_start`, `trim_end`, `pad_start`, `pad_end`, `reverse`; lists
+  `take`, `skip`, `unique`, `min`, `max`, `enumerate`, `chunks`,
+  `flat_map`, `group_by`; maps `get_or`, `entries`; numbers `pow`, `clamp`,
+  and for `Float` `round_to` and `to_fixed`.
 
 ### Changed
 

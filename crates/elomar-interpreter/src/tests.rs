@@ -780,3 +780,98 @@ fn main() {
         "Hi Lina, next year 31.\n[1, 2] 2.5 true Some(3) {literal}\nمرحبا Lina! nested 30\n"
     );
 }
+
+#[test]
+fn more_methods() {
+    let src = r#"fn main() {
+  let s = "  مرحبا Elomar  "
+  print("[{s.trim_start()}]", "[{s.trim_end()}]", "abc".reverse())
+  print("hello world".index_of("world"), "abc".index_of("z"), "مرحبا".slice(1, 3))
+  print("a b\tc".words(), "x\ny".lines(), "7".pad_start(3, "0"), "ab".pad_end(4, "."), "x".pad_start(3))
+  print(2.pow(10), 15.clamp(0, 10), 2.0.pow(0.5).round_to(3), 3.14159.to_fixed(2), 1.5.clamp(0.0, 1.0))
+  let xs = [3, 1, 3, 2, 1]
+  print(xs.take(2), xs.skip(3), xs.take(99), xs.unique(), xs.min(), xs.max(), ["b", "a"].min())
+  let empty: List<Int> = []
+  print(empty.max(), xs.chunks(2))
+  for e in ["a", "b"].enumerate() {
+    print(e.index, e.value)
+  }
+  print([1, 2].flat_map(|x| [x, x * 10]))
+  let groups = ["apple", "avocado", "banana"].group_by(|w| w.slice(0, 1))
+  print(groups)
+  let m = ["a": 1]
+  print(m.get_or("a", 0), m.get_or("z", 0), m.entries())
+}"#;
+    assert_eq!(
+        out(src),
+        "[مرحبا Elomar  ] [  مرحبا Elomar] cba\n\
+         Some(6) None رح\n\
+         [\"a\", \"b\", \"c\"] [\"x\", \"y\"] 007 ab.. __x\n\
+         1024 10 1.414 3.14 1.0\n\
+         [3, 1] [2, 1] [3, 1, 3, 2, 1] [3, 1, 2] Some(1) Some(3) Some(\"a\")\n\
+         None [[3, 1], [3, 2], [1]]\n\
+         0 a\n1 b\n\
+         [1, 10, 2, 20]\n\
+         [\"a\": [\"apple\", \"avocado\"], \"b\": [\"banana\"]]\n\
+         1 0 [{ key: \"a\", value: 1 }]\n"
+            .replace("__x", "  x")
+    );
+    assert_eq!(
+        err_code("fn main() {\n  print(\"ab\".slice(1, 5))\n}"),
+        "R0003"
+    );
+    assert_eq!(err_code("fn main() {\n  print(2.pow(-1))\n}"), "R0006");
+    assert_eq!(err_code("fn main() {\n  print([1].chunks(0))\n}"), "R0006");
+}
+
+#[test]
+fn math_random_time_os() {
+    let src = r#"use std.math
+use std.random
+use std.time
+use std.os
+fn main() {
+  print(math.pi.round_to(4), math.sqrt(16), math.pow(2, 10), math.hypot(3.0, 4), math.ln(math.e), math.is_nan(math.sqrt(-1.0)))
+  random.seed(42)
+  let a = [random.int(1, 6), random.int(1, 6), random.int(1, 6)]
+  random.seed(42)
+  let b = [random.int(1, 6), random.int(1, 6), random.int(1, 6)]
+  print(a == b, a.all(|x| x >= 1 && x <= 6), random.float() < 1.0, random.choice([7]), random.shuffle([1, 2, 3]).sorted())
+  let empty: List<Int> = []
+  print(random.choice(empty))
+  let t = time.make(2026, 11, 20, 9, 30)
+  print(time.format(t), time.parse("2026-11-20T12:30:00+03:00") == Some(t), time.parse("nope"))
+  let d = time.date(t)
+  print(d.year, d.month, d.day, d.hour, d.weekday)
+  print(time.now() > t - 100000000000, time.today().length)
+  print(os.args(), os.env("ELOMAR_SURELY_UNSET_VARIABLE"), os.platform().length > 0)
+  os.exit(3)
+  print("not reached")
+}"#;
+    let (mut program, diags) = elomar_parser::parse(src);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let diags = elomar_types::check(
+        &mut program,
+        elomar_types::CheckOptions {
+            require_main: true,
+            ..Default::default()
+        },
+    );
+    assert!(diags.iter().all(|d| !d.is_error()), "{diags:#?}");
+    let mut host = BufferHost {
+        args: vec!["--name".into(), "Lina".into()],
+        ..Default::default()
+    };
+    let err = with_large_stack(|| run(&program, &mut host)).unwrap_err();
+    assert_eq!(err.exit, Some(3));
+    assert_eq!(
+        host.output,
+        "3.1416 4.0 1024.0 5.0 1.0 true\n\
+         true true true Some(7) [1, 2, 3]\n\
+         None\n\
+         2026-11-20T09:30:00Z true None\n\
+         2026 11 20 9 5\n\
+         true 10\n\
+         [\"--name\", \"Lina\"] None true\n"
+    );
+}

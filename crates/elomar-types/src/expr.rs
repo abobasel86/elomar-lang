@@ -437,6 +437,9 @@ impl Checker {
             }
             ExprKind::Field { target, name } => {
                 let name = name.clone();
+                if let Some(ty) = self.try_module_constant(target, &name) {
+                    return ty;
+                }
                 let t = self.check_expr(target, None);
                 let ty = self.field_type(&t, &name);
                 self.note_typed(name.span, format!("{}: ", name.name), &ty);

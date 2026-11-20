@@ -619,6 +619,35 @@ fn main() {
 - ما تطبعه الدالة يظهر بعد الاستدعاء. المهلة الافتراضية 60 ثانية.
 - `PyError`: `PolicyDenied` و`Unavailable` (لا يوجد Python) و`Exception` (استثناء Python، مثل `"ValueError: ..."`) و`TypeMismatch` و`Timeout`.
 
+## 4.11.4 الرياضيات والعشوائية والوقت والنظام
+
+```elomar
+use std.math
+use std.random
+use std.time
+use std.os
+
+fn main() {
+    print(math.pi, math.sqrt(2), math.pow(2, 10))       // Int يُقبل حيث يُتوقع Float
+    random.seed(7)                                        // نتائج قابلة للتكرار في الاختبارات
+    print(random.int(1, 6), random.choice(["a", "b"]))
+    let t = time.make(2026, 11, 20, 9, 30)               // ملّي ثانية منذ 1970-01-01 UTC
+    print(time.format(t), time.date(t).weekday)           // 2026-11-20T09:30:00Z 5
+    print(os.args(), os.env("HOME"))
+}
+```
+
+| الوحدة | الدوال | التأثير |
+|---|---|---|
+| `std.math` | الثوابت `math.pi` `math.e` `math.tau` `math.inf` · `sqrt` `cbrt` `exp` `ln` `log10` `log2` `sin` `cos` `tan` `asin` `acos` `atan` (عدد → `Float`) · `pow(x, y)` `atan2(y, x)` `hypot(x, y)` · `is_nan(x) -> Bool` | — |
+| `std.random` | `int(min, max) -> Int` (شامل الطرفين) · `float() -> Float` في [0, 1) · `bool()` · `choice(List<T>) -> Option<T>` · `shuffle(List<T>) -> List<T>` · `seed(Int)` | — |
+| `std.time` | `now() -> Int` · `today() -> String` (`YYYY-MM-DD` بتوقيت UTC) · `sleep(Duration)` · `format(Int) -> String` (ISO 8601) · `parse(String) -> Option<Int>` · `date(Int) -> { year, month, day, hour, minute, second, weekday }` (الاثنين = 1) · `make(year, month, day[, hour[, minute[, second]]]) -> Int` | — |
+| `std.os` | `args() -> List<String>` · `env(name) -> Option<String>` · `platform() -> String` (`windows`/`linux`/`macos`) · `exit(code)` | `io` (عدا `platform`) |
+
+- `random` عشوائية زائفة (xorshift) تصلح للألعاب والمحاكاة، **لا** لكلمات المرور والمفاتيح.
+- `time.parse` يقبل `YYYY-MM-DD` ثم اختياريًا `THH:MM[:SS[.fff]]` ومنطقة زمنية (`Z` أو `+03:00`)؛ بلا منطقة يُعدّ UTC. التاريخ غير الموجود (مثل 2001-02-29) يعطي `None`، و`time.make` بتاريخ غير صالح خطأ تنفيذي `R0006`.
+- معاملات البرنامج: `elomar run main.elo a b --flag` ثم `os.args()` تعطي `["a", "b", "--flag"]`. و`os.exit(code)` ينهي البرنامج فورًا برمز الخروج (0–255).
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text
@@ -858,7 +887,7 @@ fn test_greets_by_name() {
 
 ## 5. التأثيرات (Effects)
 
-التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py` `mcp`. المنفذ حاليًا: `io` (`print` و`input`) و`ai` (`ai.infer`)
+التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py` `mcp`. المنفذ حاليًا: `io` (`print` و`input` و`std.os`) و`ai` (`ai.infer`)
 و`net` (`ai.infer` على نموذج سحابي، انظر 4.6.2) و`fs` (`std.fs`، انظر 4.10).
 
 | القاعدة | الرمز |
@@ -903,13 +932,13 @@ fn test_greets_by_name() {
 | النوع | الأعضاء |
 |---|---|
 | كل الأنواع | `.to_string()` |
-| `List<T>` | `.length` · `push(T)`* · `pop() -> Option<T>`* · `insert(Int, T)`* · `remove(Int) -> T`* · `contains(T)` · `index_of(T) -> Option<Int>` · `is_empty()` · `first()` / `last() -> Option<T>` · `reverse()` · `sorted()` (أعداد أو نصوص) · `slice(start, end)` · `sum()` (أعداد) · `join(sep)` (`List<String>`) · `map(fn(T) -> U)` · `filter` / `any` / `all` / `count(fn(T) -> Bool)` · `find(fn(T) -> Bool) -> Option<T>` · `fold(U, fn(U, T) -> U)` · `sort_by(fn(T) -> K)` |
-| `String` | `.length` (حروف مرئية) · `upper()` · `lower()` · `trim()` · `contains(s)` · `starts_with(s)` · `ends_with(s)` · `split(sep) -> List<String>` · `chars() -> List<String>` · `replace(a, b)` · `repeat(n)` · `parse_int()` · `parse_float()` · `is_empty()` |
-| `Int` | `to_float()` · `abs()` |
-| `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` |
+| `List<T>` | `.length` · `push(T)`* · `pop() -> Option<T>`* · `insert(Int, T)`* · `remove(Int) -> T`* · `contains(T)` · `index_of(T) -> Option<Int>` · `is_empty()` · `first()` / `last() -> Option<T>` · `reverse()` · `sorted()` (أعداد أو نصوص) · `slice(start, end)` · `sum()` (أعداد) · `join(sep)` (`List<String>`) · `map(fn(T) -> U)` · `filter` / `any` / `all` / `count(fn(T) -> Bool)` · `find(fn(T) -> Bool) -> Option<T>` · `fold(U, fn(U, T) -> U)` · `sort_by(fn(T) -> K)` · `take(n)` / `skip(n)` · `unique()` · `min()` / `max() -> Option<T>` (أعداد أو نصوص) · `enumerate() -> List<{ index: Int, value: T }>` · `chunks(n) -> List<List<T>>` · `flat_map(fn(T) -> List<U>)` · `group_by(fn(T) -> K) -> Map<K, List<T>>` |
+| `String` | `.length` (حروف مرئية) · `upper()` · `lower()` · `trim()` · `contains(s)` · `starts_with(s)` · `ends_with(s)` · `split(sep) -> List<String>` · `chars() -> List<String>` · `replace(a, b)` · `repeat(n)` · `parse_int()` · `parse_float()` · `is_empty()` · `index_of(s) -> Option<Int>` · `slice(start, end)` (بالحروف المرئية) · `lines()` · `words()` · `trim_start()` / `trim_end()` · `pad_start(n[, fill])` / `pad_end(n[, fill])` · `reverse()` |
+| `Int` | `to_float()` · `abs()` · `pow(n)` (n ≥ 0) · `clamp(min, max)` |
+| `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` · `pow(Float)` · `clamp(min, max)` · `round_to(digits) -> Float` · `to_fixed(digits) -> String` |
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` |
-| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` |
+| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` |
 | `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` |
 | `AIError` · `FsError` · `JsonError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
 
@@ -1013,7 +1042,7 @@ fn test_greets_by_name() {
 | `R0003` | فهرس خارج الحدود |
 | `R0004` | فشل `assert` |
 | `R0005` | استدعاءات متداخلة كثيرة جدًا |
-| `R0006` | معامل غير صالح (جذر عدد سالب، تكرار نص بعدد سالب) |
+| `R0006` | معامل غير صالح (جذر عدد سالب، تكرار نص بعدد سالب، `pow` بأس سالب، `clamp` بحدود معكوسة، `random.int` بحدود معكوسة، تاريخ غير صالح في `time.make`) |
 | `R0007` | تحويل عشري إلى `Int` غير ممكن |
 | `R0008` | استخدام ثابت قبل تهيئته |
 | `R0009` | خطأ داخلي في المفسّر (يُبلَّغ عنه كعلة) |
@@ -1026,4 +1055,4 @@ fn test_greets_by_name() {
 
 مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
 `ai.generate` و`ai.stream` و`ai.embed` · حذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة ·
-الدوال الافتراضية في الواجهات و`impl` للأنواع العامة والمهام المتوازية والإلغاء (v0.3) · الاستيفاء النصي.
+الدوال الافتراضية في الواجهات و`impl` للأنواع العامة والمهام المتوازية والإلغاء (v0.3).

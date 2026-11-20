@@ -76,6 +76,9 @@ by the compiler when they are not declared.
   function from `python/grades.py` (or any installed package) in a
   subprocess, with typed results, the `py` effect and an explicit
   `python = true` permission. See [`examples/python`](examples/python).
+- **Everyday modules:** `std.math` (`math.pi`, `math.sqrt`, ...),
+  `std.random`, `std.time` (dates in ISO 8601) and `std.os` (`os.args()`,
+  `os.env`, `os.exit`), and string interpolation: `"Hello {name}"`.
 - An offline **mock provider** configured in `elomar.toml`: canned answers,
   simulated errors and latency, call budgets — deterministic and free.
 - An **OpenAI provider** (structured outputs) with the key read from an

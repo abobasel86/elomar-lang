@@ -164,6 +164,24 @@ fn arg_str(v: &Value) -> &str {
     }
 }
 
+fn arg_f64(v: &Value) -> f64 {
+    v.as_f64().unwrap_or(0.0)
+}
+
+fn record(fields: Vec<(&str, Value)>) -> Value {
+    Value::Record(Rc::new(
+        fields.into_iter().map(|(n, v)| (Rc::from(n), v)).collect(),
+    ))
+}
+
+fn bad_range(span: Span, lo: &str, hi: &str) -> RuntimeError {
+    invalid_arg(
+        span,
+        format!("`clamp` needs min <= max, got {lo} and {hi}"),
+        format!("`clamp` تحتاج أن يكون الأدنى <= الأعلى، والموجود {lo} و{hi}"),
+    )
+}
+
 fn arg_int(v: &Value) -> i64 {
     match v {
         Value::Int(n) => *n,
@@ -373,6 +391,16 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
                     .cloned()
                     .map_or(Value::none(), Value::some),
                 "contains_key" => Value::Bool(entries.contains_key(&key())),
+                "get_or" => entries
+                    .get(&key())
+                    .cloned()
+                    .unwrap_or_else(|| args[1].clone()),
+                "entries" => Value::list(
+                    entries
+                        .iter()
+                        .map(|(k, v)| record(vec![("key", k.to_value()), ("value", v.clone())]))
+                        .collect(),
+                ),
                 "keys" => Value::list(entries.keys().map(|k| k.to_value()).collect()),
                 "values" => Value::list(entries.values().cloned().collect()),
                 "is_empty" => Value::Bool(entries.is_empty()),
@@ -384,6 +412,44 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
         (Value::Str(s), _) => str_method(&s, method, &args, span)?,
         (Value::Int(n), "to_float") => Value::Float(n as f64),
         (Value::Int(n), "abs") => Value::Int(n.checked_abs().ok_or_else(|| overflow(span))?),
+        (Value::Int(n), "pow") => {
+            let e = arg_int(&args[0]);
+            if e < 0 {
+                return Err(invalid_arg(
+                    span,
+                    format!(
+                        "`pow` needs an exponent of 0 or more, got {e}; use a Float for negative powers"
+                    ),
+                    format!("`pow` تحتاج أسًّا 0 أو أكبر، والموجود {e}؛ استخدم Float للأسس السالبة"),
+                ));
+            }
+            let e = u32::try_from(e).map_err(|_| overflow(span))?;
+            Value::Int(n.checked_pow(e).ok_or_else(|| overflow(span))?)
+        }
+        (Value::Int(n), "clamp") => {
+            let (lo, hi) = (arg_int(&args[0]), arg_int(&args[1]));
+            if lo > hi {
+                return Err(bad_range(span, &lo.to_string(), &hi.to_string()));
+            }
+            Value::Int(n.clamp(lo, hi))
+        }
+        (Value::Float(x), "pow") => Value::Float(x.powf(arg_f64(&args[0]))),
+        (Value::Float(x), "clamp") => {
+            let (lo, hi) = (arg_f64(&args[0]), arg_f64(&args[1]));
+            if lo > hi || lo.is_nan() || hi.is_nan() {
+                return Err(bad_range(span, &format_float(lo), &format_float(hi)));
+            }
+            Value::Float(x.clamp(lo, hi))
+        }
+        (Value::Float(x), "round_to") => {
+            let digits = arg_int(&args[0]).clamp(0, 15) as i32;
+            let factor = 10f64.powi(digits);
+            Value::Float((x * factor).round() / factor)
+        }
+        (Value::Float(x), "to_fixed") => {
+            let digits = arg_int(&args[0]).clamp(0, 20) as usize;
+            Value::str(format!("{x:.digits$}"))
+        }
         (Value::Float(x), "to_int") => Value::Int(float_to_int(x, span)?),
         (Value::Float(x), "round") => Value::Int(float_to_int(x.round(), span)?),
         (Value::Float(x), "floor") => Value::Int(float_to_int(x.floor(), span)?),
@@ -453,6 +519,58 @@ fn list_method(items: &Rc<Vec<Value>>, method: &str, args: &[Value], span: Span)
             }
             Value::list(items[start as usize..end as usize].to_vec())
         }
+        "take" | "skip" => {
+            let n = arg_int(&args[0]).clamp(0, items.len() as i64) as usize;
+            Value::list(if method == "take" {
+                items[..n].to_vec()
+            } else {
+                items[n..].to_vec()
+            })
+        }
+        "unique" => {
+            let mut out: Vec<Value> = Vec::new();
+            for v in items.iter() {
+                if !out.iter().any(|o| o.equals(v)) {
+                    out.push(v.clone());
+                }
+            }
+            Value::list(out)
+        }
+        "min" | "max" => {
+            let best = items.iter().reduce(|a, b| {
+                let order = b.compare(a);
+                let better = if method == "min" {
+                    order.is_lt()
+                } else {
+                    order.is_gt()
+                };
+                if better { b } else { a }
+            });
+            best.cloned().map_or(Value::none(), Value::some)
+        }
+        "enumerate" => Value::list(
+            items
+                .iter()
+                .enumerate()
+                .map(|(i, v)| record(vec![("index", Value::Int(i as i64)), ("value", v.clone())]))
+                .collect(),
+        ),
+        "chunks" => {
+            let n = arg_int(&args[0]);
+            if n <= 0 {
+                return Err(invalid_arg(
+                    span,
+                    format!("`chunks` needs a size of 1 or more, got {n}"),
+                    format!("`chunks` تحتاج حجمًا 1 أو أكبر، والموجود {n}"),
+                ));
+            }
+            Value::list(
+                items
+                    .chunks(n as usize)
+                    .map(|c| Value::list(c.to_vec()))
+                    .collect(),
+            )
+        }
         "join" => Value::str(
             items
                 .iter()
@@ -483,6 +601,55 @@ fn list_method(items: &Rc<Vec<Value>>, method: &str, args: &[Value], span: Span)
 fn str_method(s: &str, method: &str, args: &[Value], span: Span) -> R<Value> {
     Ok(match method {
         "upper" => Value::str(s.to_uppercase()),
+        "trim_start" => Value::str(s.trim_start()),
+        "trim_end" => Value::str(s.trim_end()),
+        "reverse" => Value::str(graphemes(s).rev().collect::<String>()),
+        "lines" => Value::list(s.lines().map(Value::str).collect()),
+        "words" => Value::list(s.split_whitespace().map(Value::str).collect()),
+        "index_of" => match s.find(arg_str(&args[0])) {
+            Some(byte) => Value::some(Value::Int(graphemes(&s[..byte]).count() as i64)),
+            None => Value::none(),
+        },
+        "slice" => {
+            let (start, end) = (arg_int(&args[0]), arg_int(&args[1]));
+            let parts: Vec<&str> = graphemes(s).collect();
+            let len = parts.len() as i64;
+            if start < 0 || end > len || start > end {
+                return Err(RuntimeError::new(
+                    "R0003",
+                    span,
+                    Text::new(
+                        format!(
+                            "slice {start}..{end} is out of bounds for a string of length {len}"
+                        ),
+                        format!("المقطع {start}..{end} خارج حدود نص طوله {len}"),
+                    ),
+                ));
+            }
+            Value::str(parts[start as usize..end as usize].concat())
+        }
+        "pad_start" | "pad_end" => {
+            let width = arg_int(&args[0]).max(0) as usize;
+            let fill = args.get(1).map(arg_str).unwrap_or(" ");
+            if fill.is_empty() {
+                return Err(invalid_arg(
+                    span,
+                    format!("`{method}` needs a non-empty fill text"),
+                    format!("`{method}` تحتاج نص تعبئة غير فارغ"),
+                ));
+            }
+            let have = graphemes(s).count();
+            let mut pad = String::new();
+            let fill_parts: Vec<&str> = graphemes(fill).collect();
+            for i in 0..width.saturating_sub(have) {
+                pad.push_str(fill_parts[i % fill_parts.len()]);
+            }
+            Value::str(if method == "pad_start" {
+                pad + s
+            } else {
+                format!("{s}{pad}")
+            })
+        }
         "lower" => Value::str(s.to_lowercase()),
         "trim" => Value::str(s.trim()),
         "contains" => Value::Bool(s.contains(arg_str(&args[0]))),

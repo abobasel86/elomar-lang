@@ -11,6 +11,7 @@ mod enums;
 mod expr;
 mod ide;
 mod modules;
+mod stdextra;
 mod stdlib;
 mod traits;
 mod ty;
@@ -53,6 +54,10 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "py" => &stdlib::PY_FUNCTIONS,
         "mcp" => &stdlib::MCP_FUNCTIONS,
         "agent" => &["run"],
+        "math" => &stdextra::MATH_FUNCTIONS,
+        "random" => &stdextra::RANDOM_FUNCTIONS,
+        "time" => &stdextra::TIME_FUNCTIONS,
+        "os" => &stdextra::OS_FUNCTIONS,
         _ => &[],
     }
 }

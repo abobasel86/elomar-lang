@@ -37,6 +37,9 @@ enum Command {
     Run {
         /// Path to a `.elo` source file
         file: PathBuf,
+        /// Arguments for the program, read with `os.args()`
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
     /// Check a program for errors without running it
     Check {
@@ -123,9 +126,15 @@ enum Command {
 }
 
 /// Real terminal input/output for running programs.
-struct StdHost;
+struct StdHost {
+    args: Vec<String>,
+}
 
 impl Host for StdHost {
+    fn args(&self) -> Vec<String> {
+        self.args.clone()
+    }
+
     fn print(&mut self, text: &str) {
         let mut out = std::io::stdout().lock();
         let _ = out.write_all(text.as_bytes());
@@ -192,8 +201,12 @@ fn main() -> ExitCode {
         opts: RenderOptions { lang, color },
     };
 
+    let mut program_args = Vec::new();
     let (path, execute) = match &cli.command {
-        Command::Run { file } => (file.as_path(), true),
+        Command::Run { file, args } => {
+            program_args = args.clone();
+            (file.as_path(), true)
+        }
         Command::Test { path, filter } => {
             return testing::run_tests(path, filter.as_deref(), &reporter);
         }
@@ -252,10 +265,10 @@ fn main() -> ExitCode {
             (file.as_path(), false)
         }
     };
-    run_file(path, execute, &reporter)
+    run_file(path, execute, program_args, &reporter)
 }
 
-fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
+fn run_file(path: &Path, execute: bool, args: Vec<String>, reporter: &Reporter) -> ExitCode {
     packages::fetch_for(path, reporter);
     let loaded = match elomar_loader::load(path, &project_root(path)) {
         Ok(l) => l,
@@ -324,11 +337,12 @@ fn run_file(path: &Path, execute: bool, reporter: &Reporter) -> ExitCode {
     let mut runtime = ai.runtime;
     let fs = ai.fs;
     let result = elomar_interpreter::with_large_stack(|| {
-        elomar_interpreter::run_with(&program, &mut StdHost, &mut runtime, fs)
+        elomar_interpreter::run_with(&program, &mut StdHost { args }, &mut runtime, fs)
     });
     let _ = std::io::stdout().flush();
     match result {
         Ok(()) => ExitCode::SUCCESS,
+        Err(err) if err.exit.is_some() => ExitCode::from(err.exit.unwrap_or(0) as u8),
         Err(err) => {
             reporter.emit(&err.to_diagnostic(), &sources);
             ExitCode::from(1)
