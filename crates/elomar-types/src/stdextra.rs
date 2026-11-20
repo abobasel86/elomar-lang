@@ -322,3 +322,78 @@ impl Checker {
         Ty::Str
     }
 }
+
+pub(crate) const SERVER_FUNCTIONS: [&str; 5] = ["serve", "text", "html", "json", "redirect"];
+
+/// `HttpRequest`: what a `server.serve` handler receives.
+pub(crate) fn http_request_ty() -> Ty {
+    let text_map = Ty::map(Ty::Str, Ty::Str);
+    Ty::record(vec![
+        ("method".into(), Ty::Str),
+        ("path".into(), Ty::Str),
+        ("query".into(), text_map.clone()),
+        ("headers".into(), text_map),
+        ("body".into(), Ty::Str),
+    ])
+}
+
+/// `HttpResponse`: what a handler returns.
+pub(crate) fn http_reply_ty() -> Ty {
+    Ty::record(vec![
+        ("status".into(), Ty::Int),
+        ("headers".into(), Ty::map(Ty::Str, Ty::Str)),
+        ("body".into(), Ty::Str),
+    ])
+}
+
+impl Checker {
+    /// `server.serve(address, handler[, max_requests])` and the response
+    /// helpers `server.text`, `html`, `json` and `redirect`.
+    pub(crate) fn check_server_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        let name = func.name.as_str();
+        if !SERVER_FUNCTIONS.contains(&name) {
+            return self.unknown_module_function("server", func, &SERVER_FUNCTIONS, args);
+        }
+        let what = format!("server.{name}");
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        match name {
+            "serve" => {
+                self.usage.direct.push(("net".into(), func.span));
+                if self.arity(&what, args, 2, 3, span) {
+                    self.check_expr_against(&mut args[0].value, &Ty::Str);
+                    let handler = Ty::Fn(vec![http_request_ty()], Box::new(http_reply_ty()));
+                    self.check_expr_against(&mut args[1].value, &handler);
+                    if let Some(max) = args.get_mut(2) {
+                        self.check_expr_against(&mut max.value, &Ty::Int);
+                    }
+                }
+                Ty::result(
+                    Ty::Unit,
+                    Ty::Enum(crate::enums::HTTP_ERROR.into(), Vec::new()),
+                )
+            }
+            "text" | "html" => {
+                self.typed_args(&what, args, &[Ty::Int, Ty::Str], span);
+                http_reply_ty()
+            }
+            "json" => {
+                if self.arity(&what, args, 2, 2, span) {
+                    self.check_expr_against(&mut args[0].value, &Ty::Int);
+                    self.check_expr(&mut args[1].value, None);
+                }
+                http_reply_ty()
+            }
+            _ => {
+                self.typed_args(&what, args, &[Ty::Str], span);
+                http_reply_ty()
+            }
+        }
+    }
+}

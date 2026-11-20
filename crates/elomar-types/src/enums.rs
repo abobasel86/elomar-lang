@@ -401,42 +401,4 @@ impl Checker {
             self.check_pattern(arg, ty);
         }
     }
-
-    /// Variants of `enum_name` that no arm covers, as `E.V` or `E.V(_)`.
-    pub(crate) fn missing_variants(&mut self, enum_name: &str, arms: &[MatchArm]) -> Vec<String> {
-        // Patterns name the enum as written; compare by full name.
-        let written: Vec<Option<String>> = arms
-            .iter()
-            .map(|a| match &a.pattern.kind {
-                PatternKind::Variant { enum_name: e, .. } => self.resolve_type_name(e, false),
-                _ => None,
-            })
-            .collect();
-        let Some(info) = self.enums.get(enum_name) else {
-            return Vec::new();
-        };
-        info.variants
-            .iter()
-            .filter(|(vname, _)| {
-                !arms
-                    .iter()
-                    .zip(&written)
-                    .any(|(a, full)| match &a.pattern.kind {
-                        PatternKind::Variant { variant, args, .. } => {
-                            full.as_deref() == Some(enum_name)
-                                && &variant.name == vname
-                                && args.iter().all(crate::expr::irrefutable)
-                        }
-                        _ => false,
-                    })
-            })
-            .map(|(vname, fields)| {
-                if fields.is_empty() {
-                    format!("{enum_name}.{vname}")
-                } else {
-                    format!("{enum_name}.{vname}(_)")
-                }
-            })
-            .collect()
-    }
 }

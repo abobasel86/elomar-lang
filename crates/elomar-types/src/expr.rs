@@ -1382,42 +1382,8 @@ impl Checker {
     }
 
     fn check_exhaustive(&mut self, st: &Ty, arms: &[MatchArm], span: Span) {
-        if arms.iter().any(|a| irrefutable(&a.pattern)) {
-            return;
-        }
-        let has_ctor = |name: &str| {
-            arms.iter().any(|a| match &a.pattern.kind {
-                PatternKind::Ctor { name: n, args } => {
-                    n.name == name && args.first().is_some_and(irrefutable)
-                }
-                PatternKind::Name(n) => n == name,
-                _ => false,
-            })
-        };
-        let has_bool = |b: bool| {
-            arms.iter()
-                .any(|a| matches!(a.pattern.kind, PatternKind::Bool(x) if x == b))
-        };
-        let missing: Vec<String> = match self.subst.resolve(st) {
-            Ty::Option(_) => [("Some(_)", has_ctor("Some")), ("None", has_ctor("None"))]
-                .into_iter()
-                .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n.to_string())
-                .collect(),
-            Ty::Result(..) => [("Ok(_)", has_ctor("Ok")), ("Err(_)", has_ctor("Err"))]
-                .into_iter()
-                .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n.to_string())
-                .collect(),
-            Ty::Bool => [("true", has_bool(true)), ("false", has_bool(false))]
-                .into_iter()
-                .filter(|(_, ok)| !ok)
-                .map(|(n, _)| n.to_string())
-                .collect(),
-            Ty::Error | Ty::Var(_) => return,
-            Ty::Enum(name, _) => self.missing_variants(&name, arms),
-            _ => vec!["_".to_string()],
-        };
+        let pats: Vec<&Pattern> = arms.iter().map(|a| &a.pattern).collect();
+        let missing = self.missing_cases(&pats, st);
         if missing.is_empty() {
             return;
         }

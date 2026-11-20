@@ -1,0 +1,82 @@
+// A small JSON API for notes, stored in SQLite.
+//
+//   elomar run examples/web-api/main.elo
+//   curl http://127.0.0.1:8080/notes
+//   curl -X POST http://127.0.0.1:8080/notes -d '{"text": "Buy milk"}'
+//   curl http://127.0.0.1:8080/notes/1
+use std.server
+use std.db
+use std.json
+
+type Note = { id: Int, text: String }
+type NewNote = { text: String }
+
+fn not_found(path: String) -> HttpResponse {
+    return server.json(404, { error: "no route for {path}" })
+}
+
+fn list_notes(conn: Db) -> HttpResponse {
+    return match db.query<Note>(conn, "SELECT id, text FROM notes ORDER BY id") {
+        Ok(notes) => server.json(200, notes)
+        Err(e) => server.json(500, { error: e.message() })
+    }
+}
+
+fn add_note(conn: Db, body: String) -> HttpResponse {
+    let input = match json.parse<NewNote>(body) {
+        Ok(n) => n
+        Err(e) => return server.json(400, { error: "send \{\"text\": \"...\"\}: {e.message()}" })
+    }
+    if input.text.trim().is_empty() {
+        return server.json(422, { error: "text must not be empty" })
+    }
+    return match db.execute(conn, "INSERT INTO notes (text) VALUES (:text)", { text: input.text }) {
+        Ok(_) => server.json(201, { created: input.text })
+        Err(e) => server.json(500, { error: e.message() })
+    }
+}
+
+fn get_note(conn: Db, id_text: String) -> HttpResponse {
+    let id = match id_text.parse_int() {
+        Some(n) => n
+        None => return server.json(400, { error: "the id must be a number" })
+    }
+    return match db.query_one<Note>(conn, "SELECT id, text FROM notes WHERE id = :id", { id: id }) {
+        Ok(Some(note)) => server.json(200, note)
+        Ok(None) => server.json(404, { error: "no note {id}" })
+        Err(e) => server.json(500, { error: e.message() })
+    }
+}
+
+fn handle(conn: Db, req: HttpRequest) -> HttpResponse {
+    if req.path == "/notes" {
+        return match req.method {
+            "GET" => list_notes(conn)
+            "POST" => add_note(conn, req.body)
+            _ => server.json(405, { error: "use GET or POST" })
+        }
+    }
+    if req.path.starts_with("/notes/") && req.method == "GET" {
+        return get_note(conn, req.path.slice(7, req.path.length))
+    }
+    return not_found(req.path)
+}
+
+fn main() {
+    let conn = match db.open(":memory:") {
+        Ok(c) => c
+        Err(e) => {
+            print("cannot open the database: {e.message()}")
+            return
+        }
+    }
+    match db.execute(conn, "CREATE TABLE notes (id INTEGER PRIMARY KEY, text TEXT NOT NULL)") {
+        Ok(_) => {}
+        Err(e) => print(e.message())
+    }
+    print("Listening on http://127.0.0.1:8080 (Ctrl+C to stop)")
+    match server.serve("127.0.0.1:8080", |req| handle(conn, req)) {
+        Ok(_) => {}
+        Err(e) => print("server error: {e.message()}")
+    }
+}

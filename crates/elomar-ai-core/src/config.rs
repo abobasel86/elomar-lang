@@ -53,9 +53,18 @@ pub struct Permissions {
     /// Whether `std.py` may run Python (which is not sandboxed).
     #[serde(default)]
     pub python: bool,
+    /// Addresses `server.serve` may listen on, as `host:port`
+    /// (for example `127.0.0.1:8080`, or `0.0.0.0:8080` for all networks).
+    #[serde(default)]
+    pub listen: Vec<String>,
 }
 
 impl Permissions {
+    /// Whether `server.serve` may listen on `address` (exact match).
+    pub fn allows_listen(&self, address: &str) -> bool {
+        self.listen.iter().any(|a| a.eq_ignore_ascii_case(address))
+    }
+
     /// Whether `host` (optionally on `port`) is on the allowlist.
     /// Matching is exact and case-insensitive; there are no wildcards.
     pub fn allows_host(&self, host: &str, port: u16) -> bool {

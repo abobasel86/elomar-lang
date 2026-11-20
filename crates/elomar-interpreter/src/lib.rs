@@ -10,6 +10,7 @@ mod db;
 mod http;
 mod mcp;
 mod py;
+mod server;
 mod stdextra;
 mod stdlib;
 mod value;
@@ -836,6 +837,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         }
                         "std.agent" => return Ok(self.run_future(type_args, values, true)),
                         "std.mcp" => return Ok(mcp::call(&mut self.mcp, &name.name, &values)),
+                        "std.server" if name.name == "serve" => return self.serve(values, span),
+                        "std.server" => return Ok(server::helper(&name.name, &values)),
                         "std.math" | "std.random" | "std.time" | "std.os" | "std.regex"
                         | "std.encoding" | "std.crypto" => {
                             return stdextra::call(

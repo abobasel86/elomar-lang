@@ -8,6 +8,7 @@
 mod ai;
 mod builtins;
 mod enums;
+mod exhaust;
 mod expr;
 mod ide;
 mod modules;
@@ -61,6 +62,7 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "regex" => &stdextra::REGEX_FUNCTIONS,
         "encoding" => &stdextra::ENCODING_FUNCTIONS,
         "crypto" => &stdextra::CRYPTO_FUNCTIONS,
+        "server" => &stdextra::SERVER_FUNCTIONS,
         _ => &[],
     }
 }
@@ -615,7 +617,8 @@ impl Checker {
                     .map(|a| self.lower_type_with(a, alias))
                     .collect();
                 let arity = match name.name.as_str() {
-                    "Int" | "Float" | "Bool" | "String" | "Unit" | "Range" | "Duration" | "Db" => 0,
+                    "Int" | "Float" | "Bool" | "String" | "Unit" | "Range" | "Duration" | "Db"
+                    | "HttpRequest" | "HttpResponse" => 0,
                     "List" | "Option" | "Future" => 1,
                     "Result" => 2,
                     "Map" => 2,
@@ -689,6 +692,8 @@ impl Checker {
                     "Range" => Ty::Range,
                     "Duration" => Ty::Duration,
                     "Db" => Ty::Db,
+                    "HttpRequest" => stdextra::http_request_ty(),
+                    "HttpResponse" => stdextra::http_reply_ty(),
                     "List" => Ty::list(lowered.remove(0)),
                     "Option" => Ty::option(lowered.remove(0)),
                     "Future" => Ty::future(lowered.remove(0)),

@@ -76,6 +76,9 @@ by the compiler when they are not declared.
   function from `python/grades.py` (or any installed package) in a
   subprocess, with typed results, the `py` effect and an explicit
   `python = true` permission. See [`examples/python`](examples/python).
+- **Web server:** `server.serve("127.0.0.1:8080", handle)` with
+  `fn handle(req: HttpRequest) -> HttpResponse`, JSON and HTML helpers and a
+  `listen` permission. See [`examples/web-api`](examples/web-api).
 - **Everyday modules:** `std.math` (`math.pi`, `math.sqrt`, ...),
   `std.random`, `std.time` (dates in ISO 8601) and `std.os` (`os.args()`,
   `os.env`, `os.exit`), and string interpolation: `"Hello {name}"`.

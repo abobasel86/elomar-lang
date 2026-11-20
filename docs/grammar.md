@@ -194,6 +194,8 @@ pattern     = "_" | IDENT | IDENT , "(" , pattern , ")"
 
 ### 4.3 `match`
 
+- فرع يبدأ بـ `return` أو `break` أو `continue` اختصار لكتلة: `None => return 0` تعني `None => { return 0 }`.
+- فحص التغطية يشمل الأنماط المتداخلة: `Ok(Some(x))` و`Ok(None)` و`Err(e)` معًا تغطي `Result<Option<T>, E>`، ورسالة `E2009` تذكر الحالة الناقصة بدقة (مثل `Ok(None)`).
 - الأنماط: `_`، اسم ربط، `Some(p)`/`Ok(p)`/`Err(p)`/`None`، أعداد ونصوص و`true`/`false`.
 - **الشمول إلزامي** (`E2009`): `Option` يحتاج `Some(_)` و`None`، و`Result` يحتاج `Ok(_)` و`Err(_)`،
   و`Bool` يحتاج `true` و`false`، وغيرها يحتاج `_` أو اسم ربط.
@@ -673,6 +675,46 @@ fn main() {
 - النمط المكتوب نصًا حرفيًا يُفحص وقت الترجمة (`E2023`)؛ والنمط المبني وقت التشغيل إن كان غير صالح فخطأ تنفيذي `R0006`.
 - `uuid` و`token` من مصدر عشوائي آمن يوفره النظام، فتصلح لمعرّفات الجلسات والمفاتيح، بخلاف `std.random`.
 - لا تخزّن كلمات المرور بـ `sha256` وحده؛ استخدم خوارزمية مخصصة لكلمات المرور (مخطط لها).
+
+## 4.11.6 خادم الويب: `std.server`
+
+```elomar
+use std.server
+
+fn handle(req: HttpRequest) -> HttpResponse {
+    return match req.path {
+        "/" => server.html(200, "<h1>مرحبًا</h1>")
+        "/hello" => server.text(200, "Hello, {req.query.get_or("name", "guest")}!")
+        "/api/time" => server.json(200, { ok: true })
+        _ => server.text(404, "not found")
+    }
+}
+
+fn main() {
+    print(server.serve("127.0.0.1:8080", handle))
+}
+```
+
+```toml
+[permissions]
+listen = ["127.0.0.1:8080"]     # منع افتراضي؛ "0.0.0.0:8080" للاستقبال من أجهزة أخرى
+```
+
+| الاسم | النوع |
+|---|---|
+| `HttpRequest` | `{ method: String, path: String, query: Map<String, String>, headers: Map<String, String>, body: String }` |
+| `HttpResponse` | `{ status: Int, headers: Map<String, String>, body: String }` |
+| `server.serve(address, handler[, max_requests])` | `Result<Unit, HttpError>`؛ تأثير `net`. لا تعود إلا بعد `max_requests` طلبًا (إن أُعطي وكان أكبر من 0) |
+| `server.text(status, body)` · `server.html(status, body)` | `HttpResponse` بنوع المحتوى المناسب |
+| `server.json(status, value)` | `HttpResponse`؛ أي قيمة تُحوَّل إلى JSON كما في `json.stringify` |
+| `server.redirect(url)` | `HttpResponse` بالحالة 303 و`Location` |
+
+- العنوان غير المذكور في `[permissions] listen` يعطي `HttpError.PolicyDenied` دون فتح أي منفذ، وفشل فتح المنفذ `HttpError.Network`.
+- الطلبات تُعالج **واحدًا تلو الآخر**، فلا يعمل المعالج مرتين في الوقت نفسه. كل اتصال يحمل طلبًا واحدًا (`Connection: close`).
+- `path` بعد فك ترميز URL، و`query` من `?a=1&b=2`، وأسماء `headers` بأحرف صغيرة. الجسم نص UTF-8 بحد أقصى 10 ميغابايت ويحتاج `Content-Length` (الإرسال المجزأ chunked يُرد بـ 411)، والرؤوس بحد أقصى 64 كيلوبايت، ومهلة القراءة 10 ثوانٍ.
+- خطأ تنفيذي داخل المعالج يُرد عليه بـ 500، ويُطبع الخطأ، ويستمر الخادم. رؤوس الاستجابة التي تحوي سطرًا جديدًا تُحذف (حماية من حقن الرؤوس)، و`Content-Length` يُحسب تلقائيًا.
+- طلب `HEAD` يُمرَّر للمعالج كما هو، ويُرسل الرد بلا جسم.
+- لحفظ حالة بين الطلبات استخدم قاعدة بيانات (`std.db`) ومرّر الاتصال بدالة مجهولة: `server.serve(addr, |req| handle(conn, req))`. مثال كامل: `examples/web-api`.
 
 ## 4.12 الوحدات متعددة الملفات
 

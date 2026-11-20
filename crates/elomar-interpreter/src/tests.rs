@@ -909,3 +909,125 @@ fn main() {
          36 4 32 true\n"
     );
 }
+
+// ----- std.server ------------------------------------------------------------------
+
+/// Sends raw HTTP requests once the server accepts connections; returns
+/// each full response.
+fn http_client(port: u16, requests: Vec<String>) -> std::thread::JoinHandle<Vec<String>> {
+    std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        let mut out = Vec::new();
+        for req in requests {
+            let mut stream = loop {
+                match std::net::TcpStream::connect(("127.0.0.1", port)) {
+                    Ok(s) => break s,
+                    Err(_) => std::thread::sleep(std::time::Duration::from_millis(20)),
+                }
+            };
+            stream.write_all(req.as_bytes()).expect("send");
+            let mut resp = String::new();
+            stream.read_to_string(&mut resp).expect("read");
+            out.push(resp);
+        }
+        out
+    })
+}
+
+#[test]
+fn http_server() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let src = format!(
+        r#"use std.server
+type Item = {{ name: String, qty: Int }}
+fn handle(req: HttpRequest) -> HttpResponse {{
+  return match req.path {{
+    "/hello" => server.text(200, "Hello, {{req.query.get_or("name", "guest")}}!")
+    "/item" => server.json(201, {{ name: req.body, qty: 2 }})
+    "/page" => server.html(200, "<h1>{{req.method}}</h1>")
+    "/go" => server.redirect("/hello")
+    "/boom" => server.text(200, "{{10 div ([0].length - 1)}}")
+    _ => ({{ status: 404, headers: ["X-Note": "custom", "Bad\nName": "x"], body: "no {{req.path}}" }})
+  }}
+}}
+fn main() {{
+  print(server.serve("127.0.0.1:1", handle, 1))
+  print(server.serve("127.0.0.1:{port}", handle, 7))
+  print("stopped")
+}}"#
+    );
+    let (mut program, diags) = elomar_parser::parse(&src);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let diags = elomar_types::check(
+        &mut program,
+        elomar_types::CheckOptions {
+            require_main: true,
+            ..Default::default()
+        },
+    );
+    assert!(diags.iter().all(|d| !d.is_error()), "{diags:#?}");
+    let get = |path: &str| format!("GET {path} HTTP/1.1\r\nHost: x\r\n\r\n");
+    let client = http_client(
+        port,
+        vec![
+            get("/hello?name=%D9%84%D9%8A%D9%86%D8%A7"),
+            "POST /item HTTP/1.1\r\nContent-Length: 4\r\n\r\npens".into(),
+            "HEAD /page HTTP/1.1\r\n\r\n".into(),
+            get("/go"),
+            get("/nothing%20here"),
+            get("/boom"),
+            "POST /item HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n".into(),
+        ],
+    );
+    let permissions = elomar_ai_core::Permissions {
+        listen: vec![format!("127.0.0.1:{port}")],
+        ..Default::default()
+    };
+    let output = with_large_stack(|| {
+        let mut host = BufferHost::default();
+        let mut ai = AiRuntime::default().with_permissions(permissions);
+        run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(".")).expect("run");
+        host.output
+    });
+    let responses = client.join().unwrap();
+    let body = |r: &str| {
+        r.split_once("\r\n\r\n")
+            .map(|(_, b)| b.to_string())
+            .unwrap()
+    };
+    assert!(
+        responses[0].starts_with("HTTP/1.1 200 OK\r\n"),
+        "{}",
+        responses[0]
+    );
+    assert!(responses[0].contains("Content-Type: text/plain; charset=utf-8\r\n"));
+    assert_eq!(body(&responses[0]), "Hello, لينا!");
+    assert!(responses[1].starts_with("HTTP/1.1 201 Created\r\n"));
+    assert!(responses[1].contains("Content-Type: application/json\r\n"));
+    assert_eq!(body(&responses[1]), r#"{"name":"pens","qty":2}"#);
+    assert!(
+        responses[2].contains("Content-Length: 13\r\n"),
+        "{}",
+        responses[2]
+    );
+    assert_eq!(body(&responses[2]), "");
+    assert!(responses[3].starts_with("HTTP/1.1 303 See Other\r\n"));
+    assert!(responses[3].contains("Location: /hello\r\n"));
+    assert!(responses[4].starts_with("HTTP/1.1 404 Not Found\r\n"));
+    assert!(responses[4].contains("X-Note: custom\r\n"));
+    assert!(!responses[4].contains("Bad"), "{}", responses[4]);
+    assert_eq!(body(&responses[4]), "no /nothing here");
+    assert!(responses[5].starts_with("HTTP/1.1 500 Internal Server Error\r\n"));
+    assert!(responses[6].starts_with("HTTP/1.1 411 Length Required\r\n"));
+    assert_eq!(
+        output,
+        "Err(HttpError.PolicyDenied(\"listening on `127.0.0.1:1` is not permitted; add \\\"127.0.0.1:1\\\" to `listen` under `[permissions]` in elomar.toml\"))\n\
+         error while handling GET /boom: division by zero\n\
+         Ok(())\n\
+         stopped\n"
+    );
+}

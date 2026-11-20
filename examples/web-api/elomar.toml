@@ -1,0 +1,11 @@
+# A web API. Not part of the automated example run, because it serves
+# until stopped; the server itself is tested in the interpreter's tests.
+[package]
+name = "web-api"
+version = "0.1.0"
+entry = "main.elo"
+
+# Default deny: `server.serve` may listen only on addresses listed here.
+# Use "0.0.0.0:8080" to accept connections from other machines.
+[permissions]
+listen = ["127.0.0.1:8080"]

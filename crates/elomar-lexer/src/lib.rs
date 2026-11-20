@@ -473,6 +473,32 @@ impl<'a> Lexer<'a> {
                     );
                     return None;
                 }
+                // `"{\"a\": 1}"`: an escape can only mean text, so the `{`
+                // was meant as a literal brace.
+                Some('\\') => {
+                    self.error(
+                        "E0007",
+                        open,
+                        open + 1,
+                        Text::new(
+                            "`{` in a string starts an expression; write `\\{` for a literal brace",
+                            "القوس `{` داخل النص يبدأ تعبيرًا؛ اكتب `\\{` لقوس حرفي",
+                        ),
+                    );
+                    // Skip the rest of the string, so later lines lex normally.
+                    while let Some(c) = self.peek() {
+                        if c == '\n' {
+                            break;
+                        }
+                        self.bump();
+                        if c == '\\' {
+                            self.bump();
+                        } else if c == '"' {
+                            break;
+                        }
+                    }
+                    return None;
+                }
                 Some('{') => depth += 1,
                 Some('}') if depth == 0 => break,
                 Some('}') => depth -= 1,
@@ -972,5 +998,11 @@ mod tests {
             let (_, diags) = lex(bad);
             assert_eq!(diags[0].code, "E0007", "{bad}");
         }
+        // An escape inside `{...}` means the brace was meant literally:
+        // one clear error, and the next line still lexes.
+        let (toks, diags) = lex("let s = \"{\\\"a\\\": 1}\"\nlet t = 2");
+        assert_eq!(diags.len(), 1, "{diags:?}");
+        assert_eq!(diags[0].code, "E0007");
+        assert!(toks.iter().any(|t| t.kind == Ident("t".into())));
     }
 }

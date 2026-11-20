@@ -1331,6 +1331,16 @@ impl Parser {
             self.expect(TokenKind::FatArrow)?;
             let body = if self.at(&TokenKind::LBrace) {
                 ArmBody::Block(self.block()?)
+            } else if matches!(
+                self.peek(),
+                TokenKind::Return | TokenKind::Break | TokenKind::Continue
+            ) {
+                // `Err(e) => return x` is short for `Err(e) => { return x }`.
+                let stmt = self.stmt()?;
+                ArmBody::Block(Block {
+                    span: stmt.span,
+                    stmts: vec![stmt],
+                })
             } else {
                 ArmBody::Expr(self.expr()?)
             };
@@ -1925,5 +1935,29 @@ fn f(x: lib.Level) {
 }",
         );
         assert_eq!(diags[0].code, "E0101");
+    }
+
+    #[test]
+    fn return_in_match_arm() {
+        let (program, diags) = parse(
+            "fn f(x: Option<Int>) -> Int {
+  let n = match x {
+    Some(n) => n
+    None => return 0
+  }
+  return n
+}",
+        );
+        assert!(diags.is_empty(), "{diags:?}");
+        let Item::Fn(f) = &program.items[0] else {
+            panic!("expected a function")
+        };
+        let StmtKind::Let { value, .. } = &f.body.stmts[0].kind else {
+            panic!("expected let")
+        };
+        let ExprKind::Match { arms, .. } = &value.kind else {
+            panic!("expected match")
+        };
+        assert!(matches!(&arms[1].body, ArmBody::Block(b) if b.stmts.len() == 1));
     }
 }

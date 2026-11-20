@@ -22,6 +22,15 @@ change the language.
   `split`; literal patterns are checked when compiling, `E2023`),
   `std.encoding` (Base64, hex, URL) and `std.crypto` (`sha256`,
   `hmac_sha256`, and secure `uuid` and `token`).
+- `std.server`: an HTTP server for web APIs and pages.
+  `server.serve(address, handler)` calls `fn(HttpRequest) -> HttpResponse`
+  for each request, with `server.text`, `html`, `json` and `redirect`
+  helpers. It listens only on addresses in `[permissions] listen`. See
+  `examples/web-api`.
+- A `match` arm may be `return x`, `break` or `continue`:
+  `None => return 0`.
+- `match` coverage understands nested patterns (`Ok(Some(x))`, `Ok(None)`,
+  `Err(e)`) and names the exact missing case.
 - `elomar run main.elo a b` passes `a b` to the program (`os.args()`), and
   `os.exit(code)` sets the exit code.
 - New methods: strings `index_of`, `slice`, `lines`, `words`,
