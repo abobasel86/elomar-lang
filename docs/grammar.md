@@ -716,6 +716,33 @@ listen = ["127.0.0.1:8080"]     # منع افتراضي؛ "0.0.0.0:8080" للا�
 - طلب `HEAD` يُمرَّر للمعالج كما هو، ويُرسل الرد بلا جسم.
 - لحفظ حالة بين الطلبات استخدم قاعدة بيانات (`std.db`) ومرّر الاتصال بدالة مجهولة: `server.serve(addr, |req| handle(conn, req))`. مثال كامل: `examples/web-api`.
 
+## 4.11.7 تشغيل البرامج: `std.process`
+
+```elomar
+use std.process
+
+fn main() {
+    match process.run("git", ["log", "--oneline", "-3"]) {
+        Ok(out) => print(out.status, out.stdout)
+        Err(e) => print(e.kind(), e.message())
+    }
+}
+```
+
+```toml
+[permissions]
+commands = ["git"]     # منع افتراضي: البرامج المسموح بتشغيلها بالاسم
+```
+
+| الدالة | النوع |
+|---|---|
+| `process.run(command, args[, timeout])` | `Result<{ status: Int, stdout: String, stderr: String }, ProcessError>`؛ تأثير `process` |
+
+- يُشغَّل البرنامج **مباشرة بلا shell**، فكل عنصر في `args` يصل كما هو: `"; rm -rf /"` نص عادي وليس أمرًا.
+- المجلد الحالي هو مجلد المشروع، والمهلة الافتراضية 60 ثانية (ثم يُوقف البرنامج: `Timeout`). المخرجات بحد أقصى 16 ميغابايت لكل منهما.
+- رمز خروج غير الصفر **ليس** خطأً: هو `status` في النتيجة. أما `ProcessError` فهو `PolicyDenied` (الاسم غير موجود في `commands`) و`NotFound` و`Failed` و`Timeout`.
+- البرنامج المسموح يعمل بصلاحيات المستخدم كاملة، وأذونات Elomar للملفات والشبكة لا تنطبق داخله.
+
 ## 4.12 الوحدات متعددة الملفات
 
 ```text
@@ -955,7 +982,7 @@ fn test_greets_by_name() {
 
 ## 5. التأثيرات (Effects)
 
-التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py` `mcp`. المنفذ حاليًا: `io` (`print` و`input` و`std.os`) و`ai` (`ai.infer`)
+التأثيرات المعروفة: `io` `fs` `net` `ai` `db` `py` `mcp` `process`. المنفذ حاليًا: `io` (`print` و`input` و`std.os`) و`ai` (`ai.infer`)
 و`net` (`ai.infer` على نموذج سحابي، انظر 4.6.2) و`fs` (`std.fs`، انظر 4.10).
 
 | القاعدة | الرمز |
@@ -1122,6 +1149,6 @@ fn test_greets_by_name() {
 
 ## 9. غير المنفذ بعد (مخطط)
 
-مزودات سحابية أخرى، وتطبيق `[permissions]` على الملفات والعمليات الفرعية (تُتجاهل حاليًا) ·
+مزودات سحابية أخرى ·
 `ai.generate` و`ai.stream` و`ai.embed` · حذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة ·
 الدوال الافتراضية في الواجهات و`impl` للأنواع العامة والمهام المتوازية والإلغاء (v0.3).

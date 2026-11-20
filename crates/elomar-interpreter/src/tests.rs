@@ -1031,3 +1031,58 @@ fn main() {{
          stopped\n"
     );
 }
+
+// ----- std.process -----------------------------------------------------------------
+
+#[test]
+fn process_run() {
+    let python = if cfg!(windows) { "python" } else { "python3" };
+    let src = format!(
+        r#"use std.process
+fn show(r: Result<{{ status: Int, stdout: String, stderr: String }}, ProcessError>) {{
+  match r {{
+    Ok(o) => print(o.status, o.stdout.trim(), o.stderr.trim())
+    Err(e) => print(e.kind())
+  }}
+}}
+fn main() {{
+  show(process.run("{python}", ["-c", "import sys; print(sys.argv[1:])", "a b", "; echo hacked", "$HOME"]))
+  show(process.run("{python}", ["-c", "import sys; sys.stderr.write('bad'); sys.exit(3)"]))
+  show(process.run("{python}", ["-c", "import time; time.sleep(5)"], 300ms))
+  show(process.run("not-allowed", []))
+  show(process.run("elomar-no-such-program-xyz", []))
+}}"#
+    );
+    let (mut program, diags) = elomar_parser::parse(&src);
+    assert!(diags.is_empty(), "{diags:#?}");
+    let diags = elomar_types::check(
+        &mut program,
+        elomar_types::CheckOptions {
+            require_main: true,
+            ..Default::default()
+        },
+    );
+    assert!(diags.iter().all(|d| !d.is_error()), "{diags:#?}");
+    let permissions = elomar_ai_core::Permissions {
+        commands: vec![python.into(), "elomar-no-such-program-xyz".into()],
+        ..Default::default()
+    };
+    let output = with_large_stack(|| {
+        let mut host = BufferHost::default();
+        let mut ai = AiRuntime::default().with_permissions(permissions);
+        run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(".")).expect("run");
+        host.output
+    });
+    assert_eq!(
+        output,
+        "0 ['a b', '; echo hacked', '$HOME'] \n3  bad\nTimeout\nPolicyDenied\nNotFound\n"
+    );
+}
+
+#[test]
+fn process_needs_its_effect() {
+    let src = "use std.process\npub fn git_status() -> Bool {\n  return process.run(\"git\", [\"status\"]).is_ok()\n}\nfn main() {\n  print(git_status())\n}";
+    let (mut program, _) = elomar_parser::parse(src);
+    let diags = elomar_types::check(&mut program, elomar_types::CheckOptions::default());
+    assert!(diags.iter().any(|d| d.code == "E3002"), "{diags:#?}");
+}

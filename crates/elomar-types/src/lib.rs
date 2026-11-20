@@ -63,6 +63,7 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "encoding" => &stdextra::ENCODING_FUNCTIONS,
         "crypto" => &stdextra::CRYPTO_FUNCTIONS,
         "server" => &stdextra::SERVER_FUNCTIONS,
+        "process" => &["run"],
         _ => &[],
     }
 }

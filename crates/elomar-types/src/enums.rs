@@ -33,13 +33,21 @@ pub(crate) const HTTP_ERROR: &str = "HttpError";
 pub(crate) const DB_ERROR: &str = "DbError";
 pub(crate) const PY_ERROR: &str = "PyError";
 pub(crate) const MCP_ERROR: &str = "McpError";
+pub(crate) const PROCESS_ERROR: &str = "ProcessError";
 
 /// Built-in error enums: every variant carries a message, and values have
 /// `kind()` and `message()` methods.
 pub(crate) fn is_error_enum(name: &str) -> bool {
     matches!(
         name,
-        AI_ERROR | FS_ERROR | JSON_ERROR | HTTP_ERROR | DB_ERROR | PY_ERROR | MCP_ERROR
+        AI_ERROR
+            | FS_ERROR
+            | JSON_ERROR
+            | HTTP_ERROR
+            | DB_ERROR
+            | PY_ERROR
+            | MCP_ERROR
+            | PROCESS_ERROR
     )
 }
 
@@ -80,6 +88,9 @@ pub const PY_ERROR_KINDS: [&str; 5] = [
 /// The variants of `McpError` (`std.mcp`).
 pub const MCP_ERROR_KINDS: [&str; 4] = ["NotConfigured", "Unavailable", "Protocol", "ToolFailed"];
 
+/// The variants of `ProcessError` (`std.process`).
+pub const PROCESS_ERROR_KINDS: [&str; 4] = ["PolicyDenied", "NotFound", "Failed", "Timeout"];
+
 /// The variants of `AIError` (spec §13.4); each carries a message.
 pub const AI_ERROR_KINDS: [&str; 11] = [
     "Authentication",
@@ -105,6 +116,7 @@ impl Checker {
             (DB_ERROR, &DB_ERROR_KINDS[..]),
             (PY_ERROR, &PY_ERROR_KINDS[..]),
             (MCP_ERROR, &MCP_ERROR_KINDS[..]),
+            (PROCESS_ERROR, &PROCESS_ERROR_KINDS[..]),
         ] {
             self.enums.insert(
                 name.into(),

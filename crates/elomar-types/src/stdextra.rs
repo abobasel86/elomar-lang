@@ -397,3 +397,38 @@ impl Checker {
         }
     }
 }
+
+impl Checker {
+    /// `process.run(command, args[, timeout])`: runs a program listed in
+    /// `[permissions] commands`, without a shell. The `process` effect.
+    pub(crate) fn check_process_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        if func.name != "run" {
+            return self.unknown_module_function("process", func, &["run"], args);
+        }
+        self.usage.direct.push(("process".into(), func.span));
+        self.no_type_args("process.run", type_args);
+        self.reject_named_args(args);
+        if self.arity("process.run", args, 2, 3, span) {
+            self.check_expr_against(&mut args[0].value, &Ty::Str);
+            self.check_expr_against(&mut args[1].value, &Ty::list(Ty::Str));
+            if let Some(t) = args.get_mut(2) {
+                self.check_expr_against(&mut t.value, &Ty::Duration);
+            }
+        }
+        let output = Ty::record(vec![
+            ("status".into(), Ty::Int),
+            ("stdout".into(), Ty::Str),
+            ("stderr".into(), Ty::Str),
+        ]);
+        Ty::result(
+            output,
+            Ty::Enum(crate::enums::PROCESS_ERROR.into(), Vec::new()),
+        )
+    }
+}

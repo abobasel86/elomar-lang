@@ -27,6 +27,9 @@ change the language.
   for each request, with `server.text`, `html`, `json` and `redirect`
   helpers. It listens only on addresses in `[permissions] listen`. See
   `examples/web-api`.
+- `std.process`: `process.run(command, args[, timeout])` runs a program
+  listed in `[permissions] commands`, without a shell, and returns its exit
+  status and output. New effect `process`, new error `ProcessError`.
 - A `match` arm may be `return x`, `break` or `continue`:
   `None => return 0`.
 - `match` coverage understands nested patterns (`Ok(Some(x))`, `Ok(None)`,

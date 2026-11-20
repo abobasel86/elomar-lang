@@ -57,9 +57,18 @@ pub struct Permissions {
     /// (for example `127.0.0.1:8080`, or `0.0.0.0:8080` for all networks).
     #[serde(default)]
     pub listen: Vec<String>,
+    /// Programs `process.run` may start, by name as given to it
+    /// (for example `git`). They run with the user's full rights.
+    #[serde(default)]
+    pub commands: Vec<String>,
 }
 
 impl Permissions {
+    /// Whether `process.run` may start `command` (exact match).
+    pub fn allows_command(&self, command: &str) -> bool {
+        self.commands.iter().any(|c| c == command)
+    }
+
     /// Whether `server.serve` may listen on `address` (exact match).
     pub fn allows_listen(&self, address: &str) -> bool {
         self.listen.iter().any(|a| a.eq_ignore_ascii_case(address))
