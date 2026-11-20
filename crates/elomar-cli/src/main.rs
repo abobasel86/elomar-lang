@@ -76,9 +76,11 @@ enum Command {
     },
     /// Run the language server (LSP) on standard input/output, for editors
     Lsp,
-    /// Add a dependency to elomar.toml and download it
+    /// Add a dependency to elomar.toml and download it: from the registry
+    /// (`strings` or `strings@1.2`), a folder (`--path`) or git (`--git`)
     Add {
-        /// The package name, used as `use <name>.<module>`
+        /// The package name, used as `use <name>.<module>`; for registry
+        /// packages optionally with a version requirement: `name@1.2`
         name: String,
         /// A local folder with the package
         #[arg(long, value_name = "FOLDER", conflicts_with = "git")]
@@ -98,8 +100,25 @@ enum Command {
     },
     /// Remove a dependency from elomar.toml
     Remove { name: String },
-    /// Fetch the latest commits of git dependencies and update elomar.lock
+    /// Move dependencies to the newest allowed versions and commits, and
+    /// update elomar.lock
     Update,
+    /// List packages in the registry whose name or description matches
+    Search {
+        /// Text to look for (default: list all)
+        query: Option<String>,
+    },
+    /// Add this package's version (from `[package]`) to a registry index
+    /// folder; then commit and push the index to publish it
+    Publish {
+        /// A local clone of the registry index (default: the project's
+        /// registry, if it is a folder)
+        #[arg(long, value_name = "FOLDER")]
+        index: Option<String>,
+        /// The repository URL others download from (default: `origin`)
+        #[arg(long, value_name = "URL")]
+        git: Option<String>,
+    },
 }
 
 /// Real terminal input/output for running programs.
@@ -201,6 +220,12 @@ fn main() -> ExitCode {
         }
         Command::Remove { name } => return packages::remove(name, &reporter),
         Command::Update => return packages::update(&reporter),
+        Command::Search { query } => {
+            return packages::search(query.as_deref().unwrap_or(""), &reporter);
+        }
+        Command::Publish { index, git } => {
+            return packages::publish(index.as_deref(), git.as_deref(), &reporter);
+        }
         Command::Fmt {
             paths,
             check,

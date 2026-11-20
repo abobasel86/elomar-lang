@@ -50,3 +50,4 @@ toml = "0.8"
 ureq = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 url = "2"
+semver = "1"

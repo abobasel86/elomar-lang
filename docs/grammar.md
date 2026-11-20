@@ -789,6 +789,24 @@ use geometry.shapes.{Rect, area}
 - الأوامر: `elomar add <name> --path <folder>` أو `--git <url> [--tag|--branch|--rev]`، و`elomar remove <name>`، و`elomar update`.
 - خطأ في الاعتماديات (مجلد غير موجود، تعارض مصادر، حزمة لم تُنزَّل) `E1015`؛ ووحدة غير موجودة في حزمة `E1011`.
 
+#### سجل الحزم (Registry)
+
+```toml
+# elomar.toml للتطبيق
+[registry]
+index = "https://github.com/<owner>/elomar-registry"   # مستودع git أو مجلد محلي (أو متغير البيئة ELOMAR_REGISTRY)
+
+[dependencies]
+strings = "1.2"                 # أحدث إصدار يحقق ^1.2 من السجل
+other = { version = ">=1, <3" }
+```
+
+- السجل **فهرس** وليس خادمًا: مستودع git (أو مجلد) فيه ملف لكل حزمة `packages/<name>.toml` يذكر `description` و`git` وقائمة `[[versions]]`، لكل إصدار `version` و`commit` كامل (40 خانة)، فلا تتغير شيفرة إصدار بعد نشره. `yanked = true` يخفي إصدارًا عن الحلول الجديدة دون كسر ملفات القفل الموجودة.
+- متطلبات الإصدار بصيغة Cargo/semver: `"1.2"` تعني `^1.2`، و`"=1.0.0"`، و`">=1, <3"`. يُختار أحدث إصدار مطابق غير مسحوب، ويُسجَّل الإصدار والـ commit في `elomar.lock`؛ ولا يُعاد الحل إلا إذا لم يعد القفل يحقق المتطلب أو عند `elomar update`.
+- لكل حزمة إصدار واحد في المشروع: إن طلبت حزمتان إصدارين غير متوافقين فهو خطأ `E1015` يذكر من طلب ماذا.
+- الأوامر: `elomar add strings` (يكتب `"^<أحدث إصدار>"`) أو `elomar add strings@1.2`، و`elomar search [text]`.
+- النشر: في مجلد الحزمة (مستودع git نظيف، و`version` تحت `[package]`) شغّل `elomar publish --index <نسخة محلية من مستودع السجل> [--git <URL>]`؛ يضيف الإصدار إلى ملف الحزمة في الفهرس، ثم تعمل commit وpush للفهرس (أو pull request). لا يرسل الأمر شيئًا إلى الشبكة بنفسه، ويحذّر إن لم يكن الـ commit مدفوعًا إلى فرع بعيد.
+
 ## 4.13 المشاريع والاختبارات
 
 `elomar new myapp` ينشئ مشروعًا يعمل وتنجح اختباراته:

@@ -782,3 +782,106 @@ fn packages_add_use_and_remove() {
             .success()
     );
 }
+
+#[test]
+fn registry_publish_search_add_and_run() {
+    let has_git = Command::new("git").arg("--version").output().is_ok();
+    if !has_git {
+        return;
+    }
+    let main = module_project(
+        "registry",
+        &[
+            (
+                "strings/elomar.toml",
+                "[package]\nname = \"strings\"\nversion = \"1.2.0\"\ndescription = \"Text helpers\"\n",
+            ),
+            (
+                "strings/src/text.elo",
+                "pub fn shout(s: String) -> String {\n    return s.upper() + \"!\"\n}\n",
+            ),
+            ("index/README.md", "An Elomar registry index.\n"),
+            (
+                "app/elomar.toml",
+                "[package]\nname = \"app\"\n\n[registry]\nindex = \"../index\"\n",
+            ),
+            (
+                "app/src/main.elo",
+                "use strings.text\n\nfn main() {\n    print(text.shout(\"hi\"))\n}\n",
+            ),
+        ],
+    );
+    let root = main.parent().unwrap().parent().unwrap().to_path_buf();
+    let home = root.join("home");
+    let run_in = |dir: &Path, args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_elomar"))
+            .args(["--no-color", "--lang", "en"])
+            .args(args)
+            .current_dir(dir)
+            .env("ELOMAR_HOME", &home)
+            .env_remove("ELOMAR_REGISTRY")
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            lines(&String::from_utf8_lossy(&out.stdout)),
+            lines(&String::from_utf8_lossy(&out.stderr)),
+        )
+    };
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+            .args(args)
+            .current_dir(root.join("strings"))
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    let pkg = root.join("strings");
+    let app = root.join("app");
+    let url = format!(
+        "file:///{}",
+        pkg.to_string_lossy()
+            .replace('\\', "/")
+            .trim_start_matches('/')
+    );
+
+    // Uncommitted work cannot be published.
+    git(&["init", "--quiet"]);
+    let index = root.join("index");
+    let index_arg = index.to_str().unwrap();
+    let (ok, _, err) = run_in(&pkg, &["publish", "--index", index_arg, "--git", &url]);
+    assert!(!ok && err.contains("uncommitted"), "{err}");
+    git(&["add", "."]);
+    git(&["commit", "--quiet", "-m", "1.2.0"]);
+    let (ok, out, err) = run_in(&pkg, &["publish", "--index", index_arg, "--git", &url]);
+    assert!(ok, "{err}");
+    assert!(out.contains("added strings 1.2.0"), "{out}");
+    assert!(err.contains("not on any remote branch"), "{err}");
+    let (ok, _, err) = run_in(&pkg, &["publish", "--index", index_arg, "--git", &url]);
+    assert!(!ok && err.contains("already published"), "{err}");
+
+    let (ok, out, _) = run_in(&app, &["search", "text"]);
+    assert!(ok);
+    assert_eq!(out, "strings 1.2.0 - Text helpers\n");
+
+    let (ok, out, err) = run_in(&app, &["add", "strings@2"]);
+    assert!(
+        !ok && err.contains("no version of `strings` matches `2`"),
+        "{out}{err}"
+    );
+    let (ok, out, err) = run_in(&app, &["add", "strings"]);
+    assert!(ok, "{err}");
+    assert!(out.contains("added `strings` 1.2.0"), "{out}");
+    let toml = std::fs::read_to_string(app.join("elomar.toml")).unwrap();
+    assert!(toml.contains("strings = \"^1.2.0\""), "{toml}");
+    let (ok, out, err) = run_in(&app, &["run", "src/main.elo"]);
+    assert!(ok, "{err}");
+    assert_eq!(out, "HI!\n");
+    let (_, _, err) = run_in(&app, &["add", "nothing"]);
+    assert!(err.contains("not in the registry"), "{err}");
+}

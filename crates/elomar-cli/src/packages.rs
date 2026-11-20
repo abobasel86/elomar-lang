@@ -1,10 +1,10 @@
-//! `elomar add`, `elomar remove`, `elomar update`, and downloading git
-//! packages before `run`, `check` and `test`.
+//! `elomar add`, `elomar remove`, `elomar update`, `elomar search`,
+//! `elomar publish`, and downloading packages before `run` and `test`.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use elomar_pkg::Mode;
+use elomar_pkg::{Index, Mode, registry};
 
 use crate::Reporter;
 
@@ -50,7 +50,17 @@ pub(crate) fn add(args: &AddArgs, reporter: &Reporter) -> ExitCode {
         );
         return ExitCode::from(2);
     };
-    let name = args.name;
+    let (name, requirement) = match args.name.split_once('@') {
+        Some((n, r)) => (n, Some(r)),
+        None => (args.name, None),
+    };
+    if requirement.is_some() && (args.path.is_some() || args.git.is_some()) {
+        reporter.say(
+            "error: `name@version` is for registry packages; drop `@...` or `--path`/`--git`",
+            "خطأ: الصيغة `name@version` لحزم السجل؛ احذف `@...` أو `--path`/`--git`",
+        );
+        return ExitCode::from(2);
+    }
     if !elomar_pkg::valid_name(name) {
         reporter.say(
             &format!("error: `{name}` is not a valid package name (lowercase letters, digits and `_`; not `app` or `std`)"),
@@ -74,13 +84,16 @@ pub(crate) fn add(args: &AddArgs, reporter: &Reporter) -> ExitCode {
             s.push_str(" }");
             s
         }
-        _ => {
-            reporter.say(
-                "error: give the package's source: `--path <folder>` or `--git <url>`",
-                "خطأ: حدد مصدر الحزمة: `--path <folder>` أو `--git <url>`",
-            );
-            return ExitCode::from(2);
-        }
+        _ => match registry_requirement(&dir, name, requirement) {
+            Ok(req) => quote(&req),
+            Err(message) => {
+                reporter.say(
+                    &format!("error: cannot add `{name}`: {message}"),
+                    &format!("خطأ: تعذّرت إضافة `{name}`: {message}"),
+                );
+                return ExitCode::from(1);
+            }
+        },
     };
     let manifest = dir.join("elomar.toml");
     let text = std::fs::read_to_string(&manifest).unwrap_or_default();
@@ -92,10 +105,17 @@ pub(crate) fn add(args: &AddArgs, reporter: &Reporter) -> ExitCode {
     match elomar_pkg::resolve(&dir, Mode::Online) {
         Ok(packages) => {
             let p = packages.iter().find(|p| p.name == name);
-            let detail = p
-                .and_then(|p| p.commit.as_deref())
-                .map(|c| format!(" at {}", &c[..c.len().min(10)]))
-                .unwrap_or_default();
+            let detail = match p {
+                Some(p) if p.version.is_some() => {
+                    format!(" {}", p.version.as_deref().unwrap_or_default())
+                }
+                Some(p) => p
+                    .commit
+                    .as_deref()
+                    .map(|c| format!(" at {}", &c[..c.len().min(10)]))
+                    .unwrap_or_default(),
+                None => String::new(),
+            };
             reporter.out(
                 &format!("added `{name}`{detail}; use it with `use {name}.<module>`"),
                 &format!("أُضيفت `{name}`{detail}؛ استخدمها بـ `use {name}.<module>`"),
@@ -155,11 +175,11 @@ pub(crate) fn update(reporter: &Reporter) -> ExitCode {
                 reporter.out("no dependencies", "لا توجد اعتماديات");
             }
             for p in packages {
-                let at = p
-                    .commit
-                    .as_deref()
-                    .map(|c| c[..c.len().min(10)].to_string())
-                    .unwrap_or_else(|| p.root.display().to_string());
+                let at = match (&p.version, &p.commit) {
+                    (Some(v), _) => v.clone(),
+                    (None, Some(c)) => c[..c.len().min(10)].to_string(),
+                    (None, None) => p.root.display().to_string(),
+                };
                 reporter.out(&format!("{} {at}", p.name), &format!("{} {at}", p.name));
             }
             ExitCode::SUCCESS
@@ -168,5 +188,125 @@ pub(crate) fn update(reporter: &Reporter) -> ExitCode {
             reporter.say(&format!("error: {message}"), &format!("خطأ: {message}"));
             ExitCode::from(1)
         }
+    }
+}
+
+/// The requirement to write for a registry package: the one given, checked
+/// against the registry, or `^` the newest version.
+fn registry_requirement(dir: &Path, name: &str, given: Option<&str>) -> Result<String, String> {
+    let index = open_registry(dir)?;
+    let entry = index
+        .entry(name)?
+        .ok_or_else(|| format!("`{name}` is not in the registry (try `elomar search`)"))?;
+    match given {
+        Some(text) => {
+            let req = registry::parse_requirement(text)?;
+            if entry.best(&req).is_none() {
+                return Err(format!("no version of `{name}` matches `{text}`"));
+            }
+            Ok(text.to_string())
+        }
+        None => entry
+            .latest()
+            .map(|(v, _)| format!("^{v}"))
+            .ok_or_else(|| format!("`{name}` has no published versions")),
+    }
+}
+
+fn open_registry(dir: &Path) -> Result<Index, String> {
+    let location = registry::location(dir)?.ok_or_else(registry::no_registry_message)?;
+    Index::open(&location, true)
+}
+
+pub(crate) fn search(query: &str, reporter: &Reporter) -> ExitCode {
+    let dir = project_dir().unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    let index = match open_registry(&dir) {
+        Ok(i) => i,
+        Err(message) => {
+            reporter.say(&format!("error: {message}"), &format!("خطأ: {message}"));
+            return ExitCode::from(1);
+        }
+    };
+    let found = index.search(query);
+    if found.is_empty() {
+        reporter.out("no packages found", "لم تُعثر على حزم");
+    }
+    for (name, entry) in found {
+        let version = entry
+            .latest()
+            .map(|(v, _)| v.to_string())
+            .unwrap_or_else(|| "-".into());
+        let line = if entry.description.is_empty() {
+            format!("{name} {version}")
+        } else {
+            format!("{name} {version} - {}", entry.description)
+        };
+        reporter.out(&line, &line);
+    }
+    ExitCode::SUCCESS
+}
+
+pub(crate) fn publish(index: Option<&str>, git: Option<&str>, reporter: &Reporter) -> ExitCode {
+    let fail = |message: String| {
+        reporter.say(&format!("error: {message}"), &format!("خطأ: {message}"));
+        ExitCode::from(1)
+    };
+    let Some(dir) = project_dir() else {
+        return fail(
+            "no elomar.toml here or in a parent folder; run this inside the package".into(),
+        );
+    };
+    let release = match registry::release(&dir, git) {
+        Ok(r) => r,
+        Err(m) => return fail(m),
+    };
+    let folder = match index {
+        Some(f) => std::path::absolute(f).unwrap_or_else(|_| PathBuf::from(f)),
+        None => match registry::location(&dir) {
+            Ok(Some(l)) if !l.contains("://") && !l.starts_with("git@") => PathBuf::from(l),
+            Ok(_) => {
+                return fail(
+                    "give a local clone of the registry index with `--index <folder>`".into(),
+                );
+            }
+            Err(m) => return fail(m),
+        },
+    };
+    if !folder.is_dir() {
+        return fail(format!("registry folder `{}` not found", folder.display()));
+    }
+    let written = Index { dir: folder }.publish(
+        &release.name,
+        &release.description,
+        &release.git,
+        &release.version,
+        &release.commit,
+    );
+    match written {
+        Ok(path) => {
+            let short = &release.commit[..release.commit.len().min(10)];
+            reporter.out(
+                &format!(
+                    "added {} {} (commit {short}) to {}\nnext: commit and push the registry index (or open a pull request) to publish it",
+                    release.name,
+                    release.version,
+                    path.display()
+                ),
+                &format!(
+                    "أُضيفت {} {} (commit {short}) إلى {}\nالتالي: اعمل commit وpush لفهرس السجل (أو افتح pull request) لنشرها",
+                    release.name,
+                    release.version,
+                    path.display()
+                ),
+            );
+            if !release.pushed {
+                reporter.say(
+                    &format!("warning: commit {short} is not on any remote branch yet; push it so others can download it"),
+                    &format!("تحذير: الـ commit {short} ليس على أي فرع بعيد بعد؛ ادفعه (push) ليتمكن الآخرون من تنزيله"),
+                );
+            }
+            ExitCode::SUCCESS
+        }
+        Err(m) => fail(m),
     }
 }

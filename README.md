@@ -50,6 +50,11 @@ by the compiler when they are not declared.
   (`elomar add geometry --path vendor/geometry`, `elomar add kit --git URL --tag v1`),
   locked in `elomar.lock`, used as `use geometry.shapes`. See
   [`examples/packages`](examples/packages).
+- **Package registry:** a registry is a git repository (or folder) indexing
+  published versions, each pinned to a commit. Depend on `strings = "1.2"`
+  (semver ranges), find packages with `elomar search`, add them with
+  `elomar add strings`, and publish with `elomar publish --index <clone>`.
+  No server is needed.
 - **Language server** `elomar lsp` (LSP over stdio) for any editor; see
   [Editors](#editors).
 - Effect inference with mandatory declarations on `pub` functions.
@@ -208,7 +213,7 @@ and compared with its `expected.out`.
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.
 2. ✅ Typed AI runtime: `async`/`await`, `ai.infer<T>`, validation, mock and OpenAI providers, network permissions, `net` effect.
 3. ✅ v0.2: enums, `Map`, `Set`, `?`, `std.fs`, `std.json`, modules and named imports, VS Code support, `elomar new`, `elomar test`, `elomar fmt`, CI.
-4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`), agents and MCP (`agent.run`, `std.mcp`); ⏳ a package registry.
+4. 🟡 v0.3: ✅ generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`), agents and MCP (`agent.run`, `std.mcp`), a package registry (`elomar publish`, `elomar search`).
 5. Bytecode VM, performance work and stable releases.
 
 ## Editors
