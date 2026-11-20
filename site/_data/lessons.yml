@@ -1,0 +1,31 @@
+# The tutorial, in order. Each lesson exists in /en/ and /ar/ with the same slug.
+- slug: 01-start
+  en: Getting started
+  ar: البداية
+- slug: 02-basics
+  en: Values, variables and text
+  ar: القيم والمتغيرات والنصوص
+- slug: 03-control
+  en: Decisions, loops and functions
+  ar: الشروط والتكرار والدوال
+- slug: 04-collections
+  en: Lists, maps and sets
+  ar: القوائم والقواميس والمجموعات
+- slug: 05-types
+  en: Your own types and errors
+  ar: أنواعك الخاصة والأخطاء
+- slug: 06-projects
+  en: Projects, modules and tests
+  ar: المشاريع والوحدات والاختبارات
+- slug: 07-data
+  en: Files, JSON and databases
+  ar: الملفات وJSON وقواعد البيانات
+- slug: 08-web
+  en: Web servers and HTTP
+  ar: خوادم الويب وHTTP
+- slug: 09-ai
+  en: AI in the language
+  ar: الذكاء الاصطناعي في اللغة
+- slug: 10-toolbox
+  en: The toolbox and next steps
+  ar: صندوق الأدوات والخطوات التالية

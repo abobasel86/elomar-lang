@@ -42,6 +42,9 @@ change the language.
   `flat_map`, `group_by`; maps `get_or`, `entries`; numbers `pow`, `clamp`,
   and for `Float` `round_to` and `to_fixed`.
 
+- A tutorial website in English and Arabic (`site/`, published to GitHub
+  Pages): ten lessons whose programs are type-checked by the test suite.
+
 ### Changed
 
 - A `{` inside a string now starts an interpolation. Write `\{` for a

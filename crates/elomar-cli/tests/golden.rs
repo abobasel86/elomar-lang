@@ -885,3 +885,66 @@ fn registry_publish_search_add_and_run() {
     let (_, _, err) = run_in(&app, &["add", "nothing"]);
     assert!(err.contains("not in the registry"), "{err}");
 }
+
+/// Every complete program (a block with `fn main`) in the tutorial at
+/// `site/` must type-check, so the lessons stay true as the language grows.
+/// Blocks that use `app.*` modules belong to a project and are skipped.
+#[test]
+fn tutorial_programs_check() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("tutorial");
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut pages = Vec::new();
+    for lang in ["en", "ar"] {
+        for entry in std::fs::read_dir(root().join("site").join(lang)).unwrap() {
+            pages.push(entry.unwrap().path());
+        }
+    }
+    pages.push(root().join("site/index.md"));
+    let mut checked = 0;
+    let mut failures = Vec::new();
+    for page in pages {
+        let text = lines(&std::fs::read_to_string(&page).unwrap());
+        let mut in_block = false;
+        let mut block = String::new();
+        let mut start = 0;
+        for (n, line) in text.lines().enumerate() {
+            let trimmed = line.trim();
+            if !in_block && trimmed == "```elomar" {
+                in_block = true;
+                block.clear();
+                start = n + 1;
+                continue;
+            }
+            if in_block && trimmed == "```" {
+                in_block = false;
+                if !block.contains("fn main") || block.contains("use app.") {
+                    continue;
+                }
+                let file = dir.join("main.elo");
+                std::fs::write(&file, &block).unwrap();
+                let out = elomar(&["check", file.to_str().unwrap()]);
+                if !out.status.success() {
+                    failures.push(format!(
+                        "{}:{start}\n{}",
+                        page.display(),
+                        String::from_utf8_lossy(&out.stderr)
+                    ));
+                }
+                checked += 1;
+                continue;
+            }
+            if in_block {
+                // Lessons indent code inside lists; remove that indent.
+                block.push_str(line.strip_prefix("   ").unwrap_or(line));
+                block.push('\n');
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        failures.is_empty(),
+        "tutorial programs with errors:\n{}",
+        failures.join("\n")
+    );
+    assert!(checked >= 10, "expected tutorial programs, found {checked}");
+}

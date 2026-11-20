@@ -143,6 +143,12 @@ response = '{"category": "account", "priority": "high", "summary": "Cannot sign 
 See [`examples/ai-classification`](examples/ai-classification) for timeouts,
 invalid answers and rate limits simulated by the mock.
 
+## Learn
+
+The **[tutorial](https://abobasel86.github.io/elomar-lang/)** has ten short
+lessons in English and Arabic, from a first program to web servers and AI.
+Every program in it is checked by the test suite.
+
 ## Getting started
 
 Download `elomar` for your system from the

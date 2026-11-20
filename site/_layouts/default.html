@@ -1,0 +1,72 @@
+<!doctype html>
+{% assign lang = page.lang | default: "en" %}
+{% if lang == "ar" %}{% assign dir = "rtl" %}{% else %}{% assign dir = "ltr" %}{% endif %}
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if page.title %}{{ page.title }} · {% endif %}Elomar-Lang</title>
+  <meta name="description" content="{{ site.description }}">
+  <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="{{ '/' | relative_url }}">Elomar-Lang</a>
+    <nav>
+      {% if lang == "ar" %}
+        <a href="{{ '/ar/' | relative_url }}">الدروس</a>
+        <a href="https://github.com/abobasel86/elomar-lang/releases/latest">التنزيل</a>
+        <a href="https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md">المرجع</a>
+        <a href="{{ '/en/' | relative_url }}{% if page.slug %}{{ page.slug }}.html{% endif %}" lang="en">English</a>
+      {% else %}
+        <a href="{{ '/en/' | relative_url }}">Tutorial</a>
+        <a href="https://github.com/abobasel86/elomar-lang/releases/latest">Download</a>
+        <a href="https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md">Reference</a>
+        <a href="{{ '/ar/' | relative_url }}{% if page.slug %}{{ page.slug }}.html{% endif %}" lang="ar">العربية</a>
+      {% endif %}
+    </nav>
+  </header>
+  <div class="page">
+    {% if page.slug %}
+    <aside class="toc">
+      <ol>
+        {% for l in site.data.lessons %}
+        <li{% if l.slug == page.slug %} class="here"{% endif %}><a href="{{ '/' | append: lang | append: '/' | append: l.slug | append: '.html' | relative_url }}">{{ l[lang] }}</a></li>
+        {% endfor %}
+      </ol>
+    </aside>
+    {% endif %}
+    <main>
+      {{ content }}
+      {% if page.slug %}
+      {% for l in site.data.lessons %}
+        {% if l.slug == page.slug %}
+          {% assign i = forloop.index0 %}
+        {% endif %}
+      {% endfor %}
+      <nav class="pager">
+        {% assign prev_i = i | minus: 1 %}
+        {% if i > 0 %}{% assign p = site.data.lessons[prev_i] %}
+          <a class="prev" href="{{ p.slug | append: '.html' }}">{% if lang == "ar" %}→ {{ p.ar }}{% else %}← {{ p.en }}{% endif %}</a>
+        {% endif %}
+        {% assign next_i = i | plus: 1 %}
+        {% if site.data.lessons[next_i] %}{% assign n = site.data.lessons[next_i] %}
+          <a class="next" href="{{ n.slug | append: '.html' }}">{% if lang == "ar" %}{{ n.ar }} ←{% else %}{{ n.en }} →{% endif %}</a>
+        {% endif %}
+      </nav>
+      {% endif %}
+    </main>
+  </div>
+  <footer>
+    {% if lang == "ar" %}
+    Elomar-Lang مفتوحة المصدر برخصة MIT أو Apache-2.0 ·
+    <a href="https://github.com/abobasel86/elomar-lang">الكود على GitHub</a> ·
+    <a href="https://github.com/abobasel86/elomar-lang/issues">أبلغ عن مشكلة</a>
+    {% else %}
+    Elomar-Lang is open source under MIT or Apache-2.0 ·
+    <a href="https://github.com/abobasel86/elomar-lang">Source on GitHub</a> ·
+    <a href="https://github.com/abobasel86/elomar-lang/issues">Report a problem</a>
+    {% endif %}
+  </footer>
+</body>
+</html>
