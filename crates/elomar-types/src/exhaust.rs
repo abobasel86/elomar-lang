@@ -16,6 +16,19 @@ impl Checker {
     /// The cases `pats` leave uncovered at type `ty`, written as patterns
     /// (`Ok(None)`, `Shape.Circle(_)`, `_`). Empty when every value matches.
     pub(crate) fn missing_cases(&mut self, pats: &[&Pattern], ty: &Ty) -> Vec<String> {
+        // `A | B` covers what `A` and `B` cover.
+        if pats.iter().any(|p| matches!(p.kind, PatternKind::Or(_))) {
+            let mut flat: Vec<&Pattern> = Vec::new();
+            let mut stack: Vec<&Pattern> = pats.to_vec();
+            stack.reverse();
+            while let Some(p) = stack.pop() {
+                match &p.kind {
+                    PatternKind::Or(alts) => stack.extend(alts.iter().rev()),
+                    _ => flat.push(p),
+                }
+            }
+            return self.missing_cases(&flat, ty);
+        }
         if pats.iter().any(|p| irrefutable(p)) {
             return Vec::new();
         }

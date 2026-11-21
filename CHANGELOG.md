@@ -12,6 +12,9 @@ change the language.
   `unwrap_or_else`, `or` and `ok_or`, and `Result` methods `map`,
   `map_err`, `and_then`, `unwrap_or_else`, `ok` and `err`:
   `"12".parse_int().map(|n| n * 2).unwrap_or(0)`.
+- Pattern alternatives and ranges in `match`: `"Fri" | "Sat" => ...` and
+  `90..=100 => ...`. Alternatives bind no names (`E2024`); an empty range
+  is `E2025`.
 
 ## [0.2.0] - 2026-11-21
 

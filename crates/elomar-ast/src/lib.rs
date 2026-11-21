@@ -401,6 +401,15 @@ pub enum PatternKind {
     Float(f64),
     Str(String),
     Bool(bool),
+    /// `"Fri" | "Sat"`: matches when any alternative matches. The
+    /// alternatives bind no names.
+    Or(Vec<Pattern>),
+    /// `90..=100` or `0..10`: an `Int` in the range.
+    Range {
+        start: i64,
+        end: i64,
+        inclusive: bool,
+    },
 }
 
 /// Names of the prelude's value constructors.

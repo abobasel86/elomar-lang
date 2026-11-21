@@ -1370,6 +1370,39 @@ impl Checker {
                 None
             }
             PatternKind::Int(_) => literal(Ty::Int),
+            PatternKind::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                if start > end || (start == end && !inclusive) {
+                    self.error(
+                        "E2025",
+                        p.span,
+                        Text::new(
+                            "this range matches no number; the start must be below the end",
+                            "هذا النطاق لا يطابق أي عدد؛ يجب أن تكون البداية أصغر من النهاية",
+                        ),
+                    );
+                }
+                literal(Ty::Int)
+            }
+            PatternKind::Or(alts) => {
+                for alt in alts {
+                    if binds_names(alt) {
+                        self.error(
+                            "E2024",
+                            alt.span,
+                            Text::new(
+                                "a pattern with `|` cannot bind names; use `_`, or one arm per case",
+                                "النمط الذي فيه `|` لا يربط أسماء؛ استخدم `_`، أو فرعًا لكل حالة",
+                            ),
+                        );
+                    }
+                    self.check_pattern(alt, ty);
+                }
+                None
+            }
             PatternKind::Float(_) => literal(Ty::Float),
             PatternKind::Str(_) => literal(Ty::Str),
             PatternKind::Bool(_) => literal(Ty::Bool),
@@ -1409,9 +1442,22 @@ impl Checker {
     }
 }
 
+/// Whether a pattern introduces a variable.
+fn binds_names(p: &Pattern) -> bool {
+    match &p.kind {
+        PatternKind::Name(n) => !CONSTRUCTORS.contains(&n.as_str()),
+        PatternKind::Ctor { args, .. } | PatternKind::Variant { args, .. } => {
+            args.iter().any(binds_names)
+        }
+        PatternKind::Or(alts) => alts.iter().any(binds_names),
+        _ => false,
+    }
+}
+
 pub(crate) fn irrefutable(p: &Pattern) -> bool {
     match &p.kind {
         PatternKind::Wildcard => true,
+        PatternKind::Or(alts) => alts.iter().any(irrefutable),
         PatternKind::Name(n) => !CONSTRUCTORS.contains(&n.as_str()),
         _ => false,
     }

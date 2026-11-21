@@ -1367,7 +1367,43 @@ impl Parser {
         })
     }
 
+    /// A pattern, with `|` between alternatives.
     fn pattern(&mut self) -> PResult<Pattern> {
+        let first = self.pattern_one()?;
+        if !self.at(&TokenKind::Pipe) {
+            return Ok(first);
+        }
+        let start = first.span;
+        let mut alts = vec![first];
+        while self.eat(&TokenKind::Pipe) {
+            alts.push(self.pattern_one()?);
+        }
+        Ok(Pattern {
+            span: start.to(self.prev_span()),
+            kind: PatternKind::Or(alts),
+        })
+    }
+
+    /// The end of an `Int` range pattern after `start..` or `start..=`.
+    fn range_pattern(&mut self, start: i64, span: Span) -> PResult<Pattern> {
+        let inclusive = self.at(&TokenKind::DotDotEq);
+        self.bump();
+        let negative = self.eat(&TokenKind::Minus);
+        let TokenKind::Int(n) = *self.peek() else {
+            return Err(self.unexpected("a whole number", "عدد صحيح"));
+        };
+        self.bump();
+        Ok(Pattern {
+            span: span.to(self.prev_span()),
+            kind: PatternKind::Range {
+                start,
+                end: if negative { -n } else { n },
+                inclusive,
+            },
+        })
+    }
+
+    fn pattern_one(&mut self) -> PResult<Pattern> {
         let span = self.span();
         let kind = match self.peek().clone() {
             TokenKind::Ident(name) if name == "_" => {
@@ -1428,6 +1464,9 @@ impl Parser {
             }
             TokenKind::Int(n) => {
                 self.bump();
+                if matches!(self.peek(), TokenKind::DotDot | TokenKind::DotDotEq) {
+                    return self.range_pattern(n, span);
+                }
                 PatternKind::Int(n)
             }
             TokenKind::Float(f) => {
@@ -1442,6 +1481,11 @@ impl Parser {
                     _ => return Err(self.unexpected("a number", "عدد")),
                 };
                 self.bump();
+                if let PatternKind::Int(n) = kind
+                    && matches!(self.peek(), TokenKind::DotDot | TokenKind::DotDotEq)
+                {
+                    return self.range_pattern(n, span);
+                }
                 return Ok(Pattern {
                     kind,
                     span: span.to(self.prev_span()),

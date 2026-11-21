@@ -236,20 +236,40 @@ impl<'a> Printer<'a> {
         // Closure parameter bars alternate: the opening `|` has no space
         // after it, the closing one none before it: `|a, b| a + b`.
         let mut pipe_open = false;
+        // A `|` right after a value is not a closure: it separates pattern
+        // alternatives (`"Fri" | "Sat"`) and is spaced on both sides.
+        let mut after_or_pipe = false;
         for (i, tok) in tokens.iter().enumerate() {
             let prev = i.checked_sub(1).map(|j| tokens[j]);
             let before_prev = i.checked_sub(2).map(|j| &tokens[j].kind);
             let around_type_args = (i > 0 && generic[i - 1], generic[i]);
+            let or_pipe = tok.kind == TokenKind::Pipe
+                && !pipe_open
+                && prev.is_some_and(|p| {
+                    matches!(
+                        p.kind,
+                        TokenKind::Str(_)
+                            | TokenKind::Int(_)
+                            | TokenKind::Float(_)
+                            | TokenKind::Ident(_)
+                            | TokenKind::RParen
+                            | TokenKind::True
+                            | TokenKind::False
+                    )
+                });
             let closing_pipe = tok.kind == TokenKind::Pipe && pipe_open;
             let after_opening_pipe = prev.is_some_and(|p| p.kind == TokenKind::Pipe) && pipe_open;
-            if let Some(p) = prev
+            if prev.is_some() && (or_pipe || after_or_pipe) {
+                s.push(' ');
+            } else if let Some(p) = prev
                 && !closing_pipe
                 && !after_opening_pipe
                 && self.space_between(p, tok, before_prev, in_effects, around_type_args)
             {
                 s.push(' ');
             }
-            if tok.kind == TokenKind::Pipe {
+            after_or_pipe = or_pipe;
+            if tok.kind == TokenKind::Pipe && !or_pipe {
                 pipe_open = !pipe_open;
             }
             // `!{ai, net}` and `use app.x.{a, b}` keep their braces tight.
@@ -562,6 +582,16 @@ print(xs)
     print(xs)
 }
 "
+        );
+    }
+
+    #[test]
+    fn pattern_alternatives_are_spaced() {
+        assert_eq!(
+            fmt(
+                "fn f(d: String) -> Int {\nreturn match d {\n\"Fri\"|\"Sat\" => 1\n_ => xs.map(|x| x + 1).length\n}\n}\n"
+            ),
+            "fn f(d: String) -> Int {\n    return match d {\n        \"Fri\" | \"Sat\" => 1\n        _ => xs.map(|x| x + 1).length\n    }\n}\n"
         );
     }
 }

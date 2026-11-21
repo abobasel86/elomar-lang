@@ -1143,3 +1143,20 @@ fn nested_patterns_are_exhaustive() {
         "fn f(x: Option<Bool>) -> Int {\n  return match x {\n    Some(true) => 1\n    Some(false) => 2\n    None => 3\n  }\n}",
     );
 }
+
+#[test]
+fn or_and_range_pattern_rules() {
+    ok("fn f(b: Bool) -> Int {\n  return match b {\n    true | false => 1\n  }\n}");
+    assert_eq!(
+        codes("fn f(x: Option<Int>) -> Int {\n  return match x {\n    Some(n) | None => 1\n  }\n}"),
+        vec!["E2024"]
+    );
+    assert_eq!(
+        codes("fn f(x: Int) -> Int {\n  return match x {\n    5..=1 => 1\n    _ => 2\n  }\n}"),
+        vec!["E2025"]
+    );
+    assert_eq!(
+        codes("fn f(x: String) -> Int {\n  return match x {\n    1..3 => 1\n    _ => 2\n  }\n}"),
+        vec!["E2001"]
+    );
+}

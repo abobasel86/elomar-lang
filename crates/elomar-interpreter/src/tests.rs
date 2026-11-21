@@ -1120,3 +1120,45 @@ fn main() {
          24\n"
     );
 }
+
+#[test]
+fn or_and_range_patterns() {
+    let src = r#"enum Color {
+  Red
+  Green
+  Blue
+}
+fn kind(day: String) -> String {
+  return match day {
+    "Fri" | "Sat" => "weekend"
+    _ => "workday"
+  }
+}
+fn grade(score: Int) -> String {
+  return match score {
+    90..=100 => "excellent"
+    70..90 => "good"
+    -100..0 => "invalid"
+    _ => "keep going"
+  }
+}
+fn warm(c: Color) -> Bool {
+  return match c {
+    Color.Red | Color.Green => true
+    Color.Blue => false
+  }
+}
+fn main() {
+  print(kind("Sat"), kind("Mon"))
+  print(grade(95), grade(90), grade(89), grade(70), grade(-5), grade(10))
+  print(warm(Color.Green), warm(Color.Blue))
+  print(match Some(3) {
+    Some(1) | Some(2) => "small"
+    Some(_) | None => "other"
+  })
+}"#;
+    assert_eq!(
+        out(src),
+        "weekend workday\nexcellent excellent good good invalid keep going\ntrue false\nother\n"
+    );
+}

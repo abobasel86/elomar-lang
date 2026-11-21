@@ -1599,6 +1599,15 @@ fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) ->
         (PatternKind::Int(n), Value::Float(x)) => *n as f64 == *x,
         (PatternKind::Str(s), Value::Str(t)) => **s == **t,
         (PatternKind::Bool(a), Value::Bool(b)) => a == b,
+        (PatternKind::Or(alts), _) => alts.iter().any(|a| match_pattern(a, v, bindings)),
+        (
+            PatternKind::Range {
+                start,
+                end,
+                inclusive,
+            },
+            Value::Int(n),
+        ) => n >= start && if *inclusive { n <= end } else { n < end },
         _ => false,
     }
 }
