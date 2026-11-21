@@ -375,6 +375,16 @@ impl Parser {
     /// `impl Type { ... }` or `impl Trait for Type { ... }`.
     fn impl_decl(&mut self) -> PResult<ImplDecl> {
         let start = self.expect(TokenKind::Impl)?;
+        let mut type_params = Vec::new();
+        if self.eat(&TokenKind::Lt) {
+            loop {
+                type_params.push(self.ident()?);
+                if !self.eat(&TokenKind::Comma) {
+                    break;
+                }
+            }
+            self.expect(TokenKind::Gt)?;
+        }
         let first = self.type_expr()?;
         let (trait_name, target) = if self.eat(&TokenKind::For) {
             let trait_name = match first.kind {
@@ -413,6 +423,7 @@ impl Parser {
         result?;
         let end = self.expect(TokenKind::RBrace)?;
         Ok(ImplDecl {
+            type_params,
             trait_name,
             target,
             methods,

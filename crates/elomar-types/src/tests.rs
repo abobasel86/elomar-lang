@@ -1196,3 +1196,9 @@ fn default_methods_still_require_the_rest() {
     // may add a follow-up error).
     assert_eq!(codes(src)[0], "E1014");
 }
+
+#[test]
+fn generic_impl_types_flow() {
+    let src = "type Stack<T> = { items: List<T> }\nimpl<T> Stack<T> {\n  fn push(self, x: T) -> Stack<T> {\n    return { items: self.items + [x] }\n  }\n}\nfn main() {\n  let s: Stack<Int> = { items: [] }\n  print(s.push(\"no\"))\n}";
+    assert_eq!(codes(src), vec!["E2001"]);
+}

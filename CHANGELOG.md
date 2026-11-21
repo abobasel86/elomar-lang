@@ -16,6 +16,10 @@ change the language.
   `let (a, b) = pair` and `for (k, v) in map` (also over lists of tuples).
   Tuples compare and sort element by element, so `sort_by(|p| (p.age,
   p.name))` works.
+- Default method bodies in traits, used by every `impl` that does not
+  define the method.
+- Generic impls: `impl<T> Stack<T> { ... }` and `impl<T> Describe for
+  Box<T>`.
 - Pattern alternatives and ranges in `match`: `"Fri" | "Sat" => ...` and
   `90..=100 => ...`. Alternatives bind no names (`E2024`); an empty range
   is `E2025`.

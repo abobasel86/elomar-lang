@@ -56,6 +56,8 @@ pub struct TraitMethod {
 /// method's first parameter is `self`, typed as the target.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImplDecl {
+    /// `impl<T> Stack<T>`: type parameters, shared by all its methods.
+    pub type_params: Vec<Ident>,
     pub trait_name: Option<Ident>,
     pub target: TypeExpr,
     pub methods: Vec<FnDecl>,

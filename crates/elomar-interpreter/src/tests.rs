@@ -1256,3 +1256,51 @@ fn main() {
         "Hello, Lina! HELLO, LINA!HELLO, LINA!\nBeep, unit 7. Hello, Lina! Beep, unit 1.\n"
     );
 }
+
+#[test]
+fn generic_impls() {
+    let src = r#"type Stack<T> = { items: List<T> }
+impl<T> Stack<T> {
+  fn push(self, x: T) -> Stack<T> {
+    return { items: self.items + [x] }
+  }
+  fn peek(self) -> Option<T> {
+    return self.items.last()
+  }
+  fn size(self) -> Int {
+    return self.items.length
+  }
+}
+enum Box<T> {
+  Full(T)
+  Empty
+}
+trait Describe {
+  fn describe(self) -> String
+}
+impl<T> Describe for Box<T> {
+  fn describe(self) -> String {
+    return match self {
+      Box.Full(x) => "a full box: {x}"
+      Box.Empty => "an empty box"
+    }
+  }
+}
+fn show<T: Describe>(x: T) -> String {
+  return x.describe()
+}
+fn main() {
+  let s: Stack<Int> = { items: [] }
+  let s2 = s.push(1).push(2)
+  print(s2.size(), s2.peek(), s.peek())
+  let names: Stack<String> = { items: ["a"] }
+  print(names.push("b").peek().unwrap_or(""))
+  print(Box.Full(3).describe(), show(Box.Full("x")))
+  let e: Box<Int> = Box.Empty
+  print(show(e))
+}"#;
+    assert_eq!(
+        out(src),
+        "2 Some(2) None\nb\na full box: 3 a full box: x\nan empty box\n"
+    );
+}

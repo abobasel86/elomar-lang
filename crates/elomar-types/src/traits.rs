@@ -44,6 +44,8 @@ pub(crate) struct MethodEntry {
 /// One `impl` block after desugaring.
 #[derive(Debug, Clone)]
 pub(crate) struct ImplRecord {
+    /// `impl<T>`: names that stand for any type in the target.
+    pub type_params: Vec<String>,
     pub trait_name: Option<Ident>,
     pub target: TypeExpr,
     pub module: String,
@@ -196,6 +198,10 @@ impl Checker {
                     n += 1;
                 }
                 taken.insert(full.clone());
+                // The impl's type parameters belong to each method.
+                let mut params = imp.type_params.clone();
+                params.append(&mut f.type_params);
+                f.type_params = params;
                 for p in &mut f.params {
                     replace_self(&mut p.ty, &imp.target);
                 }
@@ -207,6 +213,7 @@ impl Checker {
                 out.push(Item::Fn(f));
             }
             self.impls.push(ImplRecord {
+                type_params: imp.type_params.iter().map(|t| t.name.clone()).collect(),
                 trait_name: imp.trait_name,
                 target: imp.target,
                 module: imp.module,
@@ -332,7 +339,9 @@ impl Checker {
         let impls = self.impls.clone();
         for (idx, imp) in impls.iter().enumerate() {
             self.scopes_mod.current = imp.module.clone();
+            let saved = std::mem::replace(&mut self.type_params, imp.type_params.clone());
             let target = self.lower_type(&imp.target);
+            self.type_params = saved;
             if target == Ty::Error {
                 continue;
             }
@@ -497,10 +506,40 @@ impl Checker {
 
     /// Whether a value of type `recv` can use methods defined for `target`.
     /// Unknown parts of `recv` match anything.
+    /// `target` with each type parameter of a generic impl replaced by a
+    /// fresh type (the same one for each name).
+    pub(crate) fn open_params(&mut self, target: &Ty) -> Ty {
+        fn collect(t: &Ty, out: &mut Vec<String>) {
+            match t {
+                Ty::Param(p) if !out.contains(p) => out.push(p.clone()),
+                Ty::List(a) | Ty::Option(a) | Ty::Future(a) | Ty::Set(a) => collect(a, out),
+                Ty::Result(a, b) | Ty::Map(a, b) => {
+                    collect(a, out);
+                    collect(b, out);
+                }
+                Ty::Enum(_, xs) | Ty::Tuple(xs) => xs.iter().for_each(|x| collect(x, out)),
+                Ty::Record(fs) => fs.iter().for_each(|(_, x)| collect(x, out)),
+                Ty::Fn(ps, r) => {
+                    ps.iter().for_each(|x| collect(x, out));
+                    collect(r, out);
+                }
+                _ => {}
+            }
+        }
+        let mut names = Vec::new();
+        collect(target, &mut names);
+        if names.is_empty() {
+            return target.clone();
+        }
+        let map: Vec<(String, Ty)> = names.into_iter().map(|n| (n, self.subst.fresh())).collect();
+        target.substitute(&map)
+    }
+
     pub(crate) fn ty_matches(&self, target: &Ty, recv: &Ty) -> bool {
         let recv = self.subst.shallow(recv);
         match (target, &recv) {
-            (_, Ty::Var(_)) | (Ty::Error, _) | (_, Ty::Error) => true,
+            // A type parameter of a generic impl (`impl<T> Stack<T>`).
+            (_, Ty::Var(_)) | (Ty::Error, _) | (_, Ty::Error) | (Ty::Param(_), _) => true,
             (Ty::List(a), Ty::List(b))
             | (Ty::Option(a), Ty::Option(b))
             | (Ty::Future(a), Ty::Future(b))
@@ -567,11 +606,14 @@ impl Checker {
                     .iter()
                     .find(|e| e.name == method.name && self.ty_matches(&e.target, &recv))
                     .cloned()?;
-                self.subst.unify(&recv, &entry.target);
                 self.note_fn(method.span, &entry.fn_name);
                 self.note_def(method.span, entry.span);
-                let mut sig = self.fns.get(&entry.fn_name)?.clone();
-                sig.params.remove(0);
+                let sig = self.fns.get(&entry.fn_name)?.clone();
+                // A method of a generic impl is a generic function: give its
+                // type parameters fresh types, then match `self`.
+                let mut sig = self.instantiate(&entry.fn_name, sig, &[], span);
+                let (_, self_ty) = sig.params.remove(0);
+                self.subst.unify(&recv, &self_ty);
                 let ty = self.check_user_call(&entry.fn_name, &sig, args, span, method.span);
                 (entry.fn_name, ty)
             }
@@ -674,6 +716,7 @@ impl Checker {
                         );
                         continue;
                     };
+                    let target = self.open_params(&target);
                     self.subst.unify(t, &target);
                     let imp = &self.impls[idx];
                     let names: Vec<String> = methods

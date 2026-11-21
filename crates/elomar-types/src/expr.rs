@@ -932,7 +932,13 @@ impl Checker {
 
     /// A generic function's signature with its type parameters replaced by
     /// the explicit type arguments, or by fresh variables to be inferred.
-    fn instantiate(&mut self, name: &str, sig: FnSig, type_args: &[TypeExpr], span: Span) -> FnSig {
+    pub(crate) fn instantiate(
+        &mut self,
+        name: &str,
+        sig: FnSig,
+        type_args: &[TypeExpr],
+        span: Span,
+    ) -> FnSig {
         self.instantiate_with_map(name, sig, type_args, span).0
     }
 
