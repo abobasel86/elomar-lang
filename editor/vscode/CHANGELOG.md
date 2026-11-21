@@ -1,8 +1,13 @@
 # Changelog
 
-The extension's version follows Elomar-Lang's. See the language's
+The extension's version follows Elomar-Lang's; a patch version (such as
+0.3.1) changes only the extension. See the language's
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
+
+## 0.3.1
+
+A new icon: `{EL}` with the name Elomar Lang.
 
 ## 0.3.0
 
