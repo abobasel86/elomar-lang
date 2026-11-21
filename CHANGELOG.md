@@ -20,6 +20,10 @@ change the language.
   define the method.
 - Generic impls: `impl<T> Stack<T> { ... }` and `impl<T> Describe for
   Box<T>`.
+- `await all([...])` waits for a list of futures and returns their results
+  in order. `ai.infer` calls passed directly are sent at the same time
+  (OpenAI and Anthropic), after the permission and budget checks; other
+  futures run one after another.
 - Pattern alternatives and ranges in `match`: `"Fri" | "Sat" => ...` and
   `90..=100 => ...`. Alternatives bind no names (`E2024`); an empty range
   is `E2025`.

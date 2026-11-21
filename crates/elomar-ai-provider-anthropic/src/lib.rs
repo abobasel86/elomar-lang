@@ -45,7 +45,7 @@ const DATA_NOTICE: &str =
 
 /// Where the API key comes from. Tests pass a closure instead of touching
 /// the process environment.
-pub type KeySource = Box<dyn Fn() -> Option<String> + Send>;
+pub type KeySource = Box<dyn Fn() -> Option<String> + Send + Sync>;
 
 pub struct AnthropicProvider {
     model: String,
@@ -291,6 +291,14 @@ impl ModelProvider for AnthropicProvider {
     fn infer(&mut self, request: &AiRequest) -> Result<String, AiError> {
         let text = self.send(&self.request_body(request), request.timeout_ms)?;
         answer_text(&text, &request.schema)
+    }
+
+    /// Requests are independent HTTP calls, so several can run at once.
+    fn infer_shared(&self, request: &AiRequest) -> Option<Result<String, AiError>> {
+        Some(
+            self.send(&self.request_body(request), request.timeout_ms)
+                .and_then(|text| answer_text(&text, &request.schema)),
+        )
     }
 
     fn step(

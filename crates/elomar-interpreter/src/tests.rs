@@ -1304,3 +1304,30 @@ fn main() {
         "2 Some(2) None\nb\na full box: 3 a full box: x\nan empty box\n"
     );
 }
+
+#[test]
+fn await_all() {
+    let src = r#"use std.ai
+async fn double(n: Int) -> Int {
+  return n * 2
+}
+async fn main() {
+  let answers = await all(["a", "b", "c"].map(|t| ai.infer<String>("support", "Echo", t)))
+  print(answers.map(|r| r.is_ok()))
+  print(await all([double(1), double(2), double(3)]))
+  let empty: List<Future<Int>> = []
+  print(await all(empty))
+  let f = double(5)
+  let first = await f
+  print(first, await all([f, double(6)]))
+}"#;
+    // A budget of two calls: the third AI call in the batch is refused.
+    let policy = AiPolicy {
+        max_calls_per_run: Some(2),
+        ..Default::default()
+    };
+    assert_eq!(
+        run_ai(src, Vec::new(), policy),
+        "[true, true, false]\n[2, 4, 6]\n[]\n10 [10, 12]\n"
+    );
+}

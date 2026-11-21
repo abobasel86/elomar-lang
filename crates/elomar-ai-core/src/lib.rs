@@ -167,7 +167,7 @@ pub struct Capabilities {
 
 /// A model backend. Returns the model's raw text; validation against the
 /// schema is done by [`AiRuntime`], identically for every provider.
-pub trait ModelProvider: Send {
+pub trait ModelProvider: Send + Sync {
     fn provider_name(&self) -> &str;
     fn capabilities(&self) -> Capabilities;
     /// The host and port this provider connects to, if any. [`AiRuntime`]
@@ -176,6 +176,14 @@ pub trait ModelProvider: Send {
         None
     }
     fn infer(&mut self, request: &AiRequest) -> Result<String, AiError>;
+
+    /// Like [`ModelProvider::infer`] through a shared reference, so several
+    /// requests can run at once (`await all([...])`). `None` when the
+    /// provider can only answer one request at a time; then each request
+    /// goes through `infer` in turn.
+    fn infer_shared(&self, _request: &AiRequest) -> Option<Result<String, AiError>> {
+        None
+    }
 
     /// One step of a conversation with tools: the model either answers or
     /// asks for tool calls. `history` holds the earlier calls and results.
@@ -332,6 +340,59 @@ impl AiRuntime {
         }
         self.calls += 1;
         Ok(provider)
+    }
+
+    /// Runs several inferences, as for `await all([...])`. Each request is
+    /// checked first, in order (budget, model, network permission); then the
+    /// requests whose providers support it run at the same time, each on its
+    /// own thread, and the rest one after another. Results keep the order of
+    /// `requests`.
+    pub fn infer_all(&mut self, requests: &[AiRequest]) -> Vec<Result<serde_json::Value, AiError>> {
+        let mut texts: Vec<Option<Result<String, AiError>>> =
+            (0..requests.len()).map(|_| None).collect();
+        for (i, request) in requests.iter().enumerate() {
+            if let Err(e) = self.checked_provider(request) {
+                texts[i] = Some(Err(e));
+            }
+        }
+        // WebAssembly (the browser playground) has no threads: there every
+        // request goes through `infer` below, one after another.
+        #[cfg(not(target_family = "wasm"))]
+        let models = &self.models;
+        #[cfg(not(target_family = "wasm"))]
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = requests
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| texts[*i].is_none())
+                .map(|(i, request)| {
+                    let provider = &models[&request.model];
+                    (i, scope.spawn(move || provider.infer_shared(request)))
+                })
+                .collect();
+            for (i, handle) in handles {
+                texts[i] = handle.join().unwrap_or_else(|_| {
+                    Some(Err(AiError::new(
+                        AiErrorKind::ProviderUnavailable,
+                        "the request stopped unexpectedly",
+                    )))
+                });
+            }
+        });
+        requests
+            .iter()
+            .zip(texts)
+            .map(|(request, text)| {
+                let text = match text {
+                    Some(t) => t,
+                    None => match self.models.get_mut(&request.model) {
+                        Some(provider) => provider.infer(request),
+                        None => unreachable!("checked model"),
+                    },
+                };
+                parse_response(&text?, &request.schema)
+            })
+            .collect()
     }
 
     /// Runs one inference: budget → model lookup → network permission →
@@ -498,5 +559,69 @@ mod tests {
         for k in AiErrorKind::ALL {
             assert_eq!(AiErrorKind::parse(k.name()), Some(k));
         }
+    }
+
+    /// A provider that takes 300 ms per request and can serve several at once.
+    struct Slow;
+
+    impl ModelProvider for Slow {
+        fn provider_name(&self) -> &str {
+            "slow"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities {
+                structured_output: true,
+                uses_network: false,
+            }
+        }
+        fn infer(&mut self, request: &AiRequest) -> Result<String, AiError> {
+            self.infer_shared(request).expect("shared")
+        }
+        fn infer_shared(&self, request: &AiRequest) -> Option<Result<String, AiError>> {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            Some(Ok(format!("\"{}\"", request.input_text())))
+        }
+    }
+
+    #[test]
+    fn infer_all_runs_requests_together_and_keeps_order() {
+        let mut rt = AiRuntime::new(AiPolicy {
+            max_calls_per_run: Some(4),
+            ..Default::default()
+        });
+        rt.register("slow", Box::new(Slow));
+        let req = |input: &str, model: &str| AiRequest {
+            model: model.into(),
+            instructions: String::new(),
+            input: serde_json::json!(input),
+            schema: Schema::String,
+            timeout_ms: 5_000,
+        };
+        let requests = vec![
+            req("a", "slow"),
+            req("b", "missing"),
+            req("c", "slow"),
+            req("d", "slow"),
+            req("e", "slow"),
+            req("f", "slow"),
+        ];
+        let start = std::time::Instant::now();
+        let results = rt.infer_all(&requests);
+        let took = start.elapsed();
+        assert!(
+            took.as_millis() < 900,
+            "took {took:?}; requests did not overlap"
+        );
+        assert_eq!(results[0].as_ref().unwrap(), "a");
+        assert_eq!(
+            results[1].as_ref().unwrap_err().kind,
+            AiErrorKind::ProviderUnavailable
+        );
+        assert_eq!(results[4].as_ref().unwrap(), "e");
+        // The budget of 4 calls covers a, c, d and e; f is refused.
+        assert_eq!(
+            results[5].as_ref().unwrap_err().kind,
+            AiErrorKind::BudgetExceeded
+        );
     }
 }

@@ -866,6 +866,13 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 for arg in args {
                     values.push(self.eval(&arg.value)?);
                 }
+                if name == "all" {
+                    let items = match values.into_iter().next() {
+                        Some(Value::List(items)) => items,
+                        _ => Rc::new(Vec::new()),
+                    };
+                    return Ok(Value::future(Thunk::All(items)));
+                }
                 builtins::call_function(&mut *self.host, name, values, span).map_err(Flow::from)
             }
             ExprKind::Field { target, name } => {
@@ -1237,9 +1244,53 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             Thunk::Infer(call) => ai::run_infer(self.ai, &call),
             Thunk::Run(call) => self.run_agent(&call, span)?,
+            Thunk::All(items) => self.await_all(&items, span)?,
         };
         *state.borrow_mut() = FutureState::Done(result.clone());
         Ok(result)
+    }
+
+    /// `await all([...])`: the results in order. `ai.infer` futures that
+    /// have not started run together (see `AiRuntime::infer_all`); the
+    /// others run one after another.
+    fn await_all(&mut self, items: &[Value], span: Span) -> Exec<Value> {
+        let mut batch: Vec<(usize, ai::InferCall)> = Vec::new();
+        for (i, item) in items.iter().enumerate() {
+            if let Value::Future(state) = item {
+                let pending_infer =
+                    matches!(&*state.borrow(), FutureState::Pending(Thunk::Infer(_)));
+                if pending_infer {
+                    let previous =
+                        std::mem::replace(&mut *state.borrow_mut(), FutureState::Running);
+                    if let FutureState::Pending(Thunk::Infer(call)) = previous {
+                        batch.push((i, call));
+                    }
+                }
+            }
+        }
+        let mut results: Vec<Option<Value>> = vec![None; items.len()];
+        if !batch.is_empty() {
+            let requests: Vec<_> = batch.iter().map(|(_, c)| c.request(self.ai)).collect();
+            let answers = self.ai.infer_all(&requests);
+            for ((i, call), answer) in batch.iter().zip(answers) {
+                let value = ai::infer_result(call, answer);
+                if let Value::Future(state) = &items[*i] {
+                    *state.borrow_mut() = FutureState::Done(value.clone());
+                }
+                results[*i] = Some(value);
+            }
+        }
+        let mut out = Vec::with_capacity(items.len());
+        for (item, done) in items.iter().zip(results) {
+            out.push(match done {
+                Some(v) => v,
+                None => match item {
+                    Value::Future(state) => self.force(state, span)?,
+                    other => other.clone(),
+                },
+            });
+        }
+        Ok(Value::list(out))
     }
 
     /// The future for `ai.run<T>(model, instructions, input, tools,

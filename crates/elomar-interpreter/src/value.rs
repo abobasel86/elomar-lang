@@ -24,6 +24,8 @@ pub enum Thunk {
     Infer(InferCall),
     /// `ai.run` with tools.
     Run(Box<RunCall>),
+    /// `all([...])`: the futures to wait for, in order.
+    All(Rc<Vec<Value>>),
 }
 
 /// A `Map` key. The checker allows only `String` and `Int` keys; maps

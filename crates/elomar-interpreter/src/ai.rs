@@ -99,7 +99,15 @@ pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>)
 /// becomes an `Err(AIError)` value the program can `match` on.
 pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
     let request = call.request(ai);
-    match ai.infer(&request) {
+    infer_result(call, ai.infer(&request))
+}
+
+/// `Result<T, AIError>` from a model's checked answer.
+pub(crate) fn infer_result(
+    call: &InferCall,
+    answer: Result<serde_json::Value, elomar_ai_core::AiError>,
+) -> Value {
+    match answer {
         Ok(json) => Value::Result(Ok(Rc::new(from_json(&call.schema, &json)))),
         Err(e) => Value::Result(Err(Rc::new(ai_error_value(&e)))),
     }
