@@ -2,10 +2,12 @@
 
 **A general-purpose programming language designed for AI-native applications.**
 
-> **Project status: v0.1.0, early development. Not production-ready.**
+> **Project status: v0.2.0, early development. Not production-ready.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
-> provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard library (files, JSON,
-> HTTP, SQLite, Python), packages with a public registry, and editor support.
+> provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
+> library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
+> Python, processes), packages with a public registry, editor support, a
+> bilingual tutorial and a browser playground.
 > See [`docs/grammar.md`](docs/grammar.md) and the [changelog](CHANGELOG.md).
 
 ## Vision

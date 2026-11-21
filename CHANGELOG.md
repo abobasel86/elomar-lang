@@ -4,7 +4,7 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-21
 
 A larger language and standard library: string interpolation, a web
 server, Claude, and modules for math, time, text patterns, encoding,
