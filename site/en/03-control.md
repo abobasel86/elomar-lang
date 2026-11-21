@@ -53,6 +53,27 @@ fn main() {
 }
 ```
 
+Several cases can share an arm with `|`, and whole numbers can match a
+range:
+
+```elomar
+fn main() {
+    let day = "Sat"
+    print(match day {
+        "Fri" | "Sat" => "weekend"
+        _ => "workday"
+    })
+    let score = 84
+    print(match score {
+        90..=100 => "excellent"
+        70..90 => "good"
+        _ => "keep going"
+    })
+}
+```
+
+`70..90` includes 70 but not 90; `90..=100` includes both ends.
+
 ## Loops
 
 ```elomar

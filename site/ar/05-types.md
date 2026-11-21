@@ -74,6 +74,17 @@ fn main() {
 }
 ```
 
+وبدل `match` تختصر دوال `Option` الكلام كثيرًا:
+
+```elomar
+fn main() {
+    let العمر = "42".parse_int()
+    print(العمر.map(|n| n + 1))                  // Some(43)
+    print(العمر.filter(|n| n >= 18).is_some())   // true
+    print("x".parse_int().unwrap_or_else(|| 0))
+}
+```
+
 ## الأخطاء قيم: النوع Result
 
 الدالة التي قد تفشل تعيد `Result<T, E>`: إما `Ok(القيمة)` أو `Err(الخطأ)`. لا
@@ -124,6 +135,8 @@ fn main() {
 }
 ```
 
+ولـ `Result` دوال من النوع نفسه: `map` و`map_err` و`and_then` و`unwrap_or_else` و`ok` و`err`.
+
 ## الخروج المبكر من match
 
 يمكن لفرع أن يستخدم `return`:
@@ -160,6 +173,28 @@ fn main() {
 }
 ```
 
+## الصفوف (Tuples): عدة قيم معًا
+
+الصف يجمع بضع قيم دون أن يسميها، وهو مفيد لإرجاع نتيجتين:
+
+```elomar
+fn min_max(xs: List<Int>) -> (Int, Int) {
+    return (xs.min().unwrap_or(0), xs.max().unwrap_or(0))
+}
+
+fn main() {
+    let (الأدنى, الأعلى) = min_max([4, 9, 2])
+    print(الأدنى, الأعلى)
+    let زوج = ("لينا", 91)
+    print(زوج.0, زوج.1)
+    for (الاسم, الدرجة) in ["لينا": 91, "عمر": 55] {
+        print("{الاسم}: {الدرجة}")
+    }
+}
+```
+
+وعندما يكون لكل قيمة معنى يستحق اسمًا، فالسجل أوضح.
+
 ## الواجهات (trait): سلوك مشترك
 
 ```elomar
@@ -180,3 +215,48 @@ fn main() {
     print(b.describe())
 }
 ```
+
+ويمكن للواجهة أن تعطي دالة جسمًا افتراضيًا، يحصل عليه كل `impl` ما لم يكتب جسمه الخاص:
+
+```elomar
+trait Greet {
+    fn name(self) -> String
+    fn greet(self) -> String {
+        return "أهلًا يا {self.name()}!"
+    }
+}
+
+type Person = { first: String }
+
+impl Greet for Person {
+    fn name(self) -> String {
+        return self.first
+    }
+}
+
+fn main() {
+    let p: Person = { first: "لينا" }
+    print(p.greet())
+}
+```
+
+ويمكن أيضًا أن تكون الدوال التابعة لأنواع عامة:
+
+```elomar
+type Stack<T> = { items: List<T> }
+
+impl<T> Stack<T> {
+    fn push(self, x: T) -> Stack<T> {
+        return { items: self.items + [x] }
+    }
+    fn top(self) -> Option<T> {
+        return self.items.last()
+    }
+}
+
+fn main() {
+    let s: Stack<String> = { items: [] }
+    print(s.push("أ").push("ب").top())
+}
+```
+

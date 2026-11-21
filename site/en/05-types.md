@@ -75,6 +75,17 @@ fn main() {
 }
 ```
 
+Instead of a `match`, the methods of `Option` often say it shorter:
+
+```elomar
+fn main() {
+    let age = "42".parse_int()
+    print(age.map(|n| n + 1))                  // Some(43)
+    print(age.filter(|n| n >= 18).is_some())   // true
+    print("x".parse_int().unwrap_or_else(|| 0))
+}
+```
+
 ## Errors as values: Result
 
 A function that can fail returns `Result<T, E>`: `Ok(value)` or
@@ -126,6 +137,9 @@ fn main() {
 }
 ```
 
+`Result` has the same kind of methods: `map`, `map_err`, `and_then`,
+`unwrap_or_else`, `ok` and `err`.
+
 ## Leaving early from a match
 
 An arm can `return`:
@@ -162,6 +176,29 @@ fn main() {
 }
 ```
 
+## Tuples: several values together
+
+A tuple groups a few values without naming them. It is handy for
+returning two results:
+
+```elomar
+fn min_max(xs: List<Int>) -> (Int, Int) {
+    return (xs.min().unwrap_or(0), xs.max().unwrap_or(0))
+}
+
+fn main() {
+    let (low, high) = min_max([4, 9, 2])
+    print(low, high)
+    let pair = ("Lina", 91)
+    print(pair.0, pair.1)
+    for (name, grade) in ["Lina": 91, "Omar": 55] {
+        print("{name}: {grade}")
+    }
+}
+```
+
+When the values have meanings worth naming, a record is clearer.
+
 ## Traits: shared behavior
 
 ```elomar
@@ -182,3 +219,49 @@ fn main() {
     print(b.describe())
 }
 ```
+
+A trait can give a method a default body. Each `impl` gets it unless it
+writes its own:
+
+```elomar
+trait Greet {
+    fn name(self) -> String
+    fn greet(self) -> String {
+        return "Hello, {self.name()}!"
+    }
+}
+
+type Person = { first: String }
+
+impl Greet for Person {
+    fn name(self) -> String {
+        return self.first
+    }
+}
+
+fn main() {
+    let p: Person = { first: "Lina" }
+    print(p.greet())
+}
+```
+
+Methods can also belong to generic types:
+
+```elomar
+type Stack<T> = { items: List<T> }
+
+impl<T> Stack<T> {
+    fn push(self, x: T) -> Stack<T> {
+        return { items: self.items + [x] }
+    }
+    fn top(self) -> Option<T> {
+        return self.items.last()
+    }
+}
+
+fn main() {
+    let s: Stack<String> = { items: [] }
+    print(s.push("a").push("b").top())
+}
+```
+

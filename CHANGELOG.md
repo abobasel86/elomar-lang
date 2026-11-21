@@ -30,6 +30,12 @@ change the language.
 - `elomar fmt` lines a closing bracket up with the line that opened it,
   as in `print(match x {` ... `}, y)`.
 
+### Website
+
+- The tutorial covers pattern alternatives and ranges, `Option` and
+  `Result` methods, tuples, default trait methods, generic impls and
+  `await all`, in English and Arabic.
+
 ## [0.2.0] - 2026-11-21
 
 A larger language and standard library: string interpolation, a web
