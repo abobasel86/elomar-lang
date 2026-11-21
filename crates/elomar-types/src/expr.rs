@@ -38,6 +38,20 @@ impl Checker {
                 let (name, mutable) = (name.clone(), *mutable);
                 self.declare(&name, t, mutable, false);
             }
+            StmtKind::LetTuple {
+                mutable,
+                names,
+                value,
+            } => {
+                let t = self.check_expr(value, None);
+                let (names, mutable) = (names.clone(), *mutable);
+                let types = self.unpack(&t, names.len(), value.span);
+                for (name, ty) in names.iter().zip(types) {
+                    if name.name != "_" {
+                        self.declare(name, ty, mutable, false);
+                    }
+                }
+            }
             StmtKind::Assign { target, op, value } => {
                 let op = *op;
                 self.check_mutable_place(target);
@@ -86,12 +100,20 @@ impl Checker {
                 self.check_block(body);
                 self.loop_depth -= 1;
             }
-            StmtKind::For { var, iter, body } => {
+            StmtKind::For { vars, iter, body } => {
                 let iter_ty = self.check_expr(iter, None);
                 let elem = self.element_type(&iter_ty, iter.span);
                 self.push_scope();
-                let var = var.clone();
-                self.declare(&var, elem, false, false);
+                let vars = vars.clone();
+                let types = match vars.len() {
+                    1 => vec![elem],
+                    n => self.unpack(&elem, n, iter.span),
+                };
+                for (var, ty) in vars.iter().zip(types) {
+                    if var.name != "_" {
+                        self.declare(var, ty, false, false);
+                    }
+                }
                 self.loop_depth += 1;
                 self.check_block(body);
                 self.loop_depth -= 1;
@@ -186,6 +208,42 @@ impl Checker {
                 )),
             );
         }
+    }
+
+    /// The types of the `n` names in `let (a, b) = ...` or `for (k, v) in`:
+    /// the elements of a tuple, or a map entry's key and value.
+    fn unpack(&mut self, t: &Ty, n: usize, span: Span) -> Vec<Ty> {
+        match self.subst.shallow(t) {
+            Ty::Tuple(items) if items.len() == n => return items,
+            Ty::Record(fields)
+                if n == 2
+                    && fields.len() == 2
+                    && fields[0].0 == "key"
+                    && fields[1].0 == "value" =>
+            {
+                return fields.into_iter().map(|(_, t)| t).collect();
+            }
+            Ty::Var(_) => {
+                let items: Vec<Ty> = (0..n).map(|_| self.subst.fresh()).collect();
+                self.subst.unify(t, &Ty::Tuple(items.clone()));
+                return items;
+            }
+            Ty::Error => {}
+            other => {
+                let shown = self.subst.show(&other);
+                self.error(
+                    "E2026",
+                    span,
+                    Text::new(
+                        format!(
+                            "cannot unpack `{shown}` into {n} names; it needs a tuple of {n} values"
+                        ),
+                        format!("لا يمكن تفريق `{shown}` إلى {n} أسماء؛ يلزم صف (tuple) من {n} قيم"),
+                    ),
+                );
+            }
+        }
+        vec![Ty::Error; n]
     }
 
     fn element_type(&mut self, iter_ty: &Ty, span: Span) -> Ty {
@@ -333,6 +391,25 @@ impl Checker {
             ExprKind::Int(_) => unreachable!("handled above"),
             ExprKind::Float(_) => Ty::Float,
             ExprKind::Str(_) => Ty::Str,
+            ExprKind::Tuple(items) => {
+                let hints: Vec<Option<Ty>> = match hint_resolved {
+                    Some(Ty::Tuple(h)) if h.len() == items.len() => {
+                        h.into_iter().map(Some).collect()
+                    }
+                    _ => vec![None; items.len()],
+                };
+                let mut out = Vec::with_capacity(items.len());
+                for (item, hint) in items.iter_mut().zip(hints) {
+                    out.push(match hint {
+                        Some(h) => {
+                            self.check_expr_against(item, &h);
+                            h
+                        }
+                        None => self.check_expr(item, None),
+                    });
+                }
+                Ty::Tuple(out)
+            }
             ExprKind::Interp(parts) => {
                 // Any value can be shown as text, as with `to_string`.
                 for part in parts {
@@ -1211,6 +1288,27 @@ impl Checker {
                 Ty::Error
             }
             Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_) if name.name == "length" => Ty::Int,
+            Ty::Tuple(items) => match name.name.parse::<usize>() {
+                Ok(i) if i < items.len() => items[i].clone(),
+                _ => {
+                    let last = items.len() - 1;
+                    self.error(
+                        "E2027",
+                        name.span,
+                        Text::new(
+                            format!(
+                                "this tuple has {} values; use `.0` to `.{last}`",
+                                items.len()
+                            ),
+                            format!(
+                                "هذا الصف فيه {} قيم؛ استخدم من `.0` إلى `.{last}`",
+                                items.len()
+                            ),
+                        ),
+                    );
+                    Ty::Error
+                }
+            },
             Ty::Var(_) => {
                 self.cannot_infer(name.span);
                 Ty::Error
@@ -1367,6 +1465,18 @@ impl Checker {
                 args,
             } => {
                 self.check_variant_pattern(p, enum_name, variant, args, ty);
+                None
+            }
+            PatternKind::Tuple(items) => {
+                let fresh: Vec<Ty> = items.iter().map(|_| self.subst.fresh()).collect();
+                let tuple = Ty::Tuple(fresh.clone());
+                if !self.subst.unify(ty, &tuple) {
+                    self.mismatch(ty, &tuple, p.span);
+                } else {
+                    for (item, t) in items.iter().zip(&fresh) {
+                        self.check_pattern(item, t);
+                    }
+                }
                 None
             }
             PatternKind::Int(_) => literal(Ty::Int),

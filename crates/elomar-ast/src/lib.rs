@@ -156,6 +156,8 @@ pub enum TypeExprKind {
     Named { name: Ident, args: Vec<TypeExpr> },
     /// `{ name: String, age: Int }`
     Record(Vec<(Ident, TypeExpr)>),
+    /// `(Int, String)`
+    Tuple(Vec<TypeExpr>),
     /// `fn(Int, String) -> Bool`
     Fn {
         params: Vec<TypeExpr>,
@@ -206,10 +208,18 @@ pub enum StmtKind {
         cond: Expr,
         body: Block,
     },
+    /// `for x in xs`, or `for (k, v) in m` with several names: over a map
+    /// they are the key and the value, over tuples their elements.
     For {
-        var: Ident,
+        vars: Vec<Ident>,
         iter: Expr,
         body: Block,
+    },
+    /// `let (a, b) = pair`: one name (or `_`) per tuple element.
+    LetTuple {
+        mutable: bool,
+        names: Vec<Ident>,
+        value: Expr,
     },
     Return(Option<Expr>),
     Break,
@@ -297,6 +307,8 @@ pub enum ExprKind {
     Str(String),
     /// `"Hello {name}"`: literal text and expressions, joined as text.
     Interp(Vec<InterpPart>),
+    /// `(1, "a")`: two or more values.
+    Tuple(Vec<Expr>),
     Bool(bool),
     /// A duration literal, in milliseconds.
     Duration(i64),
@@ -401,6 +413,8 @@ pub enum PatternKind {
     Float(f64),
     Str(String),
     Bool(bool),
+    /// `(a, _)`: one pattern per tuple element.
+    Tuple(Vec<Pattern>),
     /// `"Fri" | "Sat"`: matches when any alternative matches. The
     /// alternatives bind no names.
     Or(Vec<Pattern>),

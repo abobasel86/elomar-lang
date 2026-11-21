@@ -66,7 +66,9 @@ impl InferCall {
 /// a remaining name is an enum of plain variants.
 pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>) -> Schema {
     match &t.kind {
-        TypeExprKind::Fn { .. } => unreachable!("checker rejects functions in AI answers"),
+        TypeExprKind::Fn { .. } | TypeExprKind::Tuple(_) => {
+            unreachable!("checker rejects functions and tuples in AI answers")
+        }
         TypeExprKind::Record(fields) => Schema::Record(
             fields
                 .iter()
@@ -120,6 +122,7 @@ pub(crate) fn to_json(v: &Value) -> Json {
         Value::Bool(b) => Json::Bool(*b),
         Value::Str(s) => Json::String(s.to_string()),
         Value::List(items) => Json::Array(items.iter().map(to_json).collect()),
+        Value::Tuple(items) => Json::Array(items.iter().map(to_json).collect()),
         Value::Record(fields) => Json::Object(
             fields
                 .iter()

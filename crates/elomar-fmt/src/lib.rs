@@ -176,7 +176,9 @@ impl<'a> Printer<'a> {
         // One entry per open bracket: whether it added an indent level.
         // Only the outermost bracket left open by a line adds one, so
         // `f([` followed by items indents them once, not twice.
-        let mut open: Vec<bool> = Vec::new();
+        // Per open bracket: whether it added an indent level, and the
+        // indent of the line that opened it (where its closer lines up).
+        let mut open: Vec<(bool, i32)> = Vec::new();
         let mut blank = false;
         let mut prev_last: Option<TokenKind> = None;
         let mut prev_opened = false;
@@ -189,7 +191,14 @@ impl<'a> Printer<'a> {
             }
             let leading_closers = code.iter().take_while(|t| is_closer(&t.kind)).count();
             let still_open = open.len().saturating_sub(leading_closers);
-            let mut indent = open[..still_open].iter().filter(|added| **added).count() as i32;
+            let mut indent = if leading_closers > 0 && still_open < open.len() {
+                open[still_open].1
+            } else {
+                open[..still_open]
+                    .iter()
+                    .filter(|(added, _)| *added)
+                    .count() as i32
+            };
             let continues = prev_last.as_ref().is_some_and(is_binary) && !prev_opened
                 || code[0].kind == TokenKind::Dot
                 || starts_continuation(&code[0].kind);
@@ -209,7 +218,7 @@ impl<'a> Printer<'a> {
             let mut lowest = open.len();
             for t in &code {
                 if is_opener(&t.kind) {
-                    open.push(false);
+                    open.push((false, indent));
                 } else if is_closer(&t.kind) {
                     open.pop();
                     lowest = lowest.min(open.len());
@@ -217,7 +226,7 @@ impl<'a> Printer<'a> {
             }
             prev_opened = open.len() > lowest;
             if let Some(first_new) = open.get_mut(lowest) {
-                *first_new = true;
+                first_new.0 = true;
             }
             prev_last = code
                 .iter()
@@ -592,6 +601,26 @@ print(xs)
                 "fn f(d: String) -> Int {\nreturn match d {\n\"Fri\"|\"Sat\" => 1\n_ => xs.map(|x| x + 1).length\n}\n}\n"
             ),
             "fn f(d: String) -> Int {\n    return match d {\n        \"Fri\" | \"Sat\" => 1\n        _ => xs.map(|x| x + 1).length\n    }\n}\n"
+        );
+    }
+
+    #[test]
+    fn closers_line_up_with_their_opening_line() {
+        assert_eq!(
+            fmt("fn main() {
+print(match x {
+1 => \"a\"
+_ => \"b\"
+}, y)
+}
+"),
+            "fn main() {
+    print(match x {
+        1 => \"a\"
+        _ => \"b\"
+    }, y)
+}
+"
         );
     }
 }

@@ -589,6 +589,16 @@ impl Checker {
         })
     }
 
+    /// Values `sorted`, `min`, `max` and `sort_by` can order: numbers,
+    /// strings, and tuples of these (compared element by element).
+    fn sortable(&self, t: &Ty) -> bool {
+        match self.subst.shallow(t) {
+            Ty::Int | Ty::Float | Ty::Str | Ty::Error | Ty::Var(_) => true,
+            Ty::Tuple(items) => items.iter().all(|i| self.sortable(i)),
+            _ => false,
+        }
+    }
+
     fn no_args(&mut self, m: &str, args: &mut [Arg], span: Span, ret: Ty) -> Option<Ty> {
         self.arity(m, args, 0, 0, span);
         Some(ret)
@@ -712,7 +722,7 @@ impl Checker {
                 let resolved = self.subst.shallow(&elem);
                 let ok = match m {
                     "sum" => matches!(resolved, Ty::Int | Ty::Float | Ty::Error),
-                    _ => matches!(resolved, Ty::Int | Ty::Float | Ty::Str | Ty::Error),
+                    _ => self.sortable(&resolved),
                 };
                 if matches!(resolved, Ty::Var(_)) {
                     self.cannot_infer(recv.span);
@@ -768,13 +778,13 @@ impl Checker {
                 let f = Ty::Fn(vec![elem], Box::new(key.clone()));
                 self.typed_args(m, args, &[f], span);
                 let k = self.subst.shallow(&key);
-                if !matches!(k, Ty::Int | Ty::Float | Ty::Str | Ty::Error | Ty::Var(_)) {
+                if !self.sortable(&k) {
                     let shown = self.subst.show(&k);
                     self.error(
                         "E2005",
                         span,
                         Text::new(
-                            format!("`sort_by` needs a key of type `Int`, `Float` or `String`, not `{shown}`"),
+                            format!("`sort_by` needs a key of type `Int`, `Float`, `String` or a tuple of these, not `{shown}`"),
                             format!("`sort_by` تحتاج مفتاحًا من النوع `Int` أو `Float` أو `String`، لا `{shown}`"),
                         ),
                     );

@@ -76,6 +76,10 @@ impl Checker {
                     })
                     .collect()
             }
+            Ty::Tuple(items) => vec![Ctor {
+                shown: String::new(),
+                fields: items,
+            }],
             Ty::Error | Ty::Var(_) => return Vec::new(),
             _ => return vec!["_".to_string()],
         };
@@ -105,6 +109,7 @@ impl Checker {
                     PatternKind::Variant { args, .. } if full.as_deref() == Some(&ctor.shown) => {
                         Some(args.as_slice())
                     }
+                    PatternKind::Tuple(items) if ctor.shown.is_empty() => Some(items.as_slice()),
                     _ => None,
                 })
                 .collect();

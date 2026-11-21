@@ -1162,3 +1162,53 @@ fn main() {
         "weekend workday\nexcellent excellent good good invalid keep going\ntrue false\nother\n"
     );
 }
+
+#[test]
+fn tuples() {
+    let src = r#"fn min_max(xs: List<Int>) -> (Int, Int) {
+  return (xs.min().unwrap_or(0), xs.max().unwrap_or(0))
+}
+fn describe(p: (String, Int)) -> String {
+  return match p {
+    ("Lina", _) => "the teacher"
+    (name, 0) => "{name} has nothing"
+    (name, n) => "{name} has {n}"
+  }
+}
+fn main() {
+  let pair = (1, "one")
+  print(pair, pair.0, pair.1)
+  let (lo, hi) = min_max([4, 9, 2])
+  print(lo, hi)
+  let (a, _, c) = (1, 2, 3)
+  print(a + c)
+  var (x, y) = (1, 2)
+  x += 10
+  print(x, y)
+  let nested = ((1, 2), "z")
+  print(nested.0.1, nested.1)
+  print(describe(("Lina", 3)), describe(("Omar", 0)), describe(("Sara", 5)))
+  for (name, score) in ["Lina": 91, "Omar": 55] {
+    print("{name}: {score}")
+  }
+  for (i, w) in [(1, "a"), (2, "b")] {
+    print(i, w)
+  }
+  let people = [("Sara", 30), ("Ali", 25), ("Omar", 30)]
+  print(people.sort_by(|p| (p.1, p.0)))
+  print((1, "a") == (1, "a"), (1, 2) == (2, 1))
+}"#;
+    assert_eq!(
+        out(src),
+        "(1, \"one\") 1 one\n\
+         2 9\n\
+         4\n\
+         11 2\n\
+         2 z\n\
+         the teacher Omar has nothing Sara has 5\n\
+         Lina: 91\nOmar: 55\n\
+         1 a\n2 b\n\
+         [(\"Ali\", 25), (\"Omar\", 30), (\"Sara\", 30)]\n\
+         true false\n"
+    );
+}

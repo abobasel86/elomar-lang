@@ -672,6 +672,25 @@ impl Parser {
                     span,
                 })
             }
+            TokenKind::LParen => {
+                let start = self.bump().span;
+                let mut items = Vec::new();
+                while !self.at(&TokenKind::RParen) {
+                    items.push(self.type_expr()?);
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                let close = self.expect(TokenKind::RParen)?;
+                if items.len() == 1 {
+                    // `(T)` is just `T`.
+                    return Ok(items.pop().expect("one item"));
+                }
+                Ok(TypeExpr {
+                    kind: TypeExprKind::Tuple(items),
+                    span: start.to(close),
+                })
+            }
             TokenKind::Fn => {
                 let start = self.bump().span;
                 self.expect(TokenKind::LParen)?;
@@ -796,11 +815,48 @@ impl Parser {
         }
     }
 
+    /// `(a, b, _)` after `let` or `for`: two or more names.
+    fn name_tuple(&mut self) -> PResult<Vec<Ident>> {
+        let open = self.expect(TokenKind::LParen)?;
+        let mut names = Vec::new();
+        while !self.at(&TokenKind::RParen) {
+            names.push(self.ident()?);
+            if !self.eat(&TokenKind::Comma) {
+                break;
+            }
+        }
+        let close = self.expect(TokenKind::RParen)?;
+        if names.len() < 2 {
+            return Err(Diagnostic::error(
+                "E0101",
+                open.to(close),
+                Text::new(
+                    "write two or more names between the parentheses: `(a, b)`",
+                    "اكتب اسمين أو أكثر بين القوسين: `(a, b)`",
+                ),
+            ));
+        }
+        Ok(names)
+    }
+
     fn stmt(&mut self) -> PResult<Stmt> {
         let start = self.span();
         let kind = match self.peek() {
             TokenKind::Let | TokenKind::Var => {
                 let mutable = self.bump().kind == TokenKind::Var;
+                if self.at(&TokenKind::LParen) {
+                    let names = self.name_tuple()?;
+                    self.expect(TokenKind::Eq)?;
+                    let value = self.expr()?;
+                    return Ok(Stmt {
+                        span: start.to(self.prev_span()),
+                        kind: StmtKind::LetTuple {
+                            mutable,
+                            names,
+                            value,
+                        },
+                    });
+                }
                 let name = self.ident()?;
                 let ty = if self.eat(&TokenKind::Colon) {
                     Some(self.type_expr()?)
@@ -825,11 +881,15 @@ impl Parser {
             }
             TokenKind::For => {
                 self.bump();
-                let var = self.ident()?;
+                let vars = if self.at(&TokenKind::LParen) {
+                    self.name_tuple()?
+                } else {
+                    vec![self.ident()?]
+                };
                 self.expect(TokenKind::In)?;
                 let iter = self.expr()?;
                 let body = self.block()?;
-                StmtKind::For { var, iter, body }
+                StmtKind::For { vars, iter, body }
             }
             TokenKind::Return => {
                 self.bump();
@@ -1030,14 +1090,36 @@ impl Parser {
             match self.peek() {
                 TokenKind::Dot => {
                     self.bump();
-                    let name = self.ident()?;
-                    expr = Expr {
-                        span: expr.span.to(name.span),
-                        kind: ExprKind::Field {
-                            target: Box::new(expr),
-                            name,
-                        },
+                    // `t.0`, and `t.0.1`, which the lexer reads as a float.
+                    let names: Vec<Ident> = match self.peek().clone() {
+                        TokenKind::Int(n) => {
+                            let span = self.bump().span;
+                            vec![Ident {
+                                name: n.to_string(),
+                                span,
+                            }]
+                        }
+                        TokenKind::Float(f) => {
+                            let span = self.bump().span;
+                            f.to_string()
+                                .split('.')
+                                .map(|part| Ident {
+                                    name: part.to_string(),
+                                    span,
+                                })
+                                .collect()
+                        }
+                        _ => vec![self.ident()?],
                     };
+                    for name in names {
+                        expr = Expr {
+                            span: expr.span.to(name.span),
+                            kind: ExprKind::Field {
+                                target: Box::new(expr),
+                                name,
+                            },
+                        };
+                    }
                 }
                 TokenKind::LParen => {
                     expr = self.call(expr, Vec::new())?;
@@ -1168,6 +1250,20 @@ impl Parser {
             TokenKind::LParen => {
                 self.bump();
                 let inner = self.expr()?;
+                if self.eat(&TokenKind::Comma) {
+                    let mut items = vec![inner];
+                    while !self.at(&TokenKind::RParen) {
+                        items.push(self.expr()?);
+                        if !self.eat(&TokenKind::Comma) {
+                            break;
+                        }
+                    }
+                    let end = self.expect(TokenKind::RParen)?;
+                    return Ok(Expr {
+                        kind: ExprKind::Tuple(items),
+                        span: span.to(end),
+                    });
+                }
                 let end = self.expect(TokenKind::RParen)?;
                 return Ok(Expr {
                     kind: inner.kind,
@@ -1406,6 +1502,24 @@ impl Parser {
     fn pattern_one(&mut self) -> PResult<Pattern> {
         let span = self.span();
         let kind = match self.peek().clone() {
+            TokenKind::LParen => {
+                self.bump();
+                let mut items = Vec::new();
+                while !self.at(&TokenKind::RParen) {
+                    items.push(self.pattern()?);
+                    if !self.eat(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                let end = self.expect(TokenKind::RParen)?;
+                if items.len() == 1 {
+                    return Ok(items.pop().expect("one item"));
+                }
+                return Ok(Pattern {
+                    span: span.to(end),
+                    kind: PatternKind::Tuple(items),
+                });
+            }
             TokenKind::Ident(name) if name == "_" => {
                 self.bump();
                 PatternKind::Wildcard
@@ -1649,6 +1763,10 @@ mod tests {
                 format!("(match {} {})", sexp(scrutinee), arms.len())
             }
             ExprKind::Duration(ms) => format!("{ms}ms"),
+            ExprKind::Tuple(items) => {
+                let items: Vec<_> = items.iter().map(sexp).collect();
+                format!("(tuple {})", items.join(" "))
+            }
             ExprKind::Interp(parts) => {
                 let parts: Vec<_> = parts
                     .iter()

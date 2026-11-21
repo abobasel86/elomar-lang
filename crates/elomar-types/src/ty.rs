@@ -20,6 +20,8 @@ pub enum Ty {
     Result(Box<Ty>, Box<Ty>),
     /// Structural record; fields are kept sorted by name.
     Record(Vec<(String, Ty)>),
+    /// `(Int, String)`: two or more values by position.
+    Tuple(Vec<Ty>),
     /// A nominal enum, by name, with its type arguments (`Tree<Int>`).
     Enum(String, Vec<Ty>),
     /// `Map<K, V>`; keys are `String` or `Int`.
@@ -87,6 +89,7 @@ impl Ty {
             Ty::Record(fields) => {
                 Ty::Record(fields.iter().map(|(n, t)| (n.clone(), sub(t))).collect())
             }
+            Ty::Tuple(items) => Ty::Tuple(items.iter().map(sub).collect()),
             other => other.clone(),
         }
     }
@@ -140,6 +143,7 @@ impl Subst {
                     .map(|(n, t)| (n.clone(), self.resolve(t)))
                     .collect(),
             ),
+            Ty::Tuple(items) => Ty::Tuple(items.iter().map(|t| self.resolve(t)).collect()),
             other => other,
         }
     }
@@ -150,6 +154,7 @@ impl Subst {
             Ty::List(t) | Ty::Option(t) | Ty::Future(t) | Ty::Set(t) => self.occurs(v, &t),
             Ty::Result(t, e) | Ty::Map(t, e) => self.occurs(v, &t) || self.occurs(v, &e),
             Ty::Record(fields) => fields.iter().any(|(_, t)| self.occurs(v, t)),
+            Ty::Tuple(items) => items.iter().any(|t| self.occurs(v, t)),
             Ty::Fn(ps, r) => ps.iter().any(|p| self.occurs(v, p)) || self.occurs(v, &r),
             Ty::Enum(_, args) => args.iter().any(|a| self.occurs(v, a)),
             _ => false,
@@ -197,6 +202,16 @@ impl Subst {
                     ok &= self.unify(a, b);
                 }
                 self.unify(r1, r2) && ok
+            }
+            (Ty::Tuple(a), Ty::Tuple(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                let mut ok = true;
+                for (x, y) in a.iter().zip(b) {
+                    ok &= self.unify(x, y);
+                }
+                ok
             }
             (Ty::Record(f1), Ty::Record(f2)) => {
                 if f1.len() != f2.len() || f1.iter().zip(f2).any(|(a, b)| a.0 != b.0) {
@@ -298,6 +313,16 @@ impl Subst {
                     self.write(out, t);
                 }
                 out.push_str(if fields.is_empty() { "}" } else { " }" });
+            }
+            Ty::Tuple(items) => {
+                out.push('(');
+                for (i, t) in items.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    self.write(out, t);
+                }
+                out.push(')');
             }
             Ty::Var(_) | Ty::Error => out.push('_'),
         }

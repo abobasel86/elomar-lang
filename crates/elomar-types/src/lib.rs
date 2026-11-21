@@ -585,6 +585,12 @@ impl Checker {
         alias: &mut dyn FnMut(&mut Checker, &str) -> Option<Ty>,
     ) -> Ty {
         match &t.kind {
+            TypeExprKind::Tuple(items) => Ty::Tuple(
+                items
+                    .iter()
+                    .map(|i| self.lower_type_with(i, alias))
+                    .collect(),
+            ),
             TypeExprKind::Fn { params, ret } => {
                 let params = params
                     .iter()

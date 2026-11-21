@@ -1160,3 +1160,31 @@ fn or_and_range_pattern_rules() {
         vec!["E2001"]
     );
 }
+
+#[test]
+fn tuple_rules() {
+    ok(
+        "fn f() -> (Int, String) {\n  return (1, \"a\")\n}\nfn main() {\n  let (n, s) = f()\n  print(n + 1, s.upper())\n}",
+    );
+    assert_eq!(
+        codes("fn main() {\n  let t = (1, 2)\n  print(t.2)\n}"),
+        vec!["E2027"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  let (a, b) = 5\n  print(a)\n}"),
+        vec!["E2026"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  let (a, b) = (1, 2, 3)\n  print(a)\n}"),
+        vec!["E2026"]
+    );
+    assert_eq!(
+        codes("fn f(t: (Int, Bool)) -> Int {\n  return match t {\n    (_, true) => 1\n  }\n}"),
+        vec!["E2009"]
+    );
+    ok(
+        "fn f(t: (Int, Bool)) -> Int {\n  return match t {\n    (_, true) => 1\n    (n, false) => n\n  }\n}",
+    );
+    let d = diags("fn main() {\n  let t: (Int, String) = (1, 2)\n}");
+    assert_eq!(d[0].code, "E2001");
+}

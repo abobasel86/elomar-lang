@@ -81,6 +81,8 @@ pub enum Value {
     List(Rc<Vec<Value>>),
     /// Fields in the order they were written.
     Record(Rc<Vec<(Rc<str>, Value)>>),
+    /// `(1, "a")`.
+    Tuple(Rc<Vec<Value>>),
     Range {
         start: i64,
         end: i64,
@@ -167,6 +169,9 @@ impl Value {
             (List(a), List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y))
             }
+            (Tuple(a), Tuple(b)) => {
+                a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y))
+            }
             (Record(a), Record(b)) => {
                 a.len() == b.len()
                     && a.iter()
@@ -204,6 +209,13 @@ impl Value {
             (Value::Int(a), Value::Int(b)) => a.cmp(b),
             (Value::Str(a), Value::Str(b)) => a.cmp(b),
             (Value::Duration(a), Value::Duration(b)) => a.cmp(b),
+            // Element by element, as for `sort_by(|p| (p.last, p.first))`.
+            (Value::Tuple(a), Value::Tuple(b)) => a
+                .iter()
+                .zip(b.iter())
+                .map(|(x, y)| x.compare(y))
+                .find(|o| o.is_ne())
+                .unwrap_or_else(|| a.len().cmp(&b.len())),
             _ => match (self.as_f64(), other.as_f64()) {
                 (Some(a), Some(b)) => a.total_cmp(&b),
                 _ => Ordering::Equal,
@@ -260,6 +272,16 @@ impl fmt::Display for Value {
                     item.fmt_nested(f)?;
                 }
                 f.write_str("]")
+            }
+            Value::Tuple(items) => {
+                f.write_str("(")?;
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    item.fmt_nested(f)?;
+                }
+                f.write_str(")")
             }
             Value::Record(fields) => {
                 if fields.is_empty() {

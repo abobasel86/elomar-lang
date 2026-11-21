@@ -408,6 +408,14 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 let v = self.eval(value)?;
                 self.define(&name.name, v);
             }
+            StmtKind::LetTuple { names, value, .. } => {
+                let v = self.eval(value)?;
+                for (name, x) in names.iter().zip(unpack(&v)) {
+                    if name.name != "_" {
+                        self.define(&name.name, x);
+                    }
+                }
+            }
             StmtKind::Assign { target, op, value } => {
                 let rhs = self.eval(value)?;
                 let new = match op {
@@ -454,11 +462,19 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     }
                 }
             }
-            StmtKind::For { var, iter, body } => {
+            StmtKind::For { vars, iter, body } => {
                 let items = self.eval(iter)?;
                 let run = |this: &mut Self, item: Value| -> Exec<bool> {
                     let r = this.in_scope(|this| {
-                        this.define(&var.name, item);
+                        if vars.len() == 1 {
+                            this.define(&vars[0].name, item);
+                        } else {
+                            for (var, v) in vars.iter().zip(unpack(&item)) {
+                                if var.name != "_" {
+                                    this.define(&var.name, v);
+                                }
+                            }
+                        }
                         this.exec_block(body)
                     });
                     match r {
@@ -610,6 +626,13 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ExprKind::Int(n) => Value::Int(*n),
             ExprKind::Float(x) => Value::Float(*x),
             ExprKind::Str(s) => Value::str(s.as_str()),
+            ExprKind::Tuple(items) => {
+                let mut out = Vec::with_capacity(items.len());
+                for item in items {
+                    out.push(self.eval(item)?);
+                }
+                Value::Tuple(Rc::new(out))
+            }
             ExprKind::Interp(parts) => {
                 let mut out = String::new();
                 for part in parts {
@@ -701,6 +724,10 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     Value::Map(entries) => Value::Int(entries.len() as i64),
                     Value::Set(items) => Value::Int(items.len() as i64),
                     Value::Str(s) => Value::Int(builtins::graphemes(&s).count() as i64),
+                    Value::Tuple(items) => {
+                        let i: usize = name.name.parse().expect("checked tuple index");
+                        items[i].clone()
+                    }
                     _ => unreachable!("checked field access"),
                 }
             }
@@ -1560,6 +1587,16 @@ fn infer_future(
     }))
 }
 
+/// The values for `let (a, b) = v` or `for (k, v) in ...`: a tuple's
+/// elements, or a map entry's key and value.
+fn unpack(v: &Value) -> Vec<Value> {
+    match v {
+        Value::Tuple(items) => items.to_vec(),
+        Value::Record(fields) => fields.iter().map(|(_, x)| x.clone()).collect(),
+        _ => Vec::new(),
+    }
+}
+
 fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) -> bool {
     match (&p.kind, v) {
         (PatternKind::Wildcard, _) => true,
@@ -1600,6 +1637,13 @@ fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) ->
         (PatternKind::Str(s), Value::Str(t)) => **s == **t,
         (PatternKind::Bool(a), Value::Bool(b)) => a == b,
         (PatternKind::Or(alts), _) => alts.iter().any(|a| match_pattern(a, v, bindings)),
+        (PatternKind::Tuple(ps), Value::Tuple(items)) => {
+            ps.len() == items.len()
+                && ps
+                    .iter()
+                    .zip(items.iter())
+                    .all(|(p, x)| match_pattern(p, x, bindings))
+        }
         (
             PatternKind::Range {
                 start,

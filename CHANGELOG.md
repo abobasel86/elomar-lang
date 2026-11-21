@@ -12,9 +12,15 @@ change the language.
   `unwrap_or_else`, `or` and `ok_or`, and `Result` methods `map`,
   `map_err`, `and_then`, `unwrap_or_else`, `ok` and `err`:
   `"12".parse_int().map(|n| n * 2).unwrap_or(0)`.
+- Tuples: `(1, "a")`, the type `(Int, String)`, `t.0`, patterns `(x, _)`,
+  `let (a, b) = pair` and `for (k, v) in map` (also over lists of tuples).
+  Tuples compare and sort element by element, so `sort_by(|p| (p.age,
+  p.name))` works.
 - Pattern alternatives and ranges in `match`: `"Fri" | "Sat" => ...` and
   `90..=100 => ...`. Alternatives bind no names (`E2024`); an empty range
   is `E2025`.
+- `elomar fmt` lines a closing bracket up with the line that opened it,
+  as in `print(match x {` ... `}, y)`.
 
 ## [0.2.0] - 2026-11-21
 

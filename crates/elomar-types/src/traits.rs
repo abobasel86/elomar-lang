@@ -64,6 +64,7 @@ fn target_base(t: &TypeExpr) -> String {
         TypeExprKind::Named { name, .. } => modules::base_name(&name.name).to_string(),
         TypeExprKind::Record(_) => "record".into(),
         TypeExprKind::Fn { .. } => "fn".into(),
+        TypeExprKind::Tuple(_) => "tuple".into(),
     }
 }
 
@@ -92,6 +93,11 @@ fn replace_self(t: &mut TypeExpr, target: &TypeExpr) {
                 replace_self(p, target);
             }
             replace_self(ret, target);
+        }
+        TypeExprKind::Tuple(items) => {
+            for t in items {
+                replace_self(t, target);
+            }
         }
     }
 }
