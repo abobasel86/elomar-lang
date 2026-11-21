@@ -1918,9 +1918,14 @@ mod tests {
     }
 
     #[test]
-    fn trait_methods_have_no_bodies() {
-        let (_, diags) = parse("trait T {\n  fn f(self) {}\n}");
-        assert_eq!(diags[0].code, "E0101");
+    fn trait_methods_may_have_default_bodies() {
+        let program =
+            parse_ok("trait T {\n  fn f(self)\n  fn g(self) -> Int {\n    return 1\n  }\n}");
+        let Item::Trait(t) = &program.items[0] else {
+            panic!("expected a trait")
+        };
+        assert!(t.methods[0].body.is_none());
+        assert!(t.methods[1].body.is_some());
         let (_, diags) = parse("trait T {\n  fn f<U>(self)\n}");
         assert_eq!(diags[0].code, "E0103");
     }
