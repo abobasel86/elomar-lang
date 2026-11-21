@@ -4,6 +4,11 @@ The extension's version follows Elomar-Lang's. See the language's
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.3.0
+
+Works with the 0.3.0 language: tuples, pattern alternatives and ranges,
+default trait methods, generic impls and `await all`.
+
 ## 0.2.0
 
 Highlighting for string interpolation (`"Hello {name}"`), raw strings

@@ -2,7 +2,7 @@
 
 **A general-purpose programming language designed for AI-native applications.**
 
-> **Project status: v0.2.0, early development. Not production-ready.**
+> **Project status: v0.3.0, early development. Not production-ready.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
