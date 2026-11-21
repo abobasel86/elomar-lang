@@ -342,23 +342,19 @@ impl Parser {
                         "a later version",
                     ));
                 }
-                if self.at(&TokenKind::LBrace) {
-                    return Err(Diagnostic::error(
-                        "E0101",
-                        self.span(),
-                        Text::new(
-                            "a trait lists method signatures without bodies; write the body in each `impl`",
-                            "الواجهة تذكر تواقيع الدوال دون أجسام؛ اكتب الجسم في كل `impl`",
-                        ),
-                    ));
-                }
                 self.require_self(&params, &mname)?;
+                let body = if self.at(&TokenKind::LBrace) {
+                    Some(self.block()?)
+                } else {
+                    None
+                };
                 methods.push(TraitMethod {
                     is_async,
                     name: mname,
                     params,
                     ret,
                     effects,
+                    body,
                     span: mstart.to(self.prev_span()),
                 });
                 self.skip_seps();

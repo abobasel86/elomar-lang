@@ -1188,3 +1188,11 @@ fn tuple_rules() {
     let d = diags("fn main() {\n  let t: (Int, String) = (1, 2)\n}");
     assert_eq!(d[0].code, "E2001");
 }
+
+#[test]
+fn default_methods_still_require_the_rest() {
+    let src = "trait Greet {\n  fn name(self) -> String\n  fn greet(self) -> String {\n    return self.name()\n  }\n}\ntype P = { n: String }\nimpl Greet for P {\n}\n";
+    // The missing method is reported first (the default body that calls it
+    // may add a follow-up error).
+    assert_eq!(codes(src)[0], "E1014");
+}

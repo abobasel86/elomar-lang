@@ -47,6 +47,8 @@ pub struct TraitMethod {
     pub params: Vec<Param>,
     pub ret: Option<TypeExpr>,
     pub effects: Option<EffectSet>,
+    /// A default body, used by every `impl` that does not define the method.
+    pub body: Option<Block>,
     pub span: Span,
 }
 

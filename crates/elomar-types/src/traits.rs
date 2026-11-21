@@ -58,6 +58,30 @@ pub(crate) fn dict_name(param: &str, tr: &str, method: &str) -> String {
     format!("{param}: {tr}.{method}")
 }
 
+/// The default methods of the trait an impl names: by its full name, by its
+/// name inside the impl's module, or by a base name only one trait has.
+fn find_trait<'a>(
+    defaults: &'a [(String, Vec<TraitMethod>)],
+    written: &str,
+    module: &str,
+) -> Option<&'a Vec<TraitMethod>> {
+    let in_module = format!("{module}.{written}");
+    if let Some((_, m)) = defaults
+        .iter()
+        .find(|(full, _)| *full == written || (!module.is_empty() && *full == in_module))
+    {
+        return Some(m);
+    }
+    let base = written.rsplit('.').next().unwrap_or(written);
+    let mut same_base = defaults
+        .iter()
+        .filter(|(full, _)| full.rsplit('.').next() == Some(base));
+    match (same_base.next(), same_base.next()) {
+        (Some((_, m)), None) => Some(m),
+        _ => None,
+    }
+}
+
 /// The written name of an impl's target, for its methods' function names.
 fn target_base(t: &TypeExpr) -> String {
     match &t.kind {
@@ -113,12 +137,49 @@ impl Checker {
                 _ => None,
             })
             .collect();
+        // Default method bodies by trait (full name).
+        let defaults: Vec<(String, Vec<TraitMethod>)> = program
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Trait(t) => Some((
+                    t.name.name.clone(),
+                    t.methods
+                        .iter()
+                        .filter(|m| m.body.is_some())
+                        .cloned()
+                        .collect(),
+                )),
+                _ => None,
+            })
+            .collect();
         let mut out = Vec::with_capacity(program.items.len());
         for item in std::mem::take(&mut program.items) {
-            let Item::Impl(imp) = item else {
+            let Item::Impl(mut imp) = item else {
                 out.push(item);
                 continue;
             };
+            if let Some(written) = &imp.trait_name
+                && let Some(methods) = find_trait(&defaults, &written.name, &imp.module)
+            {
+                for m in methods {
+                    if imp.methods.iter().any(|f| f.name.name == m.name.name) {
+                        continue;
+                    }
+                    imp.methods.push(FnDecl {
+                        is_pub: true,
+                        is_async: m.is_async,
+                        name: m.name.clone(),
+                        type_params: Vec::new(),
+                        bounds: Vec::new(),
+                        params: m.params.clone(),
+                        ret: m.ret.clone(),
+                        effects: m.effects.clone(),
+                        body: m.body.clone().expect("default method"),
+                        span: m.span,
+                    });
+                }
+            }
             let prefix = if imp.module.is_empty() {
                 String::new()
             } else {

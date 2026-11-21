@@ -1212,3 +1212,47 @@ fn main() {
          true false\n"
     );
 }
+
+#[test]
+fn default_trait_methods() {
+    let src = r#"trait Greet {
+  fn name(self) -> String
+  fn greet(self) -> String {
+    return "Hello, {self.name()}!"
+  }
+  fn shout(self, times: Int) -> String {
+    return self.greet().upper().repeat(times)
+  }
+}
+type Person = { first: String }
+enum Robot {
+  Unit(Int)
+}
+impl Greet for Person {
+  fn name(self) -> String {
+    return self.first
+  }
+}
+impl Greet for Robot {
+  fn name(self) -> String {
+    return match self {
+      Robot.Unit(n) => "unit {n}"
+    }
+  }
+  fn greet(self) -> String {
+    return "Beep, {self.name()}."
+  }
+}
+fn welcome<T: Greet>(x: T) -> String {
+  return x.greet()
+}
+fn main() {
+  let p: Person = { first: "Lina" }
+  print(p.greet(), p.shout(2))
+  print(Robot.Unit(7).greet(), welcome(p), welcome(Robot.Unit(1)))
+}"#;
+    assert_eq!(
+        out(src),
+        "Hello, Lina! HELLO, LINA!HELLO, LINA!\nBeep, unit 7. Hello, Lina! Beep, unit 1.\n"
+    );
+}
