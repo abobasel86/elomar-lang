@@ -131,8 +131,31 @@ const FLOAT_METHODS: &[&str] = &[
     "to_fixed",
     "to_string",
 ];
-const OPTION_METHODS: &[&str] = &["is_some", "is_none", "unwrap_or", "to_string"];
-const RESULT_METHODS: &[&str] = &["is_ok", "is_err", "unwrap_or", "to_string"];
+const OPTION_METHODS: &[&str] = &[
+    "is_some",
+    "is_none",
+    "unwrap_or",
+    "unwrap_or_else",
+    "map",
+    "and_then",
+    "filter",
+    "or",
+    "ok_or",
+    "is_some_and",
+    "to_string",
+];
+const RESULT_METHODS: &[&str] = &[
+    "is_ok",
+    "is_err",
+    "unwrap_or",
+    "unwrap_or_else",
+    "map",
+    "map_err",
+    "and_then",
+    "ok",
+    "err",
+    "to_string",
+];
 const DURATION_METHODS: &[&str] = &["millis", "seconds", "to_string"];
 const MAP_METHODS: &[&str] = &[
     "get",
@@ -435,6 +458,8 @@ impl Checker {
                 self.typed_args(m, args, std::slice::from_ref(&t), span);
                 Some(t)
             }
+            (Ty::Option(t), _) => self.option_method(t, m, args, span),
+            (Ty::Result(t, e), _) => self.result_method(t, e, m, args, span),
             _ => None,
         };
         if let Some(t) = result {
@@ -477,6 +502,91 @@ impl Checker {
         self.push(diag);
         self.check_args_loosely(args);
         Ty::Error
+    }
+
+    /// `map`, `and_then` and the other methods of `Option<T>` that take a
+    /// function or a fallback.
+    fn option_method(&mut self, t: &Ty, m: &str, args: &mut [Arg], span: Span) -> Option<Ty> {
+        let t = t.clone();
+        Some(match m {
+            "map" => {
+                let u = self.subst.fresh();
+                let f = Ty::Fn(vec![t], Box::new(u.clone()));
+                self.typed_args(m, args, &[f], span);
+                Ty::option(u)
+            }
+            "and_then" => {
+                let u = self.subst.fresh();
+                let f = Ty::Fn(vec![t], Box::new(Ty::option(u.clone())));
+                self.typed_args(m, args, &[f], span);
+                Ty::option(u)
+            }
+            "filter" | "is_some_and" => {
+                let f = Ty::Fn(vec![t.clone()], Box::new(Ty::Bool));
+                self.typed_args(m, args, &[f], span);
+                if m == "filter" {
+                    Ty::option(t)
+                } else {
+                    Ty::Bool
+                }
+            }
+            "unwrap_or_else" => {
+                let f = Ty::Fn(Vec::new(), Box::new(t.clone()));
+                self.typed_args(m, args, &[f], span);
+                t
+            }
+            "or" => {
+                let o = Ty::option(t);
+                self.typed_args(m, args, std::slice::from_ref(&o), span);
+                o
+            }
+            "ok_or" => {
+                let e = self.subst.fresh();
+                self.typed_args(m, args, std::slice::from_ref(&e), span);
+                Ty::result(t, e)
+            }
+            _ => return None,
+        })
+    }
+
+    /// `map`, `map_err`, `and_then` and the other methods of `Result<T, E>`.
+    fn result_method(
+        &mut self,
+        t: &Ty,
+        e: &Ty,
+        m: &str,
+        args: &mut [Arg],
+        span: Span,
+    ) -> Option<Ty> {
+        let (t, e) = (t.clone(), e.clone());
+        Some(match m {
+            "map" => {
+                let u = self.subst.fresh();
+                let f = Ty::Fn(vec![t], Box::new(u.clone()));
+                self.typed_args(m, args, &[f], span);
+                Ty::result(u, e)
+            }
+            "map_err" => {
+                let g = self.subst.fresh();
+                let f = Ty::Fn(vec![e], Box::new(g.clone()));
+                self.typed_args(m, args, &[f], span);
+                Ty::result(t, g)
+            }
+            "and_then" => {
+                let u = self.subst.fresh();
+                let f = Ty::Fn(vec![t], Box::new(Ty::result(u.clone(), e.clone())));
+                self.typed_args(m, args, &[f], span);
+                Ty::result(u, e)
+            }
+            "unwrap_or_else" => {
+                let f = Ty::Fn(vec![e], Box::new(t.clone()));
+                self.typed_args(m, args, &[f], span);
+                t
+            }
+            "ok" => self.no_args(m, args, span, Ty::option(t))?,
+            "err" => self.no_args(m, args, span, Ty::option(e))?,
+            _ => return None,
+        })
     }
 
     fn no_args(&mut self, m: &str, args: &mut [Arg], span: Span, ret: Ty) -> Option<Ty> {

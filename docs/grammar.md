@@ -1034,8 +1034,8 @@ fn test_greets_by_name() {
 | `String` | `.length` (حروف مرئية) · `upper()` · `lower()` · `trim()` · `contains(s)` · `starts_with(s)` · `ends_with(s)` · `split(sep) -> List<String>` · `chars() -> List<String>` · `replace(a, b)` · `repeat(n)` · `parse_int()` · `parse_float()` · `is_empty()` · `index_of(s) -> Option<Int>` · `slice(start, end)` (بالحروف المرئية) · `lines()` · `words()` · `trim_start()` / `trim_end()` · `pad_start(n[, fill])` / `pad_end(n[, fill])` · `reverse()` |
 | `Int` | `to_float()` · `abs()` · `pow(n)` (n ≥ 0) · `clamp(min, max)` |
 | `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` · `pow(Float)` · `clamp(min, max)` · `round_to(digits) -> Float` · `to_fixed(digits) -> String` |
-| `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` |
-| `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` |
+| `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn() -> T)` · `map(fn(T) -> U) -> Option<U>` · `and_then(fn(T) -> Option<U>)` · `filter(fn(T) -> Bool)` · `is_some_and(fn(T) -> Bool)` · `or(Option<T>)` · `ok_or(E) -> Result<T, E>` |
+| `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn(E) -> T)` · `map(fn(T) -> U) -> Result<U, E>` · `map_err(fn(E) -> F) -> Result<T, F>` · `and_then(fn(T) -> Result<U, E>)` · `ok() -> Option<T>` · `err() -> Option<E>` |
 | `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` |
 | `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` |
 | `AIError` · `FsError` · `JsonError` | `kind() -> String` (اسم الحالة) · `message() -> String` |

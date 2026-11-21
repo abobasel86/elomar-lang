@@ -1086,3 +1086,37 @@ fn process_needs_its_effect() {
     let diags = elomar_types::check(&mut program, elomar_types::CheckOptions::default());
     assert!(diags.iter().any(|d| d.code == "E3002"), "{diags:#?}");
 }
+
+#[test]
+fn option_and_result_methods() {
+    let src = r#"fn half(n: Int) -> Result<Int, String> {
+  return match n % 2 == 0 {
+    true => Ok(n div 2)
+    false => Err("{n} is odd")
+  }
+}
+fn main() {
+  let some = Some(4)
+  let none: Option<Int> = None
+  print(some.map(|x| x * 10), none.map(|x| x * 10))
+  print(some.and_then(|x| match x > 3 {
+    true => Some("big")
+    false => None
+  }), some.filter(|x| x > 9), some.is_some_and(|x| x == 4))
+  print(none.unwrap_or_else(|| 7), none.or(Some(1)), none.ok_or("missing"), some.ok_or("missing"))
+  print(half(8).map(|x| x + 1), half(3).map(|x| x + 1), half(3).map_err(|e| e.upper()))
+  print(half(8).and_then(half), half(6).and_then(half), half(3).unwrap_or_else(|e| e.length))
+  print(half(4).ok(), half(5).ok(), half(5).err())
+  print("12".parse_int().map(|n| n * 2).unwrap_or(0))
+}"#;
+    assert_eq!(
+        out(src),
+        "Some(40) None\n\
+         Some(\"big\") None true\n\
+         7 Some(1) Err(\"missing\") Ok(4)\n\
+         Ok(5) Err(\"3 is odd\") Err(\"3 IS ODD\")\n\
+         Ok(2) Err(\"3 is odd\") 8\n\
+         Some(2) None Some(\"5 is odd\")\n\
+         24\n"
+    );
+}

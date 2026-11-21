@@ -923,6 +923,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 {
                     return self.list_higher_order(items, method, values, span);
                 }
+                if matches!(recv, Value::Option(_) | Value::Result(_))
+                    && let Some(v) = self.option_result_method(&recv, method, &values, span)?
+                {
+                    return Ok(v);
+                }
                 builtins::call_method(recv, method, values, span).map_err(Flow::from)
             }
             _ => match self.eval(callee)? {
@@ -985,6 +990,82 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
             }
         }
+    }
+
+    /// `map`, `and_then` and the other `Option`/`Result` methods that are
+    /// not in `builtins`. `None` for methods handled there.
+    fn option_result_method(
+        &mut self,
+        recv: &Value,
+        method: &str,
+        args: &[Value],
+        span: Span,
+    ) -> Exec<Option<Value>> {
+        let func = |i: usize| match args.get(i) {
+            Some(Value::Function(f)) => Some(f.clone()),
+            _ => None,
+        };
+        let call = |this: &mut Self, i: usize, x: Vec<Value>| -> Exec<Value> {
+            let f = func(i).expect("checked function argument");
+            this.call_value(&f, x, span)
+        };
+        Ok(Some(match (recv, method) {
+            (Value::Option(o), "map") => match o {
+                Some(v) => Value::some(call(self, 0, vec![(**v).clone()])?),
+                None => Value::none(),
+            },
+            (Value::Option(o), "and_then") => match o {
+                Some(v) => call(self, 0, vec![(**v).clone()])?,
+                None => Value::none(),
+            },
+            (Value::Option(o), "filter") => match o {
+                Some(v) if matches!(call(self, 0, vec![(**v).clone()])?, Value::Bool(true)) => {
+                    recv.clone()
+                }
+                _ => Value::none(),
+            },
+            (Value::Option(o), "is_some_and") => match o {
+                Some(v) => call(self, 0, vec![(**v).clone()])?,
+                None => Value::Bool(false),
+            },
+            (Value::Option(o), "unwrap_or_else") => match o {
+                Some(v) => (**v).clone(),
+                None => call(self, 0, Vec::new())?,
+            },
+            (Value::Option(o), "or") => match o {
+                Some(_) => recv.clone(),
+                None => args[0].clone(),
+            },
+            (Value::Option(o), "ok_or") => match o {
+                Some(v) => Value::Result(Ok(v.clone())),
+                None => Value::Result(Err(Rc::new(args[0].clone()))),
+            },
+            (Value::Result(r), "map") => match r {
+                Ok(v) => Value::Result(Ok(Rc::new(call(self, 0, vec![(**v).clone()])?))),
+                Err(_) => recv.clone(),
+            },
+            (Value::Result(r), "map_err") => match r {
+                Ok(_) => recv.clone(),
+                Err(e) => Value::Result(Err(Rc::new(call(self, 0, vec![(**e).clone()])?))),
+            },
+            (Value::Result(r), "and_then") => match r {
+                Ok(v) => call(self, 0, vec![(**v).clone()])?,
+                Err(_) => recv.clone(),
+            },
+            (Value::Result(r), "unwrap_or_else") => match r {
+                Ok(v) => (**v).clone(),
+                Err(e) => call(self, 0, vec![(**e).clone()])?,
+            },
+            (Value::Result(r), "ok") => match r {
+                Ok(v) => Value::Option(Some(v.clone())),
+                Err(_) => Value::none(),
+            },
+            (Value::Result(r), "err") => match r {
+                Ok(_) => Value::none(),
+                Err(e) => Value::Option(Some(e.clone())),
+            },
+            _ => return Ok(None),
+        }))
     }
 
     /// `map`, `filter`, `fold` and the other list methods that take a function.

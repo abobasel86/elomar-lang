@@ -4,6 +4,15 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Language
+
+- `Option` methods `map`, `and_then`, `filter`, `is_some_and`,
+  `unwrap_or_else`, `or` and `ok_or`, and `Result` methods `map`,
+  `map_err`, `and_then`, `unwrap_or_else`, `ok` and `err`:
+  `"12".parse_int().map(|n| n * 2).unwrap_or(0)`.
+
 ## [0.2.0] - 2026-11-21
 
 A larger language and standard library: string interpolation, a web
