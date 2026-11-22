@@ -4,6 +4,21 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Tools
+
+- `elomar repl`: an interactive prompt. Expressions show their value;
+  variables, functions and types stay for the next lines, `let x` may be
+  typed again, `await` works directly, and errors point into the line you
+  typed. Commands: `:help`, `:show`, `:reset`, `:quit`. Lines are kept in
+  `~/.elomar_history`.
+
+### Website
+
+- The first lesson shows `elomar repl` and how to install the extension
+  from Open VSX.
+
 ## [0.3.0] - 2026-11-21
 
 ### Language

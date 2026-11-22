@@ -248,6 +248,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | Command | Purpose |
 |---|---|
 | `elomar run FILE` | Check, then run a program |
+| `elomar repl` | An interactive prompt: type code and see the result at once |
 | `elomar check FILE` | Report errors and warnings without running |
 | `--lang en\|ar` | Diagnostic language (or set `ELOMAR_LANG`) |
 | `--no-color` | Plain output (also honors `NO_COLOR`) |

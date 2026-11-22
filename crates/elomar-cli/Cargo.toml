@@ -22,6 +22,7 @@ elomar-fmt.workspace = true
 elomar-types.workspace = true
 elomar-interpreter = { workspace = true, features = ["native"] }
 clap.workspace = true
+rustyline.workspace = true
 serde_json.workspace = true
 elomar-ai-core.workspace = true
 elomar-ai-provider-mock.workspace = true

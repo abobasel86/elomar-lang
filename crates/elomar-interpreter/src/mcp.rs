@@ -43,6 +43,12 @@ impl McpHub {
         }
     }
 
+    /// A hub that may start no server; a placeholder while the real one is
+    /// kept elsewhere (the REPL's session).
+    pub(crate) fn empty() -> Self {
+        McpHub::new(McpConfig::default(), PathBuf::new())
+    }
+
     /// The running client of `server`, started if needed.
     pub(crate) fn client(&mut self, server: &str) -> Result<&mut Client, Failure> {
         if !self.clients.contains_key(server) {

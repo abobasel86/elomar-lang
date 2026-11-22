@@ -78,6 +78,8 @@ enum Command {
         /// Name of the project (and its folder)
         name: String,
     },
+    /// Type code and see the result at once (an interactive prompt)
+    Repl,
     /// Run the language server (LSP) on standard input/output, for editors
     Lsp,
     /// Add a dependency to elomar.toml and download it: from the registry
@@ -212,6 +214,7 @@ fn main() -> ExitCode {
         }
         Command::New { name } => return scaffold::new_project(name, &reporter),
         Command::Lsp => return lsp::serve(lang),
+        Command::Repl => return repl::run(&reporter),
         Command::Add {
             name,
             path,
@@ -354,6 +357,7 @@ mod editor;
 mod fmt;
 mod lsp;
 mod packages;
+mod repl;
 mod scaffold;
 mod testing;
 

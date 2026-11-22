@@ -14,6 +14,7 @@ mod mcp;
 mod process;
 mod py;
 mod server;
+mod session;
 mod stdextra;
 mod stdlib;
 mod value;
@@ -29,6 +30,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use ai::{InferCall, RunCall, RunTool};
+pub use session::Session;
 pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
 
 /// Services the running program can use. Implemented by the CLI with real
