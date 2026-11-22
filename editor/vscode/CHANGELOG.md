@@ -5,6 +5,12 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.5.0
+
+Debugging: press **F5** to stop at breakpoints, step through the program
+and look at its variables (it runs `elomar dap`). **Ctrl+F5** still runs
+the file in a terminal. Needs `elomar` 0.5.0.
+
 ## 0.4.0
 
 Works with the 0.4.0 language: `elomar repl` and the list methods `zip`,
