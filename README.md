@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/abobasel86/elomar-lang/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/abobasel86/elomar-lang?color=0f6e63"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=abobasel86.elomar-lang"><img alt="VS Code Marketplace" src="https://img.shields.io/visual-studio-marketplace/v/abobasel86.elomar-lang?label=VS%20Code&color=0f6e63"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=abobasel86.elomar-lang"><img alt="VS Code Marketplace" src="https://img.shields.io/badge/VS%20Code-Marketplace-0f6e63"></a>
   <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/abobasel86/elomar-lang?label=Open%20VSX&color=0f6e63"></a>
   <a href="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml/badge.svg"></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0f6e63"></a>
