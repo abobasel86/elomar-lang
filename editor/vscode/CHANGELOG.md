@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.0.0
+
+Works with Elomar-Lang 1.0, the first stable version. No new features since
+0.9.0.
+
 ## 0.9.0
 
 **Find All References** (Shift+F12), **Rename** (F2) across the project's

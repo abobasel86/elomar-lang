@@ -108,7 +108,7 @@ fn diagnostics_in_arabic() {
 #[test]
 fn version_and_missing_file() {
     let out = elomar(&["--version"]);
-    assert!(String::from_utf8_lossy(&out.stdout).contains("spec 1.0.0-rc.1"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("spec 1.0.0"));
     let out = elomar(&["run", "does-not-exist.elo"]);
     assert_eq!(out.status.code(), Some(2));
 }

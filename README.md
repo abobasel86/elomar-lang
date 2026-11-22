@@ -48,7 +48,8 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v0.9.0, release candidate for 1.0. The specification is frozen.**
+> **Project status: v1.0.0, stable.** Programs written for 1.0 keep working in
+> every 1.x version: see [`docs/stability.md`](docs/stability.md).
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
@@ -295,7 +296,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
 | `tests/fail/` | Programs that must fail with specific error codes |
-| `docs/grammar.md` | Authoritative grammar, semantics and error codes (frozen at 1.0.0-rc.1) |
+| `docs/grammar.md` | Authoritative grammar, semantics and error codes (version 1.0.0) |
 | `docs/stability.md` | What 1.0 promises: programs written for 1.0 keep working in every 1.x |
 | `Elomar-Lang_Master_Specification_AR.md` | Vision, architecture and roadmap (Arabic) |
 
@@ -332,7 +333,7 @@ cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 6. ✅ v0.6–v0.7: `timeout`, folder and file functions, `std.csv`, date arithmetic, `elomar build` (one executable file).
 7. ✅ v0.8: a faster interpreter (smaller values, cheaper calls, LTO builds).
 8. ✅ v0.9: fuzz testing of the parser and interpreter, rename and find references in editors, the specification frozen.
-9. v1.0: a stable release; programs written for 1.0 keep working in every 1.x.
+9. ✅ v1.0: a stable release; programs written for 1.0 keep working in every 1.x.
 10. After 1.0: a bytecode engine, and `async` work on several processor cores.
 
 ## Editors

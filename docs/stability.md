@@ -4,8 +4,8 @@ Elomar-Lang 1.0 makes one promise: **a program that works with 1.0 keeps
 working with every later 1.x version**, with the same results. You can
 upgrade `elomar` without rewriting anything.
 
-The specification ([`grammar.md`](grammar.md)) is frozen at `1.0.0-rc.1`
-from version 0.9: until 1.0, it changes only to fix mistakes.
+This applies to the specification ([`grammar.md`](grammar.md), version
+`1.0.0`) and to the `elomar` program from version 1.0.0 on.
 
 ## What stays the same in every 1.x
 
@@ -58,8 +58,8 @@ only removed in 2.0.
 تعد Elomar-Lang 1.0 بوعد واحد: **البرنامج الذي يعمل مع 1.0 يبقى يعمل مع كل إصدار 1.x
 بعده**، وبالنتائج نفسها. يمكنك تحديث `elomar` دون إعادة كتابة أي شيء.
 
-والمواصفة ([`grammar.md`](grammar.md)) مجمّدة عند `1.0.0-rc.1` منذ الإصدار 0.9: لا تتغير
-قبل 1.0 إلا لتصحيح خطأ.
+وينطبق هذا على المواصفة ([`grammar.md`](grammar.md)، الإصدار `1.0.0`) وعلى البرنامج `elomar`
+من الإصدار 1.0.0 فصاعدًا.
 
 ### ما يبقى ثابتًا في كل إصدارات 1.x
 

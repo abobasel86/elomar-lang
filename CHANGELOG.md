@@ -4,6 +4,33 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [1.0.0] - 2026-11-22
+
+The first stable version. From now on, a program that works with 1.0 keeps
+working with every 1.x version; [`docs/stability.md`](docs/stability.md)
+says exactly what is promised. The specification
+([`docs/grammar.md`](docs/grammar.md)) is version `1.0.0`.
+
+1.0 is 0.9.0 with this promise: no change to the language or the library.
+What came together on the way here:
+
+- **The language:** typed, with records, enums, generics, traits, closures,
+  `Option`/`Result` and `?`, pattern matching, `async`/`await` with `all`
+  and `timeout`, effects (`!{fs, net, ai}`), modules and packages, and names
+  in Arabic or English, with every error explained in both languages.
+- **AI in the language:** `ai.infer<T>` checked against your types, tools,
+  agents and MCP, with an offline model, OpenAI and Claude.
+- **The standard library:** files and folders, JSON, CSV, HTTP client and
+  server, SQLite, regex, dates, math, crypto, Python and other programs, all
+  behind permissions in `elomar.toml`.
+- **Tools:** `elomar run`, `check`, `test`, `fmt`, `new`, `repl`, `build`
+  (one executable to share), packages with a public registry, a language
+  server and a debugger, and the VS Code extension.
+- **Learning:** a bilingual tutorial with exercises checked in the browser,
+  and a playground.
+- **Reliability:** about a million generated programs run without a crash,
+  and fuzz testing on every change.
+
 ## [0.9.0] - 2026-11-22
 
 ### Editors
