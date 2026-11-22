@@ -183,6 +183,10 @@ impl Reporter {
     }
 }
 
+/// A faster allocator: the interpreter allocates many small values.
+#[global_allocator]
+static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
 

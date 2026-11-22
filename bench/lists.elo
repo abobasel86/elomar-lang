@@ -1,0 +1,15 @@
+fn main() {
+    var xs: List<Int> = []
+    for i in 0..200000 {
+        xs.push(i)
+    }
+    let ys = xs.map(|x| x * 2).filter(|x| x % 3 == 0)
+    print(ys.length, ys.sum())
+    var count = 0
+    for x in xs {
+        if x % 7 == 0 {
+            count += 1
+        }
+    }
+    print(count)
+}

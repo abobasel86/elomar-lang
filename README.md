@@ -299,6 +299,13 @@ cargo test --workspace
 Every example in `examples/` is executed through the real `elomar` binary
 and compared with its `expected.out`.
 
+To time the interpreter, build it in release mode and run the programs in
+`bench/`:
+
+```bash
+cargo build --release -p elomar-cli && python bench/run.py
+```
+
 ## Roadmap
 
 1. ✅ Lexer, parser, type and effect checker, interpreter, CLI.

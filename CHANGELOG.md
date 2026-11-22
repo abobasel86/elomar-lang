@@ -15,6 +15,14 @@ change the language.
   where a runtime error happens. Output goes to the Debug Console, where
   `input(...)` also reads. **Ctrl+F5** still runs the file in a terminal.
 
+### Performance
+
+- Programs run about 1.6 times faster overall (1.4 to 2 times on the
+  programs in `bench/`): a faster memory allocator, variables that no longer
+  copy their names, closures that share their captured variables between
+  calls instead of copying them, and short paths for the most common
+  statements and integer operations. `python bench/run.py` times them.
+
 ## [0.4.0] - 2026-11-22
 
 ### Language

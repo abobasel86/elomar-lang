@@ -62,7 +62,7 @@ pub enum Function {
     /// `captured` holds copies of the variables visible where it was made.
     Closure {
         key: usize,
-        captured: Vec<(String, Value)>,
+        captured: Rc<Vec<(Rc<str>, Value)>>,
     },
 }
 

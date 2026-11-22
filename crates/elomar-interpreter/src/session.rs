@@ -11,12 +11,12 @@ use std::mem;
 use elomar_ai_core::AiRuntime;
 use elomar_ast::{Expr, Item, Program, Stmt, StmtKind};
 
-use crate::{FsPolicy, Host, Interpreter, RuntimeError, Value, mcp};
+use crate::{Frame, FsPolicy, Host, Interpreter, RuntimeError, Value, mcp};
 
 /// What survives between inputs.
 struct Kept {
     globals: HashMap<String, Value>,
-    frames: Vec<Vec<Vec<(String, Value)>>>,
+    frames: Vec<Frame<'static>>,
     lambdas: HashMap<usize, &'static Expr>,
     mcp: mcp::McpHub,
 }

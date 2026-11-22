@@ -1,0 +1,13 @@
+type Point = { x: Int, y: Int }
+
+fn step(p: Point) -> Point {
+    return { x: p.x + 1, y: p.y + p.x }
+}
+
+fn main() {
+    var p: Point = { x: 0, y: 0 }
+    for i in 0..300000 {
+        p = step(p)
+    }
+    print(p.x, p.y)
+}
