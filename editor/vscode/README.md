@@ -26,9 +26,13 @@ programming language with AI built in, in Arabic and English.
 1. Install the `elomar` command: download it for your system from the
    [latest release](https://github.com/abobasel86/elomar-lang/releases/latest)
    and put it on your `PATH` (or set `elomar.path`).
-2. Install this extension from the Marketplace, or from the
-   `elomar-lang-<version>.vsix` file of the release with
-   **Extensions → … → Install from VSIX**.
+2. Install this extension:
+   - in VSCodium, Cursor, Windsurf and other editors that use
+     [Open VSX](https://open-vsx.org/extension/abobasel86/elomar-lang):
+     search for **Elomar-Lang** in the Extensions view;
+   - in Visual Studio Code: download `elomar-lang-<version>.vsix` from the
+     [latest release](https://github.com/abobasel86/elomar-lang/releases/latest)
+     and use **Extensions → … → Install from VSIX**.
 3. Open a folder with `.elo` files. New to the language? Start with the
    [tutorial](https://abobasel86.github.io/elomar-lang/) in English or Arabic.
 

@@ -2,7 +2,7 @@
   "name": "elomar-lang",
   "displayName": "Elomar-Lang",
   "description": "Elomar-Lang support: highlighting, errors while you type (Arabic/English), hover, go to definition, outline, completion, formatting, snippets and a Run button",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "abobasel86",
   "license": "MIT OR Apache-2.0",
   "icon": "images/icon.png",

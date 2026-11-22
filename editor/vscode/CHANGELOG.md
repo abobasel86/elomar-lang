@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.3.2
+
+The setup steps say where to install the extension: Open VSX, or the
+`.vsix` file of a release for Visual Studio Code.
+
 ## 0.3.1
 
 A new icon: `{EL}` with the name Elomar Lang.
