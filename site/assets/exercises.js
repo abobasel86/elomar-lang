@@ -4,7 +4,7 @@
 // endless program never freezes the page. Answers and progress are kept in
 // this browser's localStorage only.
 (function () {
-  const root = document.getElementById("exercises");
+  const root = document.getElementById("ex-root");
   const dataNode = document.getElementById("ex-data");
   if (!root || !dataNode) return;
   const lang = root.dataset.lang === "ar" ? "ar" : "en";
