@@ -26,11 +26,11 @@ const MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
 const IO_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn error(kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "HttpError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "HttpError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn text(v: &Value) -> &str {

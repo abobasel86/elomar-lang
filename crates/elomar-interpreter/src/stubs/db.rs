@@ -28,11 +28,11 @@ pub(crate) fn call(
     _args: &[Value],
     _unit_enums: &HashMap<String, Vec<String>>,
 ) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "DbError".into(),
-        variant: "Open".into(),
-        fields: Rc::new(vec![Value::str(
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "DbError",
+        "Open",
+        vec![Value::str(
             "databases are not available in this build (for example in the browser playground)",
-        )]),
-    })))
+        )],
+    ))))
 }

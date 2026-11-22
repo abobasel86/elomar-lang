@@ -12,11 +12,11 @@ use crate::Value;
 use crate::ai::{from_json, schema_of, to_json};
 
 fn error_value(enum_name: &str, kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: enum_name.into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        enum_name,
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn ok(v: Value) -> Value {

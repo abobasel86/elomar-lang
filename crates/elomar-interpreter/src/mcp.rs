@@ -112,11 +112,11 @@ impl McpHub {
 }
 
 fn error((kind, message): Failure) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "McpError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "McpError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn text(v: Option<&Value>) -> &str {

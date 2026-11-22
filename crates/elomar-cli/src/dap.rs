@@ -711,7 +711,8 @@ fn children(value: &Value) -> Vec<(String, Value)> {
             .enumerate()
             .map(|(i, k): (usize, &MapKey)| (format!("[{i}]"), k.to_value()))
             .collect(),
-        Value::Enum { fields, .. } => fields
+        Value::Enum(e) => e
+            .fields
             .iter()
             .enumerate()
             .map(|(i, v)| (format!("[{i}]"), v.clone()))

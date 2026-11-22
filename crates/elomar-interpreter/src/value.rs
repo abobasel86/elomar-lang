@@ -77,6 +77,15 @@ pub enum FutureState {
     Cancelled,
 }
 
+/// A value of an `enum`: `Shape.Circle(1.0)`; `fields` is empty for a
+/// plain variant.
+#[derive(Debug)]
+pub struct EnumValue {
+    pub enum_name: Rc<str>,
+    pub variant: Rc<str>,
+    pub fields: Vec<Value>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
@@ -96,12 +105,9 @@ pub enum Value {
     },
     /// Milliseconds.
     Duration(i64),
-    /// `Shape.Circle(1.0)`; `fields` is empty for a plain variant.
-    Enum {
-        enum_name: Rc<str>,
-        variant: Rc<str>,
-        fields: Rc<Vec<Value>>,
-    },
+    /// `Shape.Circle(1.0)`. Kept behind one pointer so every `Value` is
+    /// small (24 bytes), which makes all values faster to move.
+    Enum(Rc<EnumValue>),
     Map(Rc<BTreeMap<MapKey, Value>>),
     /// Elements are `String` or `Int` and iterate in order.
     Set(Rc<BTreeSet<MapKey>>),
@@ -125,6 +131,18 @@ impl Value {
 
     pub fn some(v: Value) -> Value {
         Value::Option(Some(Rc::new(v)))
+    }
+
+    pub fn enum_value(
+        enum_name: impl Into<Rc<str>>,
+        variant: impl Into<Rc<str>>,
+        fields: Vec<Value>,
+    ) -> Value {
+        Value::Enum(Rc::new(EnumValue {
+            enum_name: enum_name.into(),
+            variant: variant.into(),
+            fields,
+        }))
     }
 
     pub fn none() -> Value {
@@ -153,18 +171,14 @@ impl Value {
             (Str(a), Str(b)) => a == b,
             (Unit, Unit) => true,
             (Duration(a), Duration(b)) => a == b,
-            (
-                Enum {
-                    enum_name: e1,
-                    variant: v1,
-                    fields: f1,
-                },
-                Enum {
-                    enum_name: e2,
-                    variant: v2,
-                    fields: f2,
-                },
-            ) => e1 == e2 && v1 == v2 && f1.iter().zip(f2.iter()).all(|(x, y)| x.equals(y)),
+            (Enum(a), Enum(b)) => {
+                a.enum_name == b.enum_name
+                    && a.variant == b.variant
+                    && a.fields
+                        .iter()
+                        .zip(b.fields.iter())
+                        .all(|(x, y)| x.equals(y))
+            }
             (Set(a), Set(b)) => a == b,
             (Map(a), Map(b)) => {
                 a.len() == b.len() && a.iter().all(|(k, v)| b.get(k).is_some_and(|w| v.equals(w)))
@@ -309,15 +323,11 @@ impl fmt::Display for Value {
                 inclusive,
             } => write!(f, "{start}{}{end}", if *inclusive { "..=" } else { ".." }),
             Value::Duration(ms) => f.write_str(&format_duration(*ms)),
-            Value::Enum {
-                enum_name,
-                variant,
-                fields,
-            } => {
-                write!(f, "{enum_name}.{variant}")?;
-                if !fields.is_empty() {
+            Value::Enum(e) => {
+                write!(f, "{}.{}", e.enum_name, e.variant)?;
+                if !e.fields.is_empty() {
                     f.write_str("(")?;
-                    for (i, v) in fields.iter().enumerate() {
+                    for (i, v) in e.fields.iter().enumerate() {
                         if i > 0 {
                             f.write_str(", ")?;
                         }

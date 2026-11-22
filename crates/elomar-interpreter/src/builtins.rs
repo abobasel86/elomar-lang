@@ -407,8 +407,8 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
                 m => unreachable!("checked map method `{m}`"),
             }
         }
-        (Value::Enum { variant, .. }, "kind") => Value::Str(variant),
-        (Value::Enum { fields, .. }, "message") => fields.first().cloned().unwrap_or(Value::Unit),
+        (Value::Enum(e), "kind") => Value::Str(e.variant.clone()),
+        (Value::Enum(e), "message") => e.fields.first().cloned().unwrap_or(Value::Unit),
         (Value::Str(s), _) => str_method(&s, method, &args, span)?,
         (Value::Int(n), "to_float") => Value::Float(n as f64),
         (Value::Int(n), "abs") => Value::Int(n.checked_abs().ok_or_else(|| overflow(span))?),

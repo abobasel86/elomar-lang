@@ -49,11 +49,11 @@ out.flush()
 "#;
 
 fn error(kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "PyError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "PyError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn text(v: &Value) -> &str {

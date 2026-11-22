@@ -4,6 +4,18 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Performance
+
+- Programs run about 1.25 times faster than 0.7.0 (`python bench/run.py`:
+  505 ms to about 405 ms in all), and function calls about 1.5 times
+  faster. Values take half the memory (24 bytes), calls reuse the memory
+  of finished calls, a call's variables live in one list instead of one
+  per block, `x += 1` finds `x` once, record field names are shared, and
+  release builds are optimized across crates (LTO), which also makes
+  `elomar` smaller (10 MB).
+
 ## [0.7.0] - 2026-11-22
 
 ### Tools

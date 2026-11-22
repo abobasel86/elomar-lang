@@ -32,11 +32,11 @@ impl fmt::Debug for Handle {
 }
 
 fn error(kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "DbError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "DbError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn ok(v: Value) -> Value {

@@ -116,11 +116,11 @@ pub(crate) fn infer_result(
 /// `AIError` as a value: the variant named by the error kind, carrying the
 /// message, e.g. `AIError.Timeout("no answer within 10000 ms")`.
 pub(crate) fn ai_error_value(e: &AiError) -> Value {
-    Value::Enum {
-        enum_name: "AIError".into(),
-        variant: e.kind.name().into(),
-        fields: Rc::new(vec![Value::str(e.message.as_str())]),
-    }
+    Value::enum_value(
+        "AIError",
+        e.kind.name(),
+        vec![Value::str(e.message.as_str())],
+    )
 }
 
 pub(crate) fn to_json(v: &Value) -> Json {
@@ -137,7 +137,7 @@ pub(crate) fn to_json(v: &Value) -> Json {
                 .map(|(n, v)| (n.to_string(), to_json(v)))
                 .collect::<Map<_, _>>(),
         ),
-        Value::Enum { variant, .. } => Json::String(variant.to_string()),
+        Value::Enum(e) => Json::String(e.variant.to_string()),
         Value::Map(entries) => Json::Object(
             entries
                 .iter()
@@ -167,11 +167,9 @@ pub(crate) fn from_json(schema: &Schema, json: &Json) -> Value {
         ),
         (Schema::Float, Json::Number(n)) => Value::Float(n.as_f64().unwrap_or(0.0)),
         (Schema::Bool, Json::Bool(b)) => Value::Bool(*b),
-        (Schema::Enum { name, .. }, Json::String(s)) => Value::Enum {
-            enum_name: name.as_str().into(),
-            variant: s.as_str().into(),
-            fields: Rc::new(Vec::new()),
-        },
+        (Schema::Enum { name, .. }, Json::String(s)) => {
+            Value::enum_value(name.as_str(), s.as_str(), Vec::new())
+        }
         (Schema::List(t), Json::Array(items)) => {
             Value::list(items.iter().map(|i| from_json(t, i)).collect())
         }

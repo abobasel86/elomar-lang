@@ -5,19 +5,18 @@
 //! hands over here. Programs must live for the rest of the session
 //! (`&'static`): closures made by earlier inputs point into them.
 
-use std::collections::HashMap;
 use std::mem;
 
 use elomar_ai_core::AiRuntime;
 use elomar_ast::{Expr, Item, Program, Stmt, StmtKind};
 
-use crate::{Frame, FsPolicy, Host, Interpreter, RuntimeError, Value, mcp};
+use crate::{FastMap, Frame, FsPolicy, Host, Interpreter, RuntimeError, Value, mcp};
 
 /// What survives between inputs.
 struct Kept {
-    globals: HashMap<String, Value>,
+    globals: FastMap<String, Value>,
     frames: Vec<Frame<'static>>,
-    lambdas: HashMap<usize, &'static Expr>,
+    lambdas: FastMap<usize, &'static Expr>,
     mcp: mcp::McpHub,
 }
 

@@ -286,15 +286,52 @@ pub(crate) struct Frame<'p> {
     /// A closure's copies of the variables visible where it was made;
     /// shared by every call of that closure.
     captured: Option<Captured>,
-    /// Block scopes, innermost last.
-    scopes: Vec<Scope<'p>>,
+    /// Every variable of the call, inner blocks' last, so a later one
+    /// shadows an earlier one with the same name.
+    vars: Scope<'p>,
+    /// Where each open block's variables start in `vars`, innermost last.
+    /// Leaving a block cuts `vars` back to its mark: no allocation per block.
+    marks: Vec<usize>,
 }
 
 impl<'p> Frame<'p> {
-    fn new(captured: Option<Captured>, scopes: Vec<Scope<'p>>) -> Self {
-        Frame { captured, scopes }
+    fn new(captured: Option<Captured>, vars: Scope<'p>) -> Self {
+        Frame {
+            captured,
+            vars,
+            marks: Vec::new(),
+        }
     }
 }
+
+/// A fast hash for the interpreter's maps of names (FxHash): the keys are
+/// short and come from the program, so a strong hash only costs time.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct FxHasher(u64);
+
+impl std::hash::Hasher for FxHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        const K: u64 = 0x51_7c_c1_b7_27_22_0a_95;
+        let (words, rest) = bytes.as_chunks::<8>();
+        for word in words {
+            self.0 = (self.0.rotate_left(5) ^ u64::from_le_bytes(*word)).wrapping_mul(K);
+        }
+        for &b in rest {
+            self.0 = (self.0.rotate_left(5) ^ b as u64).wrapping_mul(K);
+        }
+    }
+    #[inline]
+    fn write_usize(&mut self, n: usize) {
+        self.0 = (self.0.rotate_left(5) ^ n as u64).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+pub(crate) type FastMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<FxHasher>>;
 
 /// Non-local control flow, propagated with `?`.
 enum Flow {
@@ -340,8 +377,8 @@ enum Step {
 }
 
 struct Interpreter<'p, 'h> {
-    fns: HashMap<&'p str, &'p FnDecl>,
-    globals: HashMap<String, Value>,
+    fns: FastMap<&'p str, &'p FnDecl>,
+    globals: FastMap<String, Value>,
     /// One per call.
     frames: Vec<Frame<'p>>,
     host: &'h mut dyn Host,
@@ -350,7 +387,7 @@ struct Interpreter<'p, 'h> {
     /// Enums whose variants are all plain names, for AI answer schemas.
     unit_enums: HashMap<String, Vec<String>>,
     /// Closure expressions that have been evaluated, by address.
-    lambdas: HashMap<usize, &'p Expr>,
+    lambdas: FastMap<usize, &'p Expr>,
     /// MCP servers started so far; stopped when the run ends.
     mcp: mcp::McpHub,
     /// Set when a debugger runs the program.
@@ -364,6 +401,12 @@ struct Interpreter<'p, 'h> {
     /// When each running `timeout` ends (milliseconds since 1970),
     /// outermost first.
     deadlines: Vec<i64>,
+    /// Frames of finished calls, emptied, so a call reuses their memory
+    /// instead of allocating.
+    spare: Vec<Frame<'p>>,
+    /// One shared copy of each record field name written in the program,
+    /// by the address of its text, so making a record allocates no names.
+    field_names: FastMap<usize, Rc<str>>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -385,16 +428,18 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         Interpreter {
             fns,
             mcp,
-            globals: HashMap::new(),
-            frames: vec![Frame::new(None, vec![Vec::new()])],
+            globals: FastMap::default(),
+            frames: vec![Frame::new(None, Vec::new())],
             host,
             ai,
             fs,
-            lambdas: HashMap::new(),
+            lambdas: FastMap::default(),
             debugger: None,
             calls: Vec::new(),
             reported_error: 0,
             deadlines: Vec::new(),
+            spare: Vec::new(),
+            field_names: FastMap::default(),
             unit_enums: program
                 .items
                 .iter()
@@ -411,12 +456,12 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
     // ----- environment -----------------------------------------------------
 
-    fn scopes(&mut self) -> &mut Vec<Scope<'p>> {
-        &mut self.frames.last_mut().expect("frame").scopes
+    fn frame(&mut self) -> &mut Frame<'p> {
+        self.frames.last_mut().expect("frame")
     }
 
     fn define(&mut self, name: &'p str, value: Value) {
-        self.scopes().last_mut().expect("scope").push((name, value));
+        self.frame().vars.push((name, value));
     }
 
     fn lookup(&self, name: &str, span: Span) -> Exec<Value> {
@@ -443,10 +488,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     /// A local variable or constant called `name`, if there is one.
     fn find_variable(&self, name: &str) -> Option<Value> {
         let frame = self.frames.last().expect("frame");
-        for scope in frame.scopes.iter().rev() {
-            if let Some((_, v)) = scope.iter().rev().find(|(n, _)| *n == name) {
-                return Some(v.clone());
-            }
+        if let Some((_, v)) = frame.vars.iter().rev().find(|(n, _)| *n == name) {
+            return Some(v.clone());
         }
         if let Some(captured) = &frame.captured
             && let Some((_, v)) = captured.iter().rev().find(|(n, _)| &**n == name)
@@ -458,10 +501,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
     fn lookup_mut(&mut self, name: &str) -> Option<&mut Value> {
         let frame = self.frames.last_mut().expect("frame");
-        for scope in frame.scopes.iter_mut().rev() {
-            if let Some((_, v)) = scope.iter_mut().rev().find(|(n, _)| *n == name) {
-                return Some(v);
-            }
+        if let Some((_, v)) = frame.vars.iter_mut().rev().find(|(n, _)| *n == name) {
+            return Some(v);
         }
         let captured = Rc::make_mut(frame.captured.as_mut()?);
         captured
@@ -471,10 +512,15 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             .map(|(_, v)| v)
     }
 
+    #[inline]
     fn in_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> Exec<T>) -> Exec<T> {
-        self.scopes().push(Vec::new());
+        let frame = self.frame();
+        let mark = frame.vars.len();
+        frame.marks.push(mark);
         let result = f(self);
-        self.scopes().pop();
+        let frame = self.frame();
+        frame.marks.pop();
+        frame.vars.truncate(mark);
         result
     }
 
@@ -540,6 +586,22 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     unreachable!()
                 };
                 let rhs = self.eval(value)?;
+                // `x += 1` on an `Int`: one search for `x`, changed in place.
+                if matches!(op, AssignOp::Add | AssignOp::Sub | AssignOp::Mul)
+                    && let Value::Int(b) = rhs
+                    && let Some(slot) = self.lookup_mut(n)
+                    && let Value::Int(a) = *slot
+                {
+                    let bin = match op {
+                        AssignOp::Add => BinOp::Add,
+                        AssignOp::Sub => BinOp::Sub,
+                        _ => BinOp::Mul,
+                    };
+                    if let Some(v) = int_binary(bin, a, b) {
+                        *slot = v;
+                        return Ok(());
+                    }
+                }
                 let new = match op {
                     AssignOp::Set => rhs,
                     _ => {
@@ -838,8 +900,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ExprKind::Bool(b) => Ok(Value::Bool(*b)),
             ExprKind::Name(n) => self.lookup(n, e.span),
             ExprKind::Binary { op, lhs, rhs } if !matches!(op, BinOp::And | BinOp::Or) => {
-                let l = self.eval(lhs)?;
-                let r = self.eval(rhs)?;
+                let l = self.operand(lhs)?;
+                let r = self.operand(rhs)?;
                 if let (Value::Int(a), Value::Int(b)) = (&l, &r)
                     && let Some(v) = int_binary(*op, *a, *b)
                 {
@@ -849,6 +911,32 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             _ => self.eval_other(e),
         }
+    }
+
+    /// An operand of an arithmetic or comparison: a number or a variable
+    /// is read at once, anything else is evaluated.
+    #[inline(always)]
+    fn operand(&mut self, e: &'p Expr) -> Exec<Value> {
+        match &e.kind {
+            ExprKind::Int(n) => Ok(Value::Int(*n)),
+            ExprKind::Name(n) => match self.local(n) {
+                Some(v) => Ok(v),
+                None => self.lookup(n, e.span),
+            },
+            _ => self.eval(e),
+        }
+    }
+
+    /// A variable of the current call (not a captured one or a constant).
+    #[inline(always)]
+    fn local(&self, name: &str) -> Option<Value> {
+        let frame = self.frames.last()?;
+        frame
+            .vars
+            .iter()
+            .rev()
+            .find(|(n, _)| *n == name)
+            .map(|(_, v)| v.clone())
     }
 
     #[inline(never)]
@@ -890,7 +978,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ExprKind::Record(fields) => {
                 let mut out = Vec::with_capacity(fields.len());
                 for field in fields {
-                    out.push((Rc::from(field.name.name.as_str()), self.eval(&field.value)?));
+                    let name = self.field_name(&field.name.name);
+                    out.push((name, self.eval(&field.value)?));
                 }
                 Value::Record(Rc::new(out))
             }
@@ -990,11 +1079,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 for a in args {
                     fields.push(self.eval(a)?);
                 }
-                Value::Enum {
-                    enum_name: enum_name.as_str().into(),
-                    variant: variant.as_str().into(),
-                    fields: Rc::new(fields),
-                }
+                Value::enum_value(enum_name.as_str(), variant.as_str(), fields)
             }
             // `?`: unwrap, or return the `Err`/`None` from this function.
             ExprKind::Try(inner) => match self.eval(inner)? {
@@ -1015,7 +1100,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     .as_deref()
                     .map(|c| c.to_vec())
                     .unwrap_or_default();
-                for (name, value) in frame.scopes.iter().flatten() {
+                for (name, value) in &frame.vars {
                     captured.push((Rc::from(*name), value.clone()));
                 }
                 Value::Function(Rc::new(Function::Closure {
@@ -1073,11 +1158,18 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 if let Some(f) = self.fns.get(name.as_str()).copied() {
                     // Arguments in order: no reordering needed.
                     if !f.is_async && args.iter().all(|a| a.name.is_none()) {
-                        let mut values = Vec::with_capacity(args.len());
-                        for arg in args {
-                            values.push(self.eval(&arg.value)?);
+                        // Straight into the new call's variables.
+                        let mut frame = self.take_frame();
+                        for (param, arg) in f.params.iter().zip(args) {
+                            match self.eval(&arg.value) {
+                                Ok(v) => frame.vars.push((param.name.name.as_str(), v)),
+                                Err(e) => {
+                                    self.recycle(frame);
+                                    return Err(e);
+                                }
+                            }
                         }
-                        return self.call_fn(f, values, callee.span);
+                        return self.enter_fn(f, frame, callee.span);
                     }
                     let mut values: Vec<Option<Value>> = vec![None; f.params.len()];
                     for (i, arg) in args.iter().enumerate() {
@@ -1277,8 +1369,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     .map(|p| p.name.name.as_str())
                     .zip(args)
                     .collect();
-                self.frames
-                    .push(Frame::new(Some(captured.clone()), vec![params]));
+                self.frames.push(Frame::new(Some(captured.clone()), params));
                 if self.debugger.is_some() {
                     self.calls.push(StackFrame {
                         name: "<closure>".into(),
@@ -1953,14 +2044,48 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     fn call_fn(&mut self, f: &'p FnDecl, args: Vec<Value>, call_span: Span) -> Exec<Value> {
-        self.check_depth(call_span)?;
-        let params = f
-            .params
-            .iter()
-            .map(|p| p.name.name.as_str())
-            .zip(args)
-            .collect();
-        self.frames.push(Frame::new(None, vec![params]));
+        let mut frame = self.take_frame();
+        frame
+            .vars
+            .extend(f.params.iter().map(|p| p.name.name.as_str()).zip(args));
+        self.enter_fn(f, frame, call_span)
+    }
+
+    /// The shared copy of a field name from the program.
+    #[inline]
+    fn field_name(&mut self, name: &'p str) -> Rc<str> {
+        self.field_names
+            .entry(name.as_ptr() as usize)
+            .or_insert_with(|| Rc::from(name))
+            .clone()
+    }
+
+    /// An empty frame, reusing a finished call's memory when there is one.
+    #[inline]
+    fn take_frame(&mut self) -> Frame<'p> {
+        self.spare
+            .pop()
+            .unwrap_or_else(|| Frame::new(None, Vec::with_capacity(8)))
+    }
+
+    /// Keeps `frame`'s memory for a later call.
+    #[inline]
+    fn recycle(&mut self, mut frame: Frame<'p>) {
+        frame.vars.clear();
+        frame.marks.clear();
+        frame.captured = None;
+        if self.spare.len() < 64 {
+            self.spare.push(frame);
+        }
+    }
+
+    /// Runs `f` with its parameters already in `frame`.
+    fn enter_fn(&mut self, f: &'p FnDecl, frame: Frame<'p>, call_span: Span) -> Exec<Value> {
+        if let Err(e) = self.check_depth(call_span) {
+            self.recycle(frame);
+            return Err(e);
+        }
+        self.frames.push(frame);
         if self.debugger.is_some() {
             self.calls.push(StackFrame {
                 name: f.name.name.clone(),
@@ -1968,7 +2093,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             });
         }
         let result = self.exec_block(&f.body);
-        self.frames.pop();
+        if let Some(frame) = self.frames.pop() {
+            self.recycle(frame);
+        }
         if self.debugger.is_some() {
             self.calls.pop();
         }
@@ -2063,16 +2190,11 @@ fn match_pattern<'a>(p: &'a Pattern, v: &Value, bindings: &mut Vec<(&'a str, Val
         }
         // The checker made sure the pattern's enum is the value's enum (the
         // pattern may name it as written, e.g. `Level` inside its module).
-        (
-            PatternKind::Variant { variant, args, .. },
-            Value::Enum {
-                variant: v, fields, ..
-            },
-        ) => {
-            **v == *variant.name
+        (PatternKind::Variant { variant, args, .. }, Value::Enum(e)) => {
+            *e.variant == *variant.name
                 && args
                     .iter()
-                    .zip(fields.iter())
+                    .zip(e.fields.iter())
                     .all(|(p, f)| match_pattern(p, f, bindings))
         }
         (PatternKind::Variant { .. }, _) => false,
@@ -2126,7 +2248,7 @@ impl Inspect for Interpreter<'_, '_> {
             .captured
             .iter()
             .flat_map(|c| c.iter().map(|(n, v)| (&**n, v)));
-        let locals = frame.scopes.iter().flatten().map(|(n, v)| (*n, v));
+        let locals = frame.vars.iter().map(|(n, v)| (*n, v));
         for (name, value) in captured.chain(locals) {
             match out.iter_mut().find(|(n, _)| n == name) {
                 Some(slot) => slot.1 = value.clone(),

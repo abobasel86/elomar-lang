@@ -17,11 +17,11 @@ const DEFAULT_TIMEOUT_MS: i64 = 60_000;
 const MAX_OUTPUT: u64 = 16 * 1024 * 1024;
 
 fn error(kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "ProcessError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "ProcessError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn text(v: &Value) -> &str {

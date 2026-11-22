@@ -1514,3 +1514,10 @@ fn main() {
          29 -29\n"
     );
 }
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn values_stay_small() {
+    // Every value is moved around constantly; keep it at three words.
+    assert_eq!(std::mem::size_of::<Value>(), 24);
+}

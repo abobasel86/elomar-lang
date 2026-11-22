@@ -18,11 +18,11 @@ use crate::Value;
 pub const TIMEOUT: Duration = Duration::from_secs(30);
 
 fn error(kind: &str, message: String) -> Value {
-    Value::Result(Err(Rc::new(Value::Enum {
-        enum_name: "HttpError".into(),
-        variant: kind.into(),
-        fields: Rc::new(vec![Value::str(message)]),
-    })))
+    Value::Result(Err(Rc::new(Value::enum_value(
+        "HttpError",
+        kind,
+        vec![Value::str(message)],
+    ))))
 }
 
 fn text(v: &Value) -> &str {
