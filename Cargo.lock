@@ -380,6 +380,7 @@ version = "0.5.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
+ "elomar-ast",
  "elomar-diagnostics",
  "elomar-interpreter",
  "elomar-parser",

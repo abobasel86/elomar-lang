@@ -1,0 +1,21 @@
+{% comment %}
+  Interactive exercises at the end of a lesson (site/_data/exercises.json),
+  checked in the browser by assets/exercises.js. The data of every lesson
+  is included so the lesson list can mark finished lessons.
+{% endcomment %}
+<section id="exercises" class="exercises"
+         data-lang="{{ include.lang }}"
+         data-slug="{{ page.slug }}"
+         data-base="{{ '/' | relative_url }}">
+  {% if include.lang == "ar" %}
+  <h2>تمارين <span class="ex-progress" id="ex-progress"></span></h2>
+  <p>اكتب حلك ثم اضغط <strong>تحقّق</strong>، فيُختبر في متصفحك على عدة حالات. ويُحفظ عملك على هذا الجهاز.</p>
+  {% else %}
+  <h2>Exercises <span class="ex-progress" id="ex-progress"></span></h2>
+  <p>Write your answer and press <strong>Check</strong>: it is tested in your browser on several cases. Your work is saved on this device.</p>
+  {% endif %}
+  <div id="ex-list"></div>
+  <noscript>JavaScript is needed for the exercises.</noscript>
+</section>
+<script type="application/json" id="ex-data">{{ site.data.exercises | jsonify }}</script>
+<script src="{{ '/assets/exercises.js' | relative_url }}?v={{ site.time | date: '%s' }}"></script>

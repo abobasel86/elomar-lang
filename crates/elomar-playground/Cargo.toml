@@ -12,6 +12,7 @@ repository.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+elomar-ast.workspace = true
 elomar-diagnostics.workspace = true
 elomar-parser.workspace = true
 elomar-types.workspace = true

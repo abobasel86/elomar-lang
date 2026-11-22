@@ -97,6 +97,44 @@ a { color: var(--accent); }
 @media (prefers-color-scheme: dark) { .pg-errors { color: #ff8a80; } }
 .pg-note { color: var(--muted); font-size: 0.88rem; }
 
+/* Exercises at the end of a lesson */
+.exercises { margin-top: 2.5rem; padding-top: 0.5rem; border-top: 2px solid var(--accent); }
+.ex-progress { font-size: 0.95rem; font-weight: 400; color: var(--muted); }
+.ex { border: 1px solid var(--line); border-radius: 10px; padding: 0.4rem 1rem 1rem; margin: 1.2rem 0; }
+.ex.solved { border-color: var(--accent); background: var(--accent-soft); }
+.ex h3 { margin: 0.6rem 0 0.2rem; }
+.ex-done { display: none; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+.ex.solved .ex-done { display: inline; }
+.ex-code {
+  width: 100%; display: block; font-family: var(--mono); font-size: 0.9rem; line-height: 1.5;
+  padding: 0.7rem; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg);
+  color: var(--fg); white-space: pre; overflow: auto; resize: vertical; tab-size: 4; text-align: left;
+}
+.ex-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.6rem 0; }
+.ex-bar button {
+  font: inherit; font-size: 0.92rem; padding: 0.3rem 0.85rem; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+.ex-bar .ex-check { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.ex-bar button:disabled { opacity: 0.55; cursor: default; }
+.ex-status { color: var(--muted); font-size: 0.9rem; }
+.ex-hints { margin: 0.3rem 0; padding-inline-start: 1.4rem; color: var(--muted); }
+.ex-hints:empty { display: none; }
+.ex-good { color: var(--accent); font-weight: 600; }
+.ex-bad { color: #b42318; font-weight: 600; }
+.ex-errors { color: #b42318; }
+@media (prefers-color-scheme: dark) { .ex-bad, .ex-errors { color: #ff8a80; } }
+.ex-result pre { margin: 0.3rem 0; padding: 0.4rem 0.6rem; white-space: pre-wrap; text-align: left; }
+.ex-cases { list-style: none; padding: 0; margin: 0.4rem 0; }
+.ex-cases li { display: flex; gap: 0.6rem; align-items: baseline; padding: 0.25rem 0; }
+.ex-cases li > div { min-width: 0; flex: 1; }
+.ex-mark { font-weight: 700; }
+.ex-cases .pass .ex-mark { color: var(--accent); }
+.ex-cases .fail .ex-mark { color: #b42318; }
+.ex-compare { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 0.6rem; align-items: baseline; }
+.ex-label { font-size: 0.85rem; color: var(--muted); }
+.toc li.solved > a::after { content: " ✓"; color: var(--accent); font-weight: 700; }
+
 
 .toc ol { padding-inline-start: 1.3rem; margin: 0; position: sticky; top: 1rem; }
 .toc li { margin: 0.3rem 0; color: var(--muted); }

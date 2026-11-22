@@ -41,6 +41,9 @@
     {% endif %}
     <main>
       {{ content }}
+      {% if page.slug and site.data.exercises[page.slug] %}
+      {% include exercises.html lang=lang %}
+      {% endif %}
       {% if page.slug %}
       {% for l in site.data.lessons %}
         {% if l.slug == page.slug %}

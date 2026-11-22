@@ -115,8 +115,3 @@ fn main() {
     print(seen.union(other), seen.intersection(other))
 }
 ```
-
-## Exercise
-
-Given `let scores = ["Lina": 91, "Omar": 55, "Sara": 78]`, print the names
-of everyone with 60 or more, sorted, separated by commas.

@@ -4,6 +4,16 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Website
+
+- Interactive exercises at the end of lessons 1–5, 7 and 10 (16 in all),
+  in English and Arabic. **Check** tests the answer in the browser on
+  several cases and shows what was expected and what came back; hints and
+  the solution are there when needed. Answers and progress are kept in the
+  browser, and finished lessons are ticked in the lesson list.
+
 ## [0.5.0] - 2026-11-22
 
 ### Tools

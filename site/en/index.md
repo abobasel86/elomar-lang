@@ -8,6 +8,8 @@ lang: en
 
 Ten short lessons. Each one has programs you can copy into a file and run
 with `elomar run`. No programming experience is needed for the first five.
+Most lessons end with exercises you solve right on the page: write your
+answer, press **Check**, and see whether it works.
 
 {% for l in site.data.lessons -%}
 {{ forloop.index }}. [{{ l.en }}]({{ l.slug }}.html)

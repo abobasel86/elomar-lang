@@ -144,9 +144,3 @@ fn main() {
     print(المساحة(3.0, 4.0))
 }
 ```
-
-## Exercise
-
-Write `fn grade(score: Int) -> String` that returns `"excellent"` from 90,
-`"good"` from 70, `"pass"` from 50 and `"fail"` below. Print the grade for
-95, 72 and 40.

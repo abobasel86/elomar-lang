@@ -15,6 +15,7 @@
   <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/abobasel86/elomar-lang?label=Open%20VSX&color=0f6e63"></a>
   <a href="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml/badge.svg"></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0f6e63"></a>
+  <a href="https://github.com/sponsors/abobasel86"><img alt="Sponsor" src="https://img.shields.io/github/sponsors/abobasel86?label=Sponsor&logo=GitHub&color=ea4aaa"></a>
 </p>
 
 <p align="center">
@@ -196,7 +197,10 @@ invalid answers and rate limits simulated by the mock.
 
 The **[tutorial](https://abobasel86.github.io/elomar-lang/)** has ten short
 lessons in English and Arabic, from a first program to web servers and AI.
-Every program in it is checked by the test suite.
+Most lessons end with exercises you solve in the browser: press **Check**
+and your answer is tested on several cases, with hints and the solution
+when you need them. Every program in the tutorial is checked by the test
+suite.
 
 Or try it without installing anything in the
 **[playground](https://abobasel86.github.io/elomar-lang/en/playground.html)**,
@@ -345,6 +349,12 @@ document symbols, completion and formatting.
   language-servers = ["elomar"]
   ```
 
+## Sponsor
+
+Elomar-Lang is free and open source. If it is useful to you or your company,
+you can support its development through
+[GitHub Sponsors](https://github.com/sponsors/abobasel86).
+
 ## License
 
 Licensed under either of
@@ -376,6 +386,9 @@ VS Code أو VSCodium أو Cursor وثبّتها.
 ```bash
 cargo run -p elomar-cli -- --lang ar run examples/arabic/main.elo
 ```
+
+**ادعم المشروع:** Elomar-Lang مجانية ومفتوحة المصدر. إن كانت مفيدة لك أو لمؤسستك،
+يمكنك دعم تطويرها عبر [GitHub Sponsors](https://github.com/sponsors/abobasel86).
 
 المرجع النحوي الملزم: [`docs/grammar.md`](docs/grammar.md). الرؤية والخطة:
 [`Elomar-Lang_Master_Specification_AR.md`](Elomar-Lang_Master_Specification_AR.md).
