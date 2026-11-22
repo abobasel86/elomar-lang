@@ -1,0 +1,7 @@
+# Sponsors shown on the website home page ($100+ monthly tier).
+# Add one entry per sponsor, for example:
+#
+# - name: Example Co
+#   url: https://example.com
+#   logo: assets/sponsors/example.png   # optional, path inside site/
+[]

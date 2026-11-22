@@ -355,6 +355,13 @@ Elomar-Lang is free and open source. If it is useful to you or your company,
 you can support its development through
 [GitHub Sponsors](https://github.com/sponsors/abobasel86).
 
+### Sponsors
+
+Thank you to everyone who supports Elomar-Lang.
+[Become the first sponsor!](https://github.com/sponsors/abobasel86)
+
+<!-- sponsors: add each $25+ monthly sponsor's name or logo below this line -->
+
 ## License
 
 Licensed under either of

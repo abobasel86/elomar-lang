@@ -51,3 +51,16 @@ fn main() {
 Download `elomar` for Windows, Linux or macOS from the
 [latest release](https://github.com/abobasel86/elomar-lang/releases/latest),
 then follow [Getting started](en/01-start.html).
+
+## Sponsors
+
+Elomar-Lang is free and open source. Sponsors make its development possible.
+
+<div class="sponsors">
+{%- for s in site.data.sponsors %}
+  <a class="sponsor" href="{{ s.url }}">{% if s.logo %}<img src="{{ s.logo | relative_url }}" alt="{{ s.name }}">{% else %}{{ s.name }}{% endif %}</a>
+{%- endfor %}
+</div>
+
+<p><a class="sponsor-button" href="https://github.com/sponsors/abobasel86">♥ Sponsor Elomar-Lang</a>
+<span lang="ar" dir="rtl"> · <a href="https://github.com/sponsors/abobasel86">ادعم المشروع</a></span></p>
