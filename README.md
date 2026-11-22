@@ -1,6 +1,50 @@
-# Elomar-Lang
+<p align="center">
+  <img src="editor/vscode/images/icon.png" width="110" alt="Elomar-Lang icon">
+</p>
 
-**A general-purpose programming language designed for AI-native applications.**
+<h1 align="center">Elomar-Lang</h1>
+
+<p align="center">
+  <b>A simple, typed programming language with AI built in. Write code in Arabic or English.</b><br>
+  <span dir="rtl">لغة برمجة بسيطة، فيها الذكاء الاصطناعي جزء من اللغة، وتكتب بها بالعربية أو الإنجليزية.</span>
+</p>
+
+<p align="center">
+  <a href="https://github.com/abobasel86/elomar-lang/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/abobasel86/elomar-lang?color=0f6e63"></a>
+  <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/abobasel86/elomar-lang?label=Open%20VSX&color=0f6e63"></a>
+  <a href="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="#license"><img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0f6e63"></a>
+</p>
+
+<p align="center">
+  <a href="https://abobasel86.github.io/elomar-lang/"><b>Tutorial (English / العربية)</b></a> ·
+  <a href="https://abobasel86.github.io/elomar-lang/en/playground.html"><b>Try it in the browser</b></a> ·
+  <a href="https://github.com/abobasel86/elomar-lang/releases/latest"><b>Download</b></a> ·
+  <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><b>Editor extension</b></a>
+</p>
+
+```elomar
+use std.ai
+
+enum Priority { Low, Normal, Urgent }
+type Ticket = { category: String, priority: Priority }
+
+async fn main() {
+    let طلبات = ["I was charged twice!", "خُصم المبلغ مرتين", "How do I reset my password?"]
+    // The three requests are sent to the model at the same time.
+    let نتائج = await all(طلبات.map(|t| ai.infer<Ticket>("mock", "Classify the support request", t)))
+    for نتيجة in نتائج {
+        match نتيجة {
+            Ok(t) => print("{t.priority}: {t.category}")
+            Err(e) => print("failed: {e.kind()}")
+        }
+    }
+}
+```
+
+The model's answer is checked against `Ticket` before your code sees it, a
+failure is a value you must handle, and `"mock"` runs offline; switch to
+OpenAI or Claude in `elomar.toml` without changing the code.
 
 > **Project status: v0.3.0, early development. Not production-ready.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
