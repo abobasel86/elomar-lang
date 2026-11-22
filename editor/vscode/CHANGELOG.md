@@ -5,6 +5,12 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.5.1
+
+A **Sponsor** button on the extension's page, linking to
+[GitHub Sponsors](https://github.com/sponsors/abobasel86). Nothing else
+changes.
+
 ## 0.5.0
 
 Debugging: press **F5** to stop at breakpoints, step through the program
