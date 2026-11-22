@@ -101,10 +101,8 @@ in Arabic: `elomar --lang ar run hello.elo`.
 
 ## The editor
 
-In VSCodium, Cursor and other editors that use Open VSX, search for
-**Elomar-Lang** in the Extensions view. In Visual Studio Code, install the
-extension from the same release page (`elomar-lang-<version>.vsix`, then
-**Extensions → … → Install from VSIX**).
+In VS Code, VSCodium, Cursor and other editors, search for **Elomar-Lang**
+in the Extensions view and install it.
 You get colors, errors while you type, hover information, completion and a
 **Run** button.
 

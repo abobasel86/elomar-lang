@@ -2,10 +2,11 @@
 #
 # - On every change under editor/vscode, packages it with the official
 #   `vsce` tool, so problems show up before a release.
-# - On a version tag (vX.Y.Z), also publishes it to the VS Code Marketplace
-#   and to Open VSX (used by VSCodium, Cursor and others), when the
-#   repository has the secrets VSCE_PAT and OVSX_PAT. Without a secret, that
-#   store is skipped. See docs/releasing.md.
+# - On a version tag (vX.Y.Z), also publishes it to Open VSX (used by
+#   VSCodium, Cursor and others) when the repository has the secret
+#   OVSX_PAT, and to the VS Code Marketplace through the Marketplace's
+#   Trusted Publishing (no secret: GitHub proves which workflow is asking).
+#   A version already in a store is skipped. See docs/releasing.md.
 # - Run by hand (workflow_dispatch) to publish the current version again,
 #   for example after adding a secret.
 name: VS Code extension
@@ -52,6 +53,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the Marketplace check that this workflow is the one allowed to
+      # publish (Trusted Publishing).
+      id-token: write
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -59,15 +65,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vsce-package
-      - name: VS Code Marketplace
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: |
-          if [ -z "$VSCE_PAT" ]; then
-            echo "VSCE_PAT is not set; skipping the VS Code Marketplace."
-            exit 0
-          fi
-          npx --yes @vscode/vsce@3 publish --packagePath elomar-lang.vsix -p "$VSCE_PAT"
       - name: Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
@@ -79,4 +76,6 @@ jobs:
           # The namespace must exist before the first publish; creating it
           # again fails harmlessly.
           npx --yes ovsx@0 create-namespace abobasel86 -p "$OVSX_PAT" || true
-          npx --yes ovsx@0 publish elomar-lang.vsix -p "$OVSX_PAT"
+          npx --yes ovsx@0 publish elomar-lang.vsix -p "$OVSX_PAT" --skip-duplicate
+      - name: VS Code Marketplace
+        run: npx --yes @vscode/vsce@4 publish --packagePath elomar-lang.vsix --oidc --skip-duplicate

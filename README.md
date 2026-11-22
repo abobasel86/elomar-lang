@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/abobasel86/elomar-lang/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/abobasel86/elomar-lang?color=0f6e63"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=abobasel86.elomar-lang"><img alt="VS Code Marketplace" src="https://img.shields.io/visual-studio-marketplace/v/abobasel86.elomar-lang?label=VS%20Code&color=0f6e63"></a>
   <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/abobasel86/elomar-lang?label=Open%20VSX&color=0f6e63"></a>
   <a href="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml/badge.svg"></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0f6e63"></a>
@@ -218,8 +219,9 @@ Unpack it and put `elomar` (or `elomar.exe`) in a folder on your `PATH`.
 binary is not signed, so the first run may need
 `xattr -d com.apple.quarantine elomar`.
 
-The release also has the VS Code extension: install
-`elomar-lang-<version>.vsix` with **Extensions → … → Install from VSIX**.
+For the editor, search for **Elomar-Lang** in the Extensions view of VS Code
+([Marketplace](https://marketplace.visualstudio.com/items?itemName=abobasel86.elomar-lang)) or of VSCodium, Cursor and other editors that use
+[Open VSX](https://open-vsx.org/extension/abobasel86/elomar-lang).
 
 Or build from source with a recent stable Rust toolchain:
 
@@ -366,8 +368,8 @@ dual licensed as above, without any additional terms or conditions.
 
 **التثبيت:** نزّل ملف `elomar` المناسب لنظامك من
 [آخر إصدار](https://github.com/abobasel86/elomar-lang/releases/latest)، وفك ضغطه،
-وضع `elomar` في مجلد ضمن `PATH`. ومع الإصدار ملف إضافة VS Code (`.vsix`) تثبّته
-من **Extensions → … → Install from VSIX**.
+وضع `elomar` في مجلد ضمن `PATH`. ثم ابحث عن **Elomar-Lang** في قائمة الإضافات في
+VS Code أو VSCodium أو Cursor وثبّتها.
 
 لتشغيل مثال بالعربية من نسخة المصدر:
 
