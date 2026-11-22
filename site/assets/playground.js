@@ -1,7 +1,7 @@
 // The playground page: an editor, a Run button and the output.
 // Programs run in a Web Worker (playground-worker.js) with a time limit.
 (function () {
-  const root = document.getElementById("playground");
+  const root = document.getElementById("pg-root");
   if (!root) return;
   const lang = root.dataset.lang === "ar" ? "ar" : "en";
   const T = JSON.parse(root.dataset.text);
