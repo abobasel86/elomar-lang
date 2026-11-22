@@ -259,6 +259,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar repl` | An interactive prompt: type code and see the result at once |
 | `elomar dap` | The debugger, for editors (Debug Adapter Protocol on stdin/stdout) |
 | `elomar check FILE` | Report errors and warnings without running |
+| `elomar build FILE [-o OUT]` | Make one executable of the program, to run where Elomar-Lang is not installed |
 | `--lang en\|ar` | Diagnostic language (or set `ELOMAR_LANG`) |
 | `--no-color` | Plain output (also honors `NO_COLOR`) |
 | `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |

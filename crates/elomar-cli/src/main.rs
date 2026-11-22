@@ -41,6 +41,14 @@ enum Command {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Make one executable file of a program, to run without Elomar-Lang
+    Build {
+        /// Path to the program's main `.elo` file
+        file: PathBuf,
+        /// The executable to write (default: the file's name, in this folder)
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
+    },
     /// Check a program for errors without running it
     Check {
         /// Path to a `.elo` source file
@@ -188,6 +196,20 @@ impl Reporter {
 static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() -> ExitCode {
+    // A program made by `elomar build`: run it, with every argument its own.
+    if let Some(bundle) = build::embedded() {
+        let lang = std::env::var("ELOMAR_LANG")
+            .ok()
+            .and_then(|s| Lang::parse(&s))
+            .unwrap_or(Lang::En);
+        let color = std::env::var_os("NO_COLOR").is_none() && std::io::stderr().is_terminal();
+        return build::run_embedded(
+            bundle,
+            &Reporter {
+                opts: RenderOptions { lang, color },
+            },
+        );
+    }
     let cli = Cli::parse();
 
     let lang = match cli
@@ -220,6 +242,7 @@ fn main() -> ExitCode {
             return testing::run_tests(path, filter.as_deref(), &reporter);
         }
         Command::New { name } => return scaffold::new_project(name, &reporter),
+        Command::Build { file, output } => return build::build(file, output.as_deref(), &reporter),
         Command::Lsp => return lsp::serve(lang),
         Command::Repl => return repl::run(&reporter),
         Command::Dap => return dap::serve(lang),
@@ -292,7 +315,6 @@ fn run_file(path: &Path, execute: bool, args: Vec<String>, reporter: &Reporter) 
             return ExitCode::from(2);
         }
     };
-    let sources = loaded.sources;
     let name = path.display().to_string();
 
     // The project config decides which models are cloud models (`net`), so
@@ -308,7 +330,19 @@ fn run_file(path: &Path, execute: bool, args: Vec<String>, reporter: &Reporter) 
             return ExitCode::from(2);
         }
     };
+    check_and_run(loaded, ai, &name, execute, args, reporter)
+}
 
+/// Checks a loaded program and, if `execute` and it has no errors, runs it.
+pub(crate) fn check_and_run(
+    loaded: elomar_loader::Loaded,
+    ai: LoadedAi,
+    name: &str,
+    execute: bool,
+    args: Vec<String>,
+    reporter: &Reporter,
+) -> ExitCode {
+    let sources = loaded.sources;
     let mut program = loaded.program;
     let mut diags = loaded.diagnostics;
     if diags.iter().all(|d| !d.is_error()) {
@@ -361,6 +395,7 @@ fn run_file(path: &Path, execute: bool, args: Vec<String>, reporter: &Reporter) 
     }
 }
 
+mod build;
 mod dap;
 mod editor;
 mod fmt;
@@ -403,16 +438,28 @@ pub(crate) struct LoadedAi {
 /// `elomar.toml`. The built-in model `mock` (placeholder answers) is always
 /// available.
 pub(crate) fn load_ai_runtime(source: &Path) -> Result<LoadedAi, (PathBuf, String)> {
-    let mut config = ProjectConfig::default();
     let config_path = find_config(source);
-    if let Some(p) = &config_path {
-        let text = std::fs::read_to_string(p).map_err(|e| (p.clone(), e.to_string()))?;
-        config = parse_config(&text).map_err(|e| (p.clone(), e))?;
-    }
-    let config_error = |message: String| (config_path.clone().unwrap_or_default(), message);
+    let text = match &config_path {
+        Some(p) => Some(std::fs::read_to_string(p).map_err(|e| (p.clone(), e.to_string()))?),
+        None => None,
+    };
     // Relative paths (in the program and in `[permissions]`) start at the
     // project folder: where elomar.toml is, else the program's folder.
-    let base = project_root(source);
+    ai_runtime_from(text.as_deref(), project_root(source))
+        .map_err(|message| (config_path.unwrap_or_default(), message))
+}
+
+/// Like [`load_ai_runtime`], from the text of `elomar.toml` (if any) and
+/// the folder relative paths start at.
+pub(crate) fn ai_runtime_from(
+    config_text: Option<&str>,
+    base: PathBuf,
+) -> Result<LoadedAi, String> {
+    let config = match config_text {
+        Some(text) => parse_config(text)?,
+        None => ProjectConfig::default(),
+    };
+    let config_error = |message: String| message;
     let fs = FsPolicy::new(
         base,
         &config.permissions.filesystem_read,

@@ -948,3 +948,74 @@ fn tutorial_programs_check() {
     );
     assert!(checked >= 10, "expected tutorial programs, found {checked}");
 }
+
+#[test]
+fn build_makes_a_standalone_executable() {
+    let dir = std::env::temp_dir().join(format!("elomar-build-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let project = dir.join("proj");
+    let run_dir = dir.join("elsewhere");
+    std::fs::create_dir_all(project.join("src")).unwrap();
+    std::fs::create_dir_all(run_dir.join("data")).unwrap();
+    std::fs::write(
+        project.join("elomar.toml"),
+        "[permissions]\nfilesystem_read = [\"data\"]\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("src/main.elo"),
+        "use app.greet\nuse std.os\nuse std.fs\n\nfn main() {\n    print(greet.hello(os.args()))\n    print(fs.read_text(\"data/n.txt\"))\n    let xs: List<Int> = []\n    print(xs[1])\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("src/greet.elo"),
+        "pub fn hello(names: List<String>) -> String {\n    return \"Hello, \" + names.join(\" & \") + \"!\"\n}\n",
+    )
+    .unwrap();
+    std::fs::write(run_dir.join("data/n.txt"), "42").unwrap();
+
+    let exe = run_dir.join(format!("hello{}", std::env::consts::EXE_SUFFIX));
+    let out = elomar(&[
+        "build",
+        project.join("src/main.elo").to_str().unwrap(),
+        "-o",
+        exe.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Moved away from the project, with the project gone.
+    std::fs::remove_dir_all(&project).unwrap();
+    let ran = std::process::Command::new(&exe)
+        .args(["Lina", "--help"])
+        .current_dir(&run_dir)
+        .output()
+        .unwrap();
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&ran.stdout)),
+        "Hello, Lina & --help!\nOk(\"42\")\n"
+    );
+    let err = String::from_utf8_lossy(&ran.stderr);
+    assert!(
+        err.contains("R0003") && err.contains("src/main.elo:9"),
+        "{err}"
+    );
+    assert_eq!(ran.status.code(), Some(1));
+
+    // A program with errors is not built.
+    let bad = dir.join("bad.elo");
+    std::fs::write(&bad, "fn main() {\n    print(1 + \"a\")\n}\n").unwrap();
+    let bad_exe = dir.join(format!("bad{}", std::env::consts::EXE_SUFFIX));
+    let out = elomar(&[
+        "build",
+        bad.to_str().unwrap(),
+        "-o",
+        bad_exe.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(!bad_exe.exists());
+    let _ = std::fs::remove_dir_all(dir);
+}

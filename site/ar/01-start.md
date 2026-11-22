@@ -113,6 +113,7 @@ elomar --lang ar run hello.elo
 | `elomar run file.elo` | فحص البرنامج ثم تشغيله |
 | `elomar repl` | اكتب كودًا وشاهد نتيجته فورًا |
 | `elomar check file.elo` | الفحص فقط |
+| `elomar build file.elo` | صنع ملف تنفيذي لمشاركته |
 | `elomar fmt file.elo` | تنسيق الكود بالأسلوب الموحد |
 | `elomar new myapp` | إنشاء مشروع مع اختبارات |
 | `elomar test` | تشغيل اختبارات المشروع |

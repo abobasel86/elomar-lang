@@ -82,20 +82,10 @@ pub fn load_with(
     let entry_abs = std::path::absolute(entry)?;
     let dir = module_dir(&std::path::absolute(project_root)?);
 
-    let mut sources = SourceMap::default();
     let mut diagnostics = Vec::new();
-
-    // Package name → its module folder.
     let mut packages: HashMap<String, PathBuf> = HashMap::new();
-    match elomar_pkg::resolve(
-        &std::path::absolute(project_root)?,
-        elomar_pkg::Mode::Offline,
-    ) {
-        Ok(list) => {
-            for p in list {
-                packages.insert(p.name, module_dir(&p.root));
-            }
-        }
+    match package_dirs(project_root) {
+        Ok(found) => packages = found,
         Err(message) => diagnostics.push(Diagnostic::error(
             "E1015",
             Span::default(),
@@ -105,11 +95,92 @@ pub fn load_with(
             ),
         )),
     }
-
     let text = match entry_text {
         Some(t) => t,
         None => std::fs::read_to_string(entry)?,
     };
+    let disk = Disk {
+        entry_display: &entry_display,
+        entry: &entry_abs,
+    };
+    load_from(&disk, &entry_abs, text, &dir, packages, diagnostics)
+}
+
+/// Each package's module folder, by package name, from the lock file and
+/// the cache (offline).
+pub fn package_dirs(project_root: &Path) -> Result<HashMap<String, PathBuf>, String> {
+    let root = std::path::absolute(project_root).map_err(|e| e.to_string())?;
+    let list = elomar_pkg::resolve(&root, elomar_pkg::Mode::Offline)?;
+    Ok(list
+        .into_iter()
+        .map(|p| (p.name, module_dir(&p.root)))
+        .collect())
+}
+
+/// Where the loader reads module files from.
+pub trait Files {
+    fn read(&self, path: &Path) -> std::io::Result<String>;
+    fn is_file(&self, path: &Path) -> bool;
+    /// The name of `path` in messages.
+    fn display(&self, path: &Path) -> String;
+}
+
+struct Disk<'a> {
+    entry_display: &'a str,
+    entry: &'a Path,
+}
+
+impl Files for Disk<'_> {
+    fn read(&self, path: &Path) -> std::io::Result<String> {
+        std::fs::read_to_string(path)
+    }
+    fn is_file(&self, path: &Path) -> bool {
+        path.is_file()
+    }
+    fn display(&self, path: &Path) -> String {
+        display_name(path, self.entry_display, self.entry)
+    }
+}
+
+/// Files kept in memory, by absolute path: a program built with
+/// `elomar build`. Paths are shown relative to `root`.
+pub struct InMemory {
+    pub root: PathBuf,
+    pub files: HashMap<PathBuf, String>,
+}
+
+impl Files for InMemory {
+    fn read(&self, path: &Path) -> std::io::Result<String> {
+        self.files
+            .get(path)
+            .cloned()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "not in the program"))
+    }
+    fn is_file(&self, path: &Path) -> bool {
+        self.files.contains_key(path)
+    }
+    fn display(&self, path: &Path) -> String {
+        let shown = path.strip_prefix(&self.root).unwrap_or(path);
+        shown.display().to_string().replace('\\', "/")
+    }
+}
+
+/// Loads the program whose main file is `entry` (with text `text`), its
+/// modules in `module_dir` and its packages' modules in `packages`, reading
+/// files through `files`.
+pub fn load_from(
+    files: &dyn Files,
+    entry: &Path,
+    text: String,
+    module_dir: &Path,
+    packages: HashMap<String, PathBuf>,
+    diagnostics: Vec<Diagnostic>,
+) -> std::io::Result<Loaded> {
+    let entry_abs = entry.to_path_buf();
+    let dir = module_dir.to_path_buf();
+    let entry_display = files.display(entry);
+    let mut sources = SourceMap::default();
+    let mut diagnostics = diagnostics;
     let base = sources.next_base();
     let (mut main, diags) = elomar_parser::parse_at(&text, base);
     canonical_uses(&mut main.items, None, &packages);
@@ -132,16 +203,13 @@ pub fn load_with(
             }
             _ => (None, module_file(&dir, &module)),
         };
-        if file == entry_abs || !file.is_file() {
+        if file == entry_abs || !files.is_file(&file) {
             continue;
         }
-        let text = std::fs::read_to_string(&file)?;
+        let text = files.read(&file)?;
         let base = sources.next_base();
         let (parsed, diags) = elomar_parser::parse_at(&text, base);
-        sources.add(SourceFile::new(
-            display_name(&file, &entry_display, &entry_abs),
-            text,
-        ));
+        sources.add(SourceFile::new(files.display(&file), text));
         paths.push(file.clone());
         diagnostics.extend(diags);
         let mut items = parsed.items;

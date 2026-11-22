@@ -6,6 +6,14 @@ change the language.
 
 ## [Unreleased]
 
+### Tools
+
+- `elomar build main.elo -o app.exe`: one executable file with the program,
+  its modules, its packages and `elomar.toml` inside. It runs on computers
+  without Elomar-Lang, with every argument going to the program. Programs
+  with errors are not built. The executable is for the system it was built
+  on; in it, relative paths start at the folder it is run from.
+
 ### Language
 
 - `timeout(future, limit)`: `await timeout(slow(), 5s)` is `Some(result)`, or

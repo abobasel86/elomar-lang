@@ -119,6 +119,7 @@ so you can see why.
 | `elomar run file.elo` | Check and run a program |
 | `elomar repl` | Type code and see the result at once |
 | `elomar check file.elo` | Only check for errors |
+| `elomar build file.elo` | Make an executable to share |
 | `elomar fmt file.elo` | Format the code in the standard style |
 | `elomar new myapp` | Create a project with tests |
 | `elomar test` | Run a project's tests |

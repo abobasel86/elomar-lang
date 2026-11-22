@@ -80,6 +80,21 @@ fn test_low_grades() {
 around operators, and so on). `elomar fmt --check` only reports files that
 need it, which is handy in CI.
 
+## Sharing a program
+
+`elomar build` makes one executable file of your program, with its
+modules, packages and `elomar.toml` inside. Send it to anyone: it runs
+without Elomar-Lang installed.
+
+```text
+elomar build src/main.elo -o grades.exe
+grades.exe Lina Omar          arguments go to the program (os.args())
+```
+
+The executable is for the system it was built on: build on Windows for
+Windows, on Linux for Linux. Paths in the program, and the folders in
+`[permissions]`, start at the folder it is run from.
+
 ## Packages
 
 Use code that others wrote:
