@@ -42,6 +42,41 @@ fn main() {
 }
 ```
 
+Dates can be written your way and moved by days or months:
+
+```elomar
+use std.time
+
+fn main() {
+    let t = time.make(2026, 1, 31, 9, 30)
+    print(time.format_as(t, "DD/MM/YYYY HH:mm"))           // 31/01/2026 09:30
+    print(time.format_as(time.add_months(t, 1), "DD/MM"))  // 28/02: the month's last day
+    print(time.days_between(t, time.add_days(t, 10)))      // 10
+}
+```
+
+## Time limits
+
+`timeout` stops work that takes too long. `await timeout(work, 2s)` is
+`Some(result)`, or `None` when the time ran out:
+
+```elomar
+async fn count_forever() -> Int {
+    var n = 0
+    while true {
+        n += 1
+    }
+    return n
+}
+
+async fn main() {
+    match await timeout(count_forever(), 200ms) {
+        Some(n) => print("finished: {n}")
+        None => print("stopped after 200ms")
+    }
+}
+```
+
 ## Text patterns, encodings and hashing
 
 ```elomar

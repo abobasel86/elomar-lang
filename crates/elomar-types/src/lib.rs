@@ -64,6 +64,7 @@ pub fn module_functions(short: &str) -> &'static [&'static str] {
         "crypto" => &stdextra::CRYPTO_FUNCTIONS,
         "server" => &stdextra::SERVER_FUNCTIONS,
         "process" => &["run"],
+        "csv" => &stdextra::CSV_FUNCTIONS,
         _ => &[],
     }
 }
@@ -585,6 +586,8 @@ impl Checker {
         alias: &mut dyn FnMut(&mut Checker, &str) -> Option<Ty>,
     ) -> Ty {
         match &t.kind {
+            // `()` is another way to write `Unit`.
+            TypeExprKind::Tuple(items) if items.is_empty() => Ty::Unit,
             TypeExprKind::Tuple(items) => Ty::Tuple(
                 items
                     .iter()

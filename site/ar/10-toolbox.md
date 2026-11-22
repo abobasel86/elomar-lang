@@ -41,6 +41,41 @@ fn main() {
 }
 ```
 
+ويمكن كتابة التاريخ بالشكل الذي تريده، وتحريكه بالأيام أو الأشهر:
+
+```elomar
+use std.time
+
+fn main() {
+    let t = time.make(2026, 1, 31, 9, 30)
+    print(time.format_as(t, "DD/MM/YYYY HH:mm"))           // 31/01/2026 09:30
+    print(time.format_as(time.add_months(t, 1), "DD/MM"))  // 28/02: آخر يوم في الشهر
+    print(time.days_between(t, time.add_days(t, 10)))      // 10
+}
+```
+
+## حدود الوقت
+
+`timeout` توقف العمل الذي يطول أكثر من اللازم. `await timeout(work, 2s)` تعطي
+`Some(الناتج)`، أو `None` إن انتهى الوقت:
+
+```elomar
+async fn count_forever() -> Int {
+    var n = 0
+    while true {
+        n += 1
+    }
+    return n
+}
+
+async fn main() {
+    match await timeout(count_forever(), 200ms) {
+        Some(n) => print("انتهى: {n}")
+        None => print("توقف بعد 200 ملي ثانية")
+    }
+}
+```
+
 ## الأنماط النصية والترميز والتشفير
 
 ```elomar

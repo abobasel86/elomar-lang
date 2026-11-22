@@ -13,8 +13,20 @@ pub(crate) const MATH_FUNCTIONS: [&str; 16] = [
 pub(crate) const MATH_CONSTANTS: [&str; 4] = ["pi", "e", "tau", "inf"];
 pub(crate) const RANDOM_FUNCTIONS: [&str; 6] =
     ["int", "float", "bool", "choice", "shuffle", "seed"];
-pub(crate) const TIME_FUNCTIONS: [&str; 7] =
-    ["now", "sleep", "format", "parse", "today", "date", "make"];
+pub(crate) const TIME_FUNCTIONS: [&str; 11] = [
+    "now",
+    "sleep",
+    "format",
+    "parse",
+    "today",
+    "date",
+    "make",
+    "add_days",
+    "add_months",
+    "days_between",
+    "format_as",
+];
+pub(crate) const CSV_FUNCTIONS: [&str; 3] = ["parse", "parse_records", "stringify"];
 pub(crate) const OS_FUNCTIONS: [&str; 4] = ["args", "env", "platform", "exit"];
 
 /// What `time.date(ms)` returns (fields in alphabetical order).
@@ -167,6 +179,14 @@ impl Checker {
                 self.typed_args(&what, args, &[Ty::Int], span);
                 date_ty()
             }
+            "add_days" | "add_months" | "days_between" => {
+                self.typed_args(&what, args, &[Ty::Int, Ty::Int], span);
+                Ty::Int
+            }
+            "format_as" => {
+                self.typed_args(&what, args, &[Ty::Int, Ty::Str], span);
+                Ty::Str
+            }
             _ => {
                 // make(year, month, day[, hour[, minute[, second]]])
                 if self.arity(&what, args, 3, 6, span) {
@@ -271,6 +291,38 @@ impl Checker {
             "find_all" | "split" => Ty::list(Ty::Str),
             "captures" => Ty::option(Ty::list(Ty::Str)),
             _ => Ty::Str,
+        }
+    }
+
+    /// `csv.*`: comma-separated tables to and from text.
+    pub(crate) fn check_csv_call(
+        &mut self,
+        func: &Ident,
+        type_args: &[TypeExpr],
+        args: &mut [Arg],
+        span: Span,
+    ) -> Ty {
+        let name = func.name.as_str();
+        if !CSV_FUNCTIONS.contains(&name) {
+            return self.unknown_module_function("csv", func, &CSV_FUNCTIONS, args);
+        }
+        let what = format!("csv.{name}");
+        self.no_type_args(&what, type_args);
+        self.reject_named_args(args);
+        let rows = Ty::list(Ty::list(Ty::Str));
+        match name {
+            "parse" => {
+                self.typed_args(&what, args, &[Ty::Str], span);
+                Ty::result(rows, Ty::Str)
+            }
+            "parse_records" => {
+                self.typed_args(&what, args, &[Ty::Str], span);
+                Ty::result(Ty::list(Ty::map(Ty::Str, Ty::Str)), Ty::Str)
+            }
+            _ => {
+                self.typed_args(&what, args, &[rows], span);
+                Ty::Str
+            }
         }
     }
 

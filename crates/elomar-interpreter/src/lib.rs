@@ -302,6 +302,8 @@ enum Flow {
     Continue,
     Return(Value),
     Error(Box<RuntimeError>),
+    /// The time of `deadlines[i]` is up: unwinds to that `timeout`.
+    Timeout(usize),
 }
 
 impl Flow {
@@ -359,6 +361,9 @@ struct Interpreter<'p, 'h> {
     /// The runtime error last shown to the debugger, by address, so it is
     /// shown once while it unwinds.
     reported_error: usize,
+    /// When each running `timeout` ends (milliseconds since 1970),
+    /// outermost first.
+    deadlines: Vec<i64>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -389,6 +394,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             debugger: None,
             calls: Vec::new(),
             reported_error: 0,
+            deadlines: Vec::new(),
             unit_enums: program
                 .items
                 .iter()
@@ -484,6 +490,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     fn exec(&mut self, stmt: &'p Stmt) -> Exec<()> {
+        if !self.deadlines.is_empty() {
+            self.check_deadlines()?;
+        }
         if self.debugger.is_none() {
             return self.exec_stmt(stmt);
         }
@@ -575,6 +584,10 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             StmtKind::While { cond, body } => {
                 while self.eval_bool(cond)? {
+                    if !self.deadlines.is_empty() {
+                        // Also stops loops whose body is empty.
+                        self.check_deadlines()?;
+                    }
                     match self.exec_block(body) {
                         Ok(()) | Err(Flow::Continue) => {}
                         Err(Flow::Break) => break,
@@ -651,6 +664,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             StmtKind::For { vars, iter, body } => {
                 let items = self.eval(iter)?;
                 let run = |this: &mut Self, item: Value| -> Exec<bool> {
+                    if !this.deadlines.is_empty() {
+                        this.check_deadlines()?;
+                    }
                     let r = this.in_scope(|this| {
                         if vars.len() == 1 {
                             this.define(&vars[0].name, item);
@@ -1100,6 +1116,15 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     };
                     return Ok(Value::future(Thunk::All(items)));
                 }
+                if name == "timeout" {
+                    let mut values = values.into_iter();
+                    let future = values.next().unwrap_or(Value::Unit);
+                    let limit = match values.next() {
+                        Some(Value::Duration(ms)) => ms,
+                        _ => 0,
+                    };
+                    return Ok(Value::future(Thunk::Timeout(future, limit)));
+                }
                 builtins::call_function(&mut *self.host, name, values, span).map_err(Flow::from)
             }
             ExprKind::Field { target, name } => {
@@ -1123,8 +1148,27 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                             ));
                         }
                         "std.server" => return Ok(server::helper(&name.name, &values)),
+                        "std.time" if name.name == "sleep" && !self.deadlines.is_empty() => {
+                            // Sleep no longer than the nearest `timeout` allows.
+                            let ms = match values.first() {
+                                Some(Value::Duration(ms)) => *ms,
+                                _ => 0,
+                            };
+                            let nearest = self.deadlines.iter().min().copied().unwrap_or(i64::MAX);
+                            let left = (nearest - stdextra::now_ms()).max(0);
+                            stdextra::call(
+                                module,
+                                "sleep",
+                                &[Value::Duration(ms.min(left))],
+                                &mut *self.host,
+                                span,
+                            )
+                            .map_err(Flow::from)?;
+                            self.check_deadlines()?;
+                            return Ok(Value::Unit);
+                        }
                         "std.math" | "std.random" | "std.time" | "std.os" | "std.regex"
-                        | "std.encoding" | "std.crypto" => {
+                        | "std.encoding" | "std.crypto" | "std.csv" => {
                             return stdextra::call(
                                 module,
                                 &name.name,
@@ -1509,6 +1553,18 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 .into());
             }
             FutureState::Pending(thunk) => thunk,
+            FutureState::Cancelled => {
+                *state.borrow_mut() = FutureState::Cancelled;
+                return Err(RuntimeError::new(
+                    "R0012",
+                    span,
+                    Text::new(
+                        "this future was stopped by `timeout`, so it has no result",
+                        "أُوقفت هذه العملية بسبب `timeout`، فليس لها ناتج",
+                    ),
+                )
+                .into());
+            }
         };
         let result = match thunk {
             Thunk::Call { name, args, span } => {
@@ -1518,9 +1574,52 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             Thunk::Infer(call) => ai::run_infer(self.ai, &call),
             Thunk::Run(call) => self.run_agent(&call, span)?,
             Thunk::All(items) => self.await_all(&items, span)?,
+            Thunk::Timeout(future, limit) => self.await_timeout(&future, limit, span)?,
         };
         *state.borrow_mut() = FutureState::Done(result.clone());
         Ok(result)
+    }
+
+    /// Unwinds to the outermost `timeout` whose time is up, if any.
+    #[inline(never)]
+    fn check_deadlines(&self) -> Exec<()> {
+        let now = stdextra::now_ms();
+        match self.deadlines.iter().position(|d| now >= *d) {
+            Some(i) => Err(Flow::Timeout(i)),
+            None => Ok(()),
+        }
+    }
+
+    /// `await timeout(future, limit)`: `Some(result)`, or `None` if the
+    /// future was still running when the time was up; it is then stopped
+    /// at its next statement. Waiting for the network or an AI model is not
+    /// interrupted, but the program stops as soon as that call returns.
+    fn await_timeout(&mut self, future: &Value, limit: i64, span: Span) -> Exec<Value> {
+        let Value::Future(state) = future else {
+            return Ok(Value::some(future.clone()));
+        };
+        let level = self.deadlines.len();
+        self.deadlines
+            .push(stdextra::now_ms().saturating_add(limit.max(0)));
+        let frames = self.frames.len();
+        let calls = self.calls.len();
+        let result = self.force(state, span);
+        self.deadlines.truncate(level);
+        match result {
+            Ok(v) => Ok(Value::some(v)),
+            Err(Flow::Timeout(i)) => {
+                // Unwinding skipped the code that pops call frames.
+                self.frames.truncate(frames);
+                self.calls.truncate(calls);
+                *state.borrow_mut() = FutureState::Cancelled;
+                if i == level {
+                    Ok(Value::none())
+                } else {
+                    Err(Flow::Timeout(i))
+                }
+            }
+            Err(other) => Err(other),
+        }
     }
 
     /// `await all([...])`: the results in order. `ai.infer` futures that

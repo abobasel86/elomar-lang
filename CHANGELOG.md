@@ -6,6 +6,22 @@ change the language.
 
 ## [Unreleased]
 
+### Language
+
+- `timeout(future, limit)`: `await timeout(slow(), 5s)` is `Some(result)`, or
+  `None` when the time ran out; the work is then stopped at its next
+  statement or loop step, and `time.sleep` ends early.
+- `()` is another way to write the type `Unit` (`Result<(), FsError>`).
+
+### Standard library
+
+- `std.fs`: `create_dir`, `remove`, `remove_dir`, `rename`, `copy`, `is_dir`
+  and `size`. A folder listed in `[permissions]` itself cannot be deleted.
+- `std.csv`: `parse`, `parse_records` (rows as maps by column name) and
+  `stringify`, with quoted fields as in RFC 4180.
+- `std.time`: `format_as(t, "DD/MM/YYYY HH:mm")`, `add_days`, `add_months`
+  and `days_between`.
+
 ### Website
 
 - Interactive exercises at the end of lessons 1–5, 7 and 10 (16 in all),

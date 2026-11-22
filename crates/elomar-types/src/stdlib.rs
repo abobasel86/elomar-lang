@@ -10,12 +10,19 @@ use elomar_diagnostics::{Diagnostic, Text};
 use crate::ai::{DataRole, type_expr_of};
 use crate::{Checker, Ty};
 
-pub(crate) const FS_FUNCTIONS: [&str; 5] = [
+pub(crate) const FS_FUNCTIONS: [&str; 12] = [
     "read_text",
     "write_text",
     "append_text",
     "exists",
     "list_dir",
+    "is_dir",
+    "size",
+    "create_dir",
+    "remove",
+    "remove_dir",
+    "rename",
+    "copy",
 ];
 pub(crate) const JSON_FUNCTIONS: [&str; 3] = ["parse", "stringify", "pretty"];
 pub(crate) const HTTP_FUNCTIONS: [&str; 2] = ["get", "post"];
@@ -110,9 +117,21 @@ impl Checker {
                 self.typed_args(&what, args, &[Ty::Str, Ty::Str], span);
                 Ty::Unit
             }
-            "exists" => {
+            "exists" | "is_dir" => {
                 self.typed_args(&what, args, &[Ty::Str], span);
                 Ty::Bool
+            }
+            "size" => {
+                self.typed_args(&what, args, &[Ty::Str], span);
+                Ty::Int
+            }
+            "create_dir" | "remove" | "remove_dir" => {
+                self.typed_args(&what, args, &[Ty::Str], span);
+                Ty::Unit
+            }
+            "rename" | "copy" => {
+                self.typed_args(&what, args, &[Ty::Str, Ty::Str], span);
+                Ty::Unit
             }
             _ => {
                 self.typed_args(&what, args, &[Ty::Str], span);

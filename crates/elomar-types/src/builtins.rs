@@ -11,9 +11,10 @@ use crate::{Checker, Ty, suggest};
 pub const KNOWN_EFFECTS: [&str; 8] = ["io", "fs", "net", "ai", "db", "py", "mcp", "process"];
 
 /// Functions available without `use`.
-pub const BUILTIN_FUNCTIONS: [&str; 14] = [
+pub const BUILTIN_FUNCTIONS: [&str; 15] = [
     "print",
     "all",
+    "timeout",
     "input",
     "to_float",
     "to_int",
@@ -307,6 +308,12 @@ impl Checker {
                 let futures = Ty::list(Ty::future(t.clone()));
                 self.typed_args(name, args, &[futures], span);
                 Ty::future(Ty::list(t))
+            }
+            "timeout" => {
+                // timeout(Future<T>, Duration) -> Future<Option<T>>
+                let t = self.subst.fresh();
+                self.typed_args(name, args, &[Ty::future(t.clone()), Ty::Duration], span);
+                Ty::future(Ty::option(t))
             }
             "to_float" | "to_int" | "abs" => {
                 if !self.arity(name, args, 1, 1, span) {

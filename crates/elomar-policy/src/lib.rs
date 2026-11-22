@@ -68,6 +68,16 @@ impl FsPolicy {
         self.base.join(path)
     }
 
+    /// Whether `path` is one of the allowed folders or files itself (not
+    /// something inside one). Programs may not delete those.
+    pub fn is_root(&self, path: &str) -> bool {
+        let target = canonical_target(&self.resolve(path));
+        self.read
+            .iter()
+            .chain(&self.write)
+            .any(|root| *root == target)
+    }
+
     /// Returns the resolved path if `access` to `path` is allowed, or a
     /// message explaining how to allow it.
     pub fn check(&self, path: &str, access: Access) -> Result<PathBuf, String> {

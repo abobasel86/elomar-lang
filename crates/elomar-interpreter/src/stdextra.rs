@@ -52,6 +52,7 @@ pub(crate) fn call(
         "std.regex" => regex_call(func, args, span),
         "std.encoding" => Ok(encoding(func, args)),
         "std.crypto" => crypto(func, args, span),
+        "std.csv" => Ok(csv(func, args)),
         _ => os(func, args, host),
     }
 }
@@ -225,6 +226,159 @@ fn parts(ms: i64) -> Parts {
     }
 }
 
+/// `time.format_as`: `YYYY` `MM` `DD` `HH` `mm` `ss` are replaced by the
+/// year, month, day, hour, minute and second; everything else is kept.
+fn format_pattern(ms: i64, pattern: &str) -> String {
+    let p = parts(ms);
+    let mut out = String::new();
+    let mut rest = pattern;
+    while !rest.is_empty() {
+        let (value, len) = if rest.starts_with("YYYY") {
+            (format!("{:04}", p.year), 4)
+        } else if rest.starts_with("MM") {
+            (format!("{:02}", p.month), 2)
+        } else if rest.starts_with("DD") {
+            (format!("{:02}", p.day), 2)
+        } else if rest.starts_with("HH") {
+            (format!("{:02}", p.hour), 2)
+        } else if rest.starts_with("mm") {
+            (format!("{:02}", p.minute), 2)
+        } else if rest.starts_with("ss") {
+            (format!("{:02}", p.second), 2)
+        } else {
+            let c = rest.chars().next().expect("not empty");
+            (c.to_string(), c.len_utf8())
+        };
+        out.push_str(&value);
+        rest = &rest[len..];
+    }
+    out
+}
+
+/// `std.csv`: RFC 4180 tables. Fields may be quoted (`"a, b"`), with `""`
+/// for a quote inside; lines end with `\n` or `\r\n`.
+fn csv(func: &str, args: &[Value]) -> Value {
+    let result = |r: Result<Value, String>| match r {
+        Ok(v) => Value::Result(Ok(Rc::new(v))),
+        Err(e) => Value::Result(Err(Rc::new(Value::str(e)))),
+    };
+    let strings = |row: Vec<String>| Value::list(row.into_iter().map(Value::str).collect());
+    match func {
+        "parse" => result(
+            parse_csv(text(&args[0]))
+                .map(|rows| Value::list(rows.into_iter().map(strings).collect())),
+        ),
+        "parse_records" => result(parse_csv(text(&args[0])).and_then(|rows| {
+            let mut rows = rows.into_iter();
+            let Some(header) = rows.next() else {
+                return Ok(Value::list(Vec::new()));
+            };
+            let mut out = Vec::new();
+            for (i, row) in rows.enumerate() {
+                if row.len() != header.len() {
+                    return Err(format!(
+                        "line {} has {} fields, but the header has {}",
+                        i + 2,
+                        row.len(),
+                        header.len()
+                    ));
+                }
+                let map = header
+                    .iter()
+                    .zip(row)
+                    .map(|(k, v)| (crate::MapKey::Str(Rc::from(k.as_str())), Value::str(v)))
+                    .collect();
+                out.push(Value::Map(Rc::new(map)));
+            }
+            Ok(Value::list(out))
+        })),
+        _ => {
+            let mut out = String::new();
+            if let Value::List(rows) = &args[0] {
+                for row in rows.iter() {
+                    if let Value::List(fields) = row {
+                        let line: Vec<String> = fields.iter().map(|f| csv_field(text(f))).collect();
+                        out.push_str(&line.join(","));
+                    }
+                    out.push('\n');
+                }
+            }
+            Value::str(out)
+        }
+    }
+}
+
+fn csv_field(s: &str) -> String {
+    if s.contains([',', '"', '\n', '\r']) || s.starts_with(' ') || s.ends_with(' ') {
+        format!("\"{}\"", s.replace('"', "\"\""))
+    } else {
+        s.to_string()
+    }
+}
+
+fn parse_csv(text: &str) -> Result<Vec<Vec<String>>, String> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    let mut field = String::new();
+    let mut chars = text.chars().peekable();
+    let mut line = 1;
+    // Whether the current line has anything yet (so a blank last line is not a row).
+    let mut started = false;
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if field.is_empty() => {
+                started = true;
+                let quote_line = line;
+                loop {
+                    match chars.next() {
+                        Some('"') if chars.peek() == Some(&'"') => {
+                            chars.next();
+                            field.push('"');
+                        }
+                        Some('"') => break,
+                        Some(c) => {
+                            if c == '\n' {
+                                line += 1;
+                            }
+                            field.push(c);
+                        }
+                        None => {
+                            return Err(format!("line {quote_line}: a quoted field is not closed"));
+                        }
+                    }
+                }
+                match chars.peek() {
+                    None | Some(',') | Some('\n') | Some('\r') => {}
+                    Some(_) => return Err(format!("line {line}: text after a closing quote")),
+                }
+            }
+            ',' => {
+                started = true;
+                row.push(std::mem::take(&mut field));
+            }
+            '\r' if chars.peek() == Some(&'\n') => {}
+            '\n' => {
+                if started || !field.is_empty() {
+                    row.push(std::mem::take(&mut field));
+                    rows.push(std::mem::take(&mut row));
+                }
+                started = false;
+                line += 1;
+            }
+            c => {
+                started = true;
+                field.push(c);
+            }
+        }
+    }
+    if started || !field.is_empty() {
+        row.push(field);
+        rows.push(row);
+    }
+    Ok(rows)
+}
+
 pub(crate) fn format_time(ms: i64) -> String {
     let p = parts(ms);
     let mut s = format!(
@@ -306,7 +460,7 @@ pub(crate) fn parse_time(text: &str) -> Option<i64> {
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -323,7 +477,7 @@ unsafe extern "C" {
 }
 
 #[cfg(target_family = "wasm")]
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     // SAFETY: a plain function provided by the page; it takes no pointers.
     unsafe { elomar_now_ms() as i64 }
 }
@@ -365,6 +519,22 @@ fn time(func: &str, args: &[Value], span: Span) -> R<Value> {
                 ("year", Value::Int(p.year)),
             ])
         }
+        "add_days" => {
+            Value::Int(int(&args[0]).saturating_add(int(&args[1]).saturating_mul(DAY_MS)))
+        }
+        "add_months" => {
+            let t = int(&args[0]);
+            let p = parts(t);
+            let months = p.year * 12 + (p.month - 1) + int(&args[1]);
+            let (y, m) = (months.div_euclid(12), months.rem_euclid(12) + 1);
+            // The 31st plus a month is the last day of a shorter month.
+            let d = p.day.min(days_in_month(y, m));
+            Value::Int(days_from_civil(y, m, d) * DAY_MS + t.rem_euclid(DAY_MS))
+        }
+        "days_between" => {
+            Value::Int(int(&args[1]).div_euclid(DAY_MS) - int(&args[0]).div_euclid(DAY_MS))
+        }
+        "format_as" => Value::str(format_pattern(int(&args[0]), text(&args[1]))),
         "make" => {
             let v: Vec<i64> = args.iter().map(int).collect();
             let get = |i: usize| v.get(i).copied().unwrap_or(0);

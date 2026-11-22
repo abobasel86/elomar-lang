@@ -57,7 +57,9 @@ fn strip_bom(s: &str) -> &str {
 pub(crate) fn fs_call(policy: &FsPolicy, func: &str, args: &[Value]) -> Value {
     let path = text_arg(&args[0]);
     let access = match func {
-        "write_text" | "append_text" => Access::Write,
+        "write_text" | "append_text" | "create_dir" | "remove" | "remove_dir" | "rename" => {
+            Access::Write
+        }
         _ => Access::Read,
     };
     let resolved = match policy.check(path, access) {
@@ -88,6 +90,71 @@ pub(crate) fn fs_call(policy: &FsPolicy, func: &str, args: &[Value]) -> Value {
             }
         }
         "exists" => ok(Value::Bool(resolved.exists())),
+        "is_dir" => ok(Value::Bool(resolved.is_dir())),
+        "size" => match std::fs::metadata(&resolved) {
+            Ok(m) if m.is_dir() => fs_error("Other", format!("`{path}` is a folder, not a file")),
+            Ok(m) => ok(Value::Int(i64::try_from(m.len()).unwrap_or(i64::MAX))),
+            Err(e) => io_error(path, "read", &e),
+        },
+        "create_dir" => match std::fs::create_dir_all(&resolved) {
+            Ok(()) => ok(Value::Unit),
+            Err(e) => io_error(path, "create the folder", &e),
+        },
+        "remove" => {
+            if resolved.is_dir() {
+                return fs_error(
+                    "Other",
+                    format!("`{path}` is a folder; use fs.remove_dir to delete folders"),
+                );
+            }
+            match std::fs::remove_file(&resolved) {
+                Ok(()) => ok(Value::Unit),
+                Err(e) => io_error(path, "delete", &e),
+            }
+        }
+        "remove_dir" => {
+            if policy.is_root(path) {
+                return fs_error(
+                    "PolicyDenied",
+                    format!(
+                        "`{path}` is listed under `[permissions]` itself; only what is inside it may be deleted"
+                    ),
+                );
+            }
+            if resolved.exists() && !resolved.is_dir() {
+                return fs_error(
+                    "Other",
+                    format!("`{path}` is a file; use fs.remove to delete files"),
+                );
+            }
+            match std::fs::remove_dir_all(&resolved) {
+                Ok(()) => ok(Value::Unit),
+                Err(e) => io_error(path, "delete the folder", &e),
+            }
+        }
+        "rename" | "copy" => {
+            let to = text_arg(&args[1]);
+            let target = match policy.check(to, Access::Write) {
+                Ok(p) => p,
+                Err(message) => return fs_error("PolicyDenied", message),
+            };
+            if func == "rename" {
+                match std::fs::rename(&resolved, &target) {
+                    Ok(()) => ok(Value::Unit),
+                    Err(e) => io_error(path, "rename", &e),
+                }
+            } else if resolved.is_dir() {
+                fs_error(
+                    "Other",
+                    format!("`{path}` is a folder; fs.copy copies files"),
+                )
+            } else {
+                match std::fs::copy(&resolved, &target) {
+                    Ok(_) => ok(Value::Unit),
+                    Err(e) => io_error(path, "copy", &e),
+                }
+            }
+        }
         "list_dir" => match std::fs::read_dir(&resolved) {
             Ok(entries) => {
                 let mut names: Vec<String> = entries

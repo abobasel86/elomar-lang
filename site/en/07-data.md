@@ -42,6 +42,49 @@ Other functions: `fs.append_text`, `fs.exists` and `fs.list_dir`. Every
 function that touches files has the `fs` *effect*: a public function that
 reads files must say so with `!{fs}` in its signature, so readers know.
 
+Folders and files can be created, moved and deleted too:
+
+```elomar
+use std.fs
+
+fn main() {
+    print(fs.create_dir("output/reports/2026"))     // Ok(()), with missing parents
+    print(fs.copy("data/students.txt", "output/reports/students.txt"))
+    print(fs.rename("output/reports/students.txt", "output/reports/old.txt"))
+    print(fs.size("output/reports/old.txt"), fs.is_dir("output/reports"))
+    print(fs.remove("output/reports/old.txt"))      // a file
+    print(fs.remove_dir("output/reports"))          // a folder and all inside it
+}
+```
+
+Deleting needs write permission, and a folder listed in `[permissions]`
+itself is never deleted: only what is inside it.
+
+## CSV tables
+
+Spreadsheets save tables as CSV. `csv.parse_records` reads one, using the
+first line as column names:
+
+```elomar
+use std.csv
+
+fn main() {
+    let text = "name,city\nLina,Amman\nOmar,\"Irbid, Jordan\"\n"
+    match csv.parse_records(text) {
+        Ok(rows) => {
+            for row in rows {
+                print("{row["name"]} lives in {row["city"]}")
+            }
+        }
+        Err(problem) => print("bad CSV: {problem}")
+    }
+    print(csv.stringify([["name", "grade"], ["Lina", "91"]]))
+}
+```
+
+`csv.parse` gives the rows as lists instead. To read a file, combine it with
+`fs.read_text`.
+
 ## JSON
 
 `json.parse<T>` reads JSON and checks that it has the shape of `T`:

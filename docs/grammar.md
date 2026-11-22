@@ -245,7 +245,20 @@ fn main() {
 - `all(List<Future<T>>) -> Future<List<T>>`: `await all([...])` ينتظر كل العمليات ويعيد نتائجها **بالترتيب نفسه**.
   استدعاءات `ai.infer` التي تُمرَّر مباشرة (مثل `await all(texts.map(|t| ai.infer<Ticket>(...)))`) تُرسل **معًا في الوقت نفسه**
   عند مزودي OpenAI وAnthropic، بعد فحص الصلاحيات وحد الاستدعاءات لكل منها بالترتيب. أما استدعاءات `async fn` فتُنفذ واحدة بعد أخرى
-  (قيم المفسّر لا تنتقل بين الخيوط)، وكذلك كل شيء في ساحة التجربة بالمتصفح. الإلغاء غير مدعوم بعد.
+  (قيم المفسّر لا تنتقل بين الخيوط)، وكذلك كل شيء في ساحة التجربة بالمتصفح.
+- `timeout(Future<T>, Duration) -> Future<Option<T>>`: `await timeout(f, 2s)` تعطي `Some(ناتج)`، أو `None` إن لم تنتهِ
+  العملية في الوقت المحدد؛ عندها **تُوقف** عند جملتها التالية (أو تكرار الحلقة التالي)، وينتهي `time.sleep` بانتهاء الوقت.
+  انتظار الشبكة أو نموذج الذكاء الاصطناعي لا يُقطع في منتصفه، لكن العملية تتوقف فور عودته (ولهما مهلتهما الخاصة).
+  في `timeout` متداخلة يفوز الوقت الأقصر. وانتظار عملية أُوقفت مرة أخرى خطأ تنفيذي `R0012`.
+
+```elomar
+async fn main() {
+    match await timeout(slow_report(), 5s) {
+        Some(report) => print(report)
+        None => print("took too long; try again later")
+    }
+}
+```
 - تُحسب تأثيرات الدالة `async` عند موضع استدعائها.
 
 ## 4.6 الوحدة `std.ai`
@@ -522,9 +535,18 @@ match fs.read_text("data/students.json") {
 | `fs.append_text(path, text)` | `Result<Unit, FsError>` (ينشئ الملف إن غاب) | `filesystem_write` |
 | `fs.exists(path)` | `Result<Bool, FsError>` | `filesystem_read` |
 | `fs.list_dir(path)` | `Result<List<String>, FsError>` (أسماء مرتبة) | `filesystem_read` |
+| `fs.is_dir(path)` | `Result<Bool, FsError>` | `filesystem_read` |
+| `fs.size(path)` | `Result<Int, FsError>` (بالبايت؛ للملفات فقط) | `filesystem_read` |
+| `fs.create_dir(path)` | `Result<Unit, FsError>` (مع المجلدات الأم الناقصة؛ لا خطأ إن وُجد) | `filesystem_write` |
+| `fs.remove(path)` | `Result<Unit, FsError>` (ملف فقط) | `filesystem_write` |
+| `fs.remove_dir(path)` | `Result<Unit, FsError>` (المجلد **وكل ما فيه**) | `filesystem_write` |
+| `fs.rename(from, to)` | `Result<Unit, FsError>` (نقل أو إعادة تسمية) | `filesystem_write` للمسارين |
+| `fs.copy(from, to)` | `Result<Unit, FsError>` (ملف فقط) | قراءة `from` وكتابة `to` |
 
 - كل دوال `fs` تُحدث التأثير `fs`؛ والدالة `pub` التي تستخدمها يجب أن تصرّح بـ `!{fs}`.
-- لا تُنشأ المجلدات تلقائيًا، ولا يوجد حذف ملفات بعد.
+- `write_text` لا تنشئ المجلدات؛ أنشئها أولًا بـ `fs.create_dir`.
+- لا يُحذف مجلد مذكور بنفسه في `[permissions]` (`PolicyDenied`)، بل ما بداخله فقط. و`fs.remove` على مجلد أو `fs.remove_dir` على ملف `Other`.
+- `()` طريقة أخرى لكتابة النوع `Unit`، فـ `Result<(), FsError>` هو `Result<Unit, FsError>`.
 - كل فشل قيمة `Err(FsError...)`، لا خطأ تنفيذ.
 
 ### 4.10.1 صلاحيات الملفات
@@ -672,7 +694,7 @@ fn main() {
 |---|---|---|
 | `std.math` | الثوابت `math.pi` `math.e` `math.tau` `math.inf` · `sqrt` `cbrt` `exp` `ln` `log10` `log2` `sin` `cos` `tan` `asin` `acos` `atan` (عدد → `Float`) · `pow(x, y)` `atan2(y, x)` `hypot(x, y)` · `is_nan(x) -> Bool` | — |
 | `std.random` | `int(min, max) -> Int` (شامل الطرفين) · `float() -> Float` في [0, 1) · `bool()` · `choice(List<T>) -> Option<T>` · `shuffle(List<T>) -> List<T>` · `seed(Int)` | — |
-| `std.time` | `now() -> Int` · `today() -> String` (`YYYY-MM-DD` بتوقيت UTC) · `sleep(Duration)` · `format(Int) -> String` (ISO 8601) · `parse(String) -> Option<Int>` · `date(Int) -> { year, month, day, hour, minute, second, weekday }` (الاثنين = 1) · `make(year, month, day[, hour[, minute[, second]]]) -> Int` | — |
+| `std.time` | `now() -> Int` · `today() -> String` (`YYYY-MM-DD` بتوقيت UTC) · `sleep(Duration)` · `format(Int) -> String` (ISO 8601) · `format_as(Int, pattern) -> String` (`YYYY` `MM` `DD` `HH` `mm` `ss`، وما عداها يبقى كما هو) · `parse(String) -> Option<Int>` · `date(Int) -> { year, month, day, hour, minute, second, weekday }` (الاثنين = 1) · `make(year, month, day[, hour[, minute[, second]]]) -> Int` · `add_days(Int, n) -> Int` · `add_months(Int, n) -> Int` (31 يناير + شهر = آخر فبراير) · `days_between(a, b) -> Int` (أيام التقويم من `a` إلى `b`) | — |
 | `std.os` | `args() -> List<String>` · `env(name) -> Option<String>` · `platform() -> String` (`windows`/`linux`/`macos`) · `exit(code)` | `io` (عدا `platform`) |
 
 - `random` عشوائية زائفة (xorshift) تصلح للألعاب والمحاكاة، **لا** لكلمات المرور والمفاتيح.
@@ -771,6 +793,34 @@ commands = ["git"]     # منع افتراضي: البرامج المسموح ب
 - المجلد الحالي هو مجلد المشروع، والمهلة الافتراضية 60 ثانية (ثم يُوقف البرنامج: `Timeout`). المخرجات بحد أقصى 16 ميغابايت لكل منهما.
 - رمز خروج غير الصفر **ليس** خطأً: هو `status` في النتيجة. أما `ProcessError` فهو `PolicyDenied` (الاسم غير موجود في `commands`) و`NotFound` و`Failed` و`Timeout`.
 - البرنامج المسموح يعمل بصلاحيات المستخدم كاملة، وأذونات Elomar للملفات والشبكة لا تنطبق داخله.
+
+## 4.11.8 الجداول: `std.csv`
+
+```elomar
+use std.csv
+
+fn main() {
+    match csv.parse_records("name,city\nLina,Amman\nعمر,\"إربد, الأردن\"\n") {
+        Ok(rows) => {
+            for row in rows {
+                print(row["name"], row["city"])
+            }
+        }
+        Err(problem) => print("bad CSV:", problem)
+    }
+    print(csv.stringify([["name", "note"], ["Lina", "a, b"]]))
+}
+```
+
+| الدالة | النوع |
+|---|---|
+| `csv.parse(text)` | `Result<List<List<String>>, String>`: كل الصفوف |
+| `csv.parse_records(text)` | `Result<List<Map<String, String>>, String>`: الصف الأول أسماء الأعمدة |
+| `csv.stringify(rows)` | `List<List<String>> -> String` (سطر لكل صف) |
+
+- الصيغة RFC 4180: الحقل بين علامتي تنصيص يحمل الفواصل والأسطر، و`""` داخله علامة تنصيص. الأسطر تنتهي بـ `\n` أو `\r\n`، وتُحذف علامة BOM.
+- الأخطاء نص يذكر رقم السطر: حقل لم يُغلق، أو نص بعد علامة الإغلاق، أو صف عدد حقوله غير عدد الأعمدة في `parse_records`.
+- لا تأثير لها: لقراءة ملف استخدم `fs.read_text` ثم `csv.parse`.
 
 ## 4.12 الوحدات متعددة الملفات
 
@@ -1183,6 +1233,5 @@ fn test_greets_by_name() {
 
 ## 9. غير المنفذ بعد (مخطط)
 
-مزودات سحابية أخرى ·
-`ai.generate` و`ai.stream` و`ai.embed` · حذف الملفات وإنشاء المجلدات والدوال التابعة للأنواع المعدودة ·
-الإلغاء والمهام المتوازية لـ `async fn`.
+`ai.stream` و`ai.embed` · تنفيذ `async fn` على عدة أنوية معًا (تُنفذ الآن واحدة بعد أخرى؛ وتُرسل استدعاءات `ai.infer` معًا) ·
+قيود على معاملات `impl` (`impl<T: A>`).

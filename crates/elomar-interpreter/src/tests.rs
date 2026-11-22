@@ -455,6 +455,35 @@ fn files_with_permissions() {
 }
 
 #[test]
+fn files_and_folders() {
+    let dir = temp_project("folders");
+    let policy = FsPolicy::new(&dir, &["data".into(), "out".into()], &["out".into()]);
+    let src = r#"use std.fs
+fn kind(r: Result<(), FsError>) -> String {
+    return match r {
+        Ok(_) => "ok"
+        Err(e) => e.kind()
+    }
+}
+fn main() {
+    print(kind(fs.create_dir("out/a/b")), fs.is_dir("out/a/b"), fs.is_dir("data/hello.txt"))
+    print(kind(fs.write_text("out/a/b/x.txt", "12345")), fs.size("out/a/b/x.txt"))
+    print(kind(fs.copy("data/hello.txt", "out/a/copy.txt")), fs.exists("out/a/copy.txt"))
+    print(kind(fs.rename("out/a/copy.txt", "out/a/moved.txt")), fs.list_dir("out/a"))
+    print(kind(fs.remove("out/a/moved.txt")), kind(fs.remove("out/a/moved.txt")), kind(fs.remove("out/a")))
+    print(kind(fs.remove_dir("out/a")), fs.exists("out/a"))
+    print(kind(fs.remove_dir("out")), kind(fs.remove("data/hello.txt")), kind(fs.copy("data/hello.txt", "data/c.txt")))
+    print(fs.size("data").is_err(), kind(fs.remove_dir("data/hello.txt")))
+}"#;
+    assert_eq!(
+        run_fs(src, policy),
+        "ok Ok(true) Ok(false)\nok Ok(5)\nok Ok(true)\nok Ok([\"b\", \"moved.txt\"])\nok NotFound Other\nok Ok(false)\nPolicyDenied PolicyDenied PolicyDenied\ntrue PolicyDenied\n"
+    );
+    assert!(dir.join("out").is_dir() && dir.join("data/hello.txt").exists());
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
 fn files_are_denied_by_default() {
     let src = "use std.fs\nfn main() {\n  match fs.read_text(\"Cargo.toml\") {\n    Ok(_) => print(\"read\")\n    Err(e) => print(e)\n  }\n}";
     let out = run_fs(src, FsPolicy::deny_all("."));
@@ -1384,5 +1413,104 @@ async fn main() {
     assert_eq!(
         run_ai(src, Vec::new(), policy),
         "[true, true, false]\n[2, 4, 6]\n[]\n10 [10, 12]\n"
+    );
+}
+
+#[test]
+fn timeout_stops_slow_work() {
+    let src = r#"use std.time
+async fn spin() -> Int {
+    var i = 0
+    while true {
+        i += 1
+    }
+    return i
+}
+async fn empty_for() -> Int {
+    for i in 0..1000000000 {
+    }
+    return 1
+}
+async fn nap() -> String {
+    time.sleep(10s)
+    return "woke"
+}
+async fn quick(n: Int) -> Int {
+    return n * 2
+}
+async fn inner() -> Option<Int> {
+    return await timeout(spin(), 50ms)
+}
+async fn main() {
+    let start = time.now()
+    print(await timeout(quick(21), 1s), await timeout(spin(), 50ms))
+    print(await timeout(empty_for(), 50ms), await timeout(nap(), 50ms))
+    print(await timeout(inner(), 5s), await timeout(timeout(spin(), 10s), 50ms))
+    let results = await all([timeout(quick(1), 1s), timeout(spin(), 50ms)])
+    print(results, time.now() - start < 5000)
+    let f = spin()
+    print(await timeout(f, 10ms))
+    print(await f)
+}"#;
+    let err = run_src(src).unwrap_err();
+    assert_eq!(err.code, "R0012");
+    // The output before the error.
+    let program = {
+        let (mut p, _) = elomar_parser::parse(src);
+        elomar_types::check(&mut p, Default::default());
+        p
+    };
+    let mut host = BufferHost::default();
+    let _ = run_with(
+        &program,
+        &mut host,
+        &mut AiRuntime::default(),
+        FsPolicy::deny_all("."),
+    );
+    assert_eq!(
+        host.output,
+        "Some(42) None\nNone None\nSome(None) None\n[Some(2), None] true\nNone\n"
+    );
+}
+
+#[test]
+fn csv_tables() {
+    let src = r#"use std.csv
+fn main() {
+    let text = "name,note\r\nLina,\"says \"\"hi\"\", then leaves\"\nعمر,\"two\nlines\"\n"
+    match csv.parse_records(text) {
+        Ok(rows) => print(rows.length, rows[0]["note"], rows[1]["name"], rows[1]["note"].lines())
+        Err(e) => print(e)
+    }
+    print(csv.parse("a,b\n\"open"), csv.parse_records("a,b\n1\n"), csv.parse(",\n\n1,"))
+    let out = csv.stringify([["a", "b, c"], ["say \"x\"", " d"]])
+    print(out.lines(), csv.parse(out) == Ok([["a", "b, c"], ["say \"x\"", " d"]]))
+    print(csv.parse(""), csv.parse_records(""))
+}"#;
+    assert_eq!(
+        run_src(src).unwrap(),
+        "2 says \"hi\", then leaves عمر [\"two\", \"lines\"]\n\
+         Err(\"line 2: a quoted field is not closed\") Err(\"line 2 has 1 fields, but the header has 2\") Ok([[\"\", \"\"], [\"1\", \"\"]])\n\
+         [\"a,\\\"b, c\\\"\", \"\\\"say \\\"\\\"x\\\"\\\"\\\",\\\" d\\\"\"] true\n\
+         Ok([]) Ok([])\n"
+    );
+}
+
+#[test]
+fn dates() {
+    let src = r#"use std.time
+fn main() {
+    let t = time.make(2026, 1, 31, 14, 5, 9)
+    print(time.format_as(t, "DD/MM/YYYY HH:mm:ss"), time.format_as(t, "YYYY-MM, الساعة HH"))
+    print(time.format(time.add_days(t, 30)), time.format(time.add_months(t, 1)), time.format(time.add_months(t, -2)))
+    print(time.format(time.add_months(time.make(2024, 2, 29), 12)), time.format(time.add_days(t, -31)))
+    print(time.days_between(t, time.make(2026, 3, 1)), time.days_between(time.make(2026, 3, 1), t))
+}"#;
+    assert_eq!(
+        run_src(src).unwrap(),
+        "31/01/2026 14:05:09 2026-01, الساعة 14\n\
+         2026-03-02T14:05:09Z 2026-02-28T14:05:09Z 2025-11-30T14:05:09Z\n\
+         2025-02-28T00:00:00Z 2025-12-31T14:05:09Z\n\
+         29 -29\n"
     );
 }

@@ -41,6 +41,48 @@ fn main() {
 **تأثير** `fs`: الدالة العامة التي تقرأ ملفات يجب أن تصرّح بذلك بـ `!{fs}` في توقيعها،
 فيعرف القارئ ذلك.
 
+ويمكن أيضًا إنشاء المجلدات ونقل الملفات وحذفها:
+
+```elomar
+use std.fs
+
+fn main() {
+    print(fs.create_dir("output/reports/2026"))     // Ok(()) مع المجلدات الأم الناقصة
+    print(fs.copy("data/students.txt", "output/reports/students.txt"))
+    print(fs.rename("output/reports/students.txt", "output/reports/old.txt"))
+    print(fs.size("output/reports/old.txt"), fs.is_dir("output/reports"))
+    print(fs.remove("output/reports/old.txt"))      // ملف
+    print(fs.remove_dir("output/reports"))          // مجلد وكل ما فيه
+}
+```
+
+الحذف يحتاج صلاحية الكتابة، والمجلد المذكور بنفسه في `[permissions]` لا يُحذف أبدًا،
+بل ما بداخله فقط.
+
+## جداول CSV
+
+برامج الجداول تحفظ الجداول بصيغة CSV. و`csv.parse_records` تقرؤها، والسطر الأول أسماء
+الأعمدة:
+
+```elomar
+use std.csv
+
+fn main() {
+    let text = "الاسم,المدينة\nلينا,عمّان\nعمر,\"إربد، الأردن\"\n"
+    match csv.parse_records(text) {
+        Ok(rows) => {
+            for row in rows {
+                print("{row["الاسم"]} تسكن في {row["المدينة"]}")
+            }
+        }
+        Err(problem) => print("ملف CSV غير صالح: {problem}")
+    }
+    print(csv.stringify([["الاسم", "الدرجة"], ["لينا", "91"]]))
+}
+```
+
+أما `csv.parse` فتعطي الصفوف قوائم. ولقراءة ملف، استخدمها مع `fs.read_text`.
+
 ## JSON
 
 `json.parse<T>` تقرأ JSON وتتأكد أن له شكل `T`:

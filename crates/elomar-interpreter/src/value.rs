@@ -26,6 +26,8 @@ pub enum Thunk {
     Run(Box<RunCall>),
     /// `all([...])`: the futures to wait for, in order.
     All(Rc<Vec<Value>>),
+    /// `timeout(future, limit)`: the future, and the limit in milliseconds.
+    Timeout(Value, i64),
 }
 
 /// A `Map` key. The checker allows only `String` and `Int` keys; maps
@@ -71,6 +73,8 @@ pub enum FutureState {
     Pending(Thunk),
     Running,
     Done(Value),
+    /// Stopped by `timeout` before it finished; it has no result.
+    Cancelled,
 }
 
 #[derive(Debug, Clone)]
