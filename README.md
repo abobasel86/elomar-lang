@@ -46,7 +46,7 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v0.3.0, early development. Not production-ready.**
+> **Project status: v0.4.0, early development. Not production-ready.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,

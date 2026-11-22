@@ -4,7 +4,13 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-22
+
+### Language
+
+- List methods `zip` (pairs, as long as the shorter list), `windows(n)`,
+  `sum_by(f)` (`Int` or `Float`), `min_by(f)` and `max_by(f)` (the first
+  smallest or largest key).
 
 ### Tools
 
@@ -14,8 +20,13 @@ change the language.
   typed. Commands: `:help`, `:show`, `:reset`, `:quit`. Lines are kept in
   `~/.elomar_history`.
 
+### Fixes
+
+- The HTTP server test no longer hangs when another test takes its port.
+
 ### Website
 
+- The collections lesson shows the new list methods.
 - The first lesson shows `elomar repl` and how to install the extension
   from Open VSX.
 

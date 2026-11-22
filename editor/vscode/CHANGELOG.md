@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.4.0
+
+Works with the 0.4.0 language: `elomar repl` and the list methods `zip`,
+`windows`, `sum_by`, `min_by` and `max_by`.
+
 ## 0.3.2
 
 The setup steps say where to install the extension: Open VSX, or the
