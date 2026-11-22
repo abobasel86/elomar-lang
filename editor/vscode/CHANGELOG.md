@@ -5,6 +5,12 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.7.0
+
+Works with the 0.7.0 language: `timeout`, `std.csv`, the new file and date
+functions, and `elomar build`. `all` and `timeout` are colored as built-in
+functions.
+
 ## 0.5.1
 
 A **Sponsor** button on the extension's page, linking to
