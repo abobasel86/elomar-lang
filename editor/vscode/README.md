@@ -14,8 +14,13 @@ programming language with AI built in, in Arabic and English.
 - **Outline** of functions, types, enums, traits and `impl` blocks.
 - **Completion**: keywords, built-ins, your functions and variables, and
   fields and methods after `.` (also `fs.`, `json.`, `db.`, ...).
-- **Run** button in the editor title bar, `Elomar: Run File`, or **F5**.
-  There is no debugger yet (no breakpoints), so F5 runs the file.
+- **Debugging** with **F5**: breakpoints, step over / into / out, the call
+  stack, variables (lists and records open up), values in the Debug Console
+  (`total`, `student.name`), and a stop where a runtime error happens.
+  Program output appears in the Debug Console, and `input(...)` reads what
+  you type there.
+- **Run** button in the editor title bar, `Elomar: Run File`, or
+  **Ctrl+F5**: runs the file in a terminal.
 - **Formatting** with `elomar fmt`: Format Document, and on save by default
   (turn off with `"[elomar]": { "editor.formatOnSave": false }`).
 - **Snippets**: `main`, `amain`, `fn`, `pfn`, `type`, `enum`, `trait`,

@@ -3,8 +3,8 @@
 // Language features come from the language server `elomar lsp`, started by
 // this extension and spoken to over JSON-RPC on its standard input/output:
 // diagnostics while typing, hover, go to definition, the outline and
-// completion. Formatting uses `elomar fmt --stdin`, and Run / F5 run the
-// file in a terminal.
+// completion. Formatting uses `elomar fmt --stdin`, Run and Ctrl+F5 run the
+// file in a terminal, and F5 debugs it with `elomar dap`.
 
 'use strict';
 
@@ -368,12 +368,12 @@ async function runFile(file) {
 }
 
 /**
- * F5 / Ctrl+F5: there is no debugger for Elomar yet, so a launch runs the
- * file instead. Returning `undefined` ends the launch without starting a
- * debug session (and without asking for a debugger extension).
+ * F5 debugs the file with breakpoints; Ctrl+F5 (run without debugging) runs
+ * it in a terminal, where `input(...)` reads from the keyboard. Without a
+ * launch.json, the open .elo file is used.
  */
-const runOnLaunch = {
-  resolveDebugConfiguration(_folder, config) {
+const launchProvider = {
+  async resolveDebugConfiguration(_folder, config) {
     let file = config.program;
     if (!file || file.includes('${')) {
       const editor = vscode.window.activeTextEditor;
@@ -383,8 +383,31 @@ const runOnLaunch = {
       vscode.window.showInformationMessage('Elomar: open a .elo file to run it.');
       return undefined;
     }
-    runFile(file);
-    return undefined;
+    if (config.noDebug) {
+      runFile(file);
+      return undefined;
+    }
+    const doc = vscode.workspace.textDocuments.find((d) => samePath(d.uri.fsPath, file));
+    if (doc && doc.isDirty) {
+      await doc.save();
+    }
+    return {
+      ...config,
+      type: 'elomar',
+      request: 'launch',
+      name: config.name || `Debug ${path.basename(file)}`,
+      program: file,
+    };
+  },
+};
+
+/** Starts `elomar dap` for each debug session. */
+const adapterFactory = {
+  createDebugAdapterDescriptor(session) {
+    const program = session.configuration.program;
+    return new vscode.DebugAdapterExecutable(executable(), ['--lang', messageLanguage(), 'dap'], {
+      cwd: program ? path.dirname(program) : undefined,
+    });
   },
 };
 
@@ -460,7 +483,8 @@ function activate(context) {
     vscode.languages.registerDefinitionProvider(selector, definitionProvider),
     vscode.languages.registerDocumentSymbolProvider(selector, symbolProvider),
     vscode.languages.registerCompletionItemProvider(selector, completionProvider, '.'),
-    vscode.debug.registerDebugConfigurationProvider('elomar', runOnLaunch),
+    vscode.debug.registerDebugConfigurationProvider('elomar', launchProvider),
+    vscode.debug.registerDebugAdapterDescriptorFactory('elomar', adapterFactory),
   );
   vscode.workspace.textDocuments.forEach((doc) => schedule(doc, 0));
 }

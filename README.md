@@ -91,7 +91,9 @@ by the compiler when they are not declared.
   items are visible to other files. See [`examples/school`](examples/school).
 - **VS Code support** in [`editor/vscode`](editor/vscode): highlighting
   (Arabic names included), errors while typing in English or Arabic, hover
-  types, go to definition, outline, completion, a Run button and snippets.
+  types, go to definition, outline, completion, a Run button, snippets, and
+  a **debugger** (F5: breakpoints, stepping, the call stack and variables)
+  through `elomar dap`, the Debug Adapter Protocol.
 - **Packages:** `[dependencies]` from a local folder or a git repository
   (`elomar add geometry --path vendor/geometry`, `elomar add kit --git URL --tag v1`),
   locked in `elomar.lock`, used as `use geometry.shapes`. See
@@ -249,6 +251,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 |---|---|
 | `elomar run FILE` | Check, then run a program |
 | `elomar repl` | An interactive prompt: type code and see the result at once |
+| `elomar dap` | The debugger, for editors (Debug Adapter Protocol on stdin/stdout) |
 | `elomar check FILE` | Report errors and warnings without running |
 | `--lang en\|ar` | Diagnostic language (or set `ELOMAR_LANG`) |
 | `--no-color` | Plain output (also honors `NO_COLOR`) |

@@ -8,6 +8,7 @@ mod ai;
 mod builtins;
 #[cfg_attr(not(feature = "native"), path = "stubs/db.rs")]
 mod db;
+mod debug;
 #[cfg_attr(not(feature = "native"), path = "stubs/http.rs")]
 mod http;
 mod mcp;
@@ -30,6 +31,7 @@ use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
 pub use ai::{InferCall, RunCall, RunTool};
+pub use debug::{Debugger, Inspect, Resume, StackFrame};
 pub use session::Session;
 pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
 
@@ -195,7 +197,31 @@ pub fn run_function(
     ai: &mut AiRuntime,
     fs: FsPolicy,
 ) -> Result<Value, RuntimeError> {
+    run_function_with(program, name, host, ai, fs, None)
+}
+
+/// Like [`run_with`], reporting each statement and runtime error to
+/// `debugger`.
+pub fn run_debug(
+    program: &Program,
+    host: &mut dyn Host,
+    ai: &mut AiRuntime,
+    fs: FsPolicy,
+    debugger: Box<dyn Debugger>,
+) -> Result<(), RuntimeError> {
+    run_function_with(program, "main", host, ai, fs, Some(debugger)).map(|_| ())
+}
+
+fn run_function_with(
+    program: &Program,
+    name: &str,
+    host: &mut dyn Host,
+    ai: &mut AiRuntime,
+    fs: FsPolicy,
+    debugger: Option<Box<dyn Debugger>>,
+) -> Result<Value, RuntimeError> {
     let mut interp = Interpreter::new(program, host, ai, fs);
+    interp.debugger = debugger;
     for item in &program.items {
         if let Item::Const(c) = item {
             let v = interp.eval(&c.value).map_err(Flow::into_error)?;
@@ -284,6 +310,14 @@ struct Interpreter<'p, 'h> {
     lambdas: HashMap<usize, &'p Expr>,
     /// MCP servers started so far; stopped when the run ends.
     mcp: mcp::McpHub,
+    /// Set when a debugger runs the program.
+    debugger: Option<Box<dyn Debugger>>,
+    /// With a debugger: each call's name and the statement it is running,
+    /// outermost first. `calls[i]` runs in `frames[i + 1]`.
+    calls: Vec<StackFrame>,
+    /// The runtime error last shown to the debugger, by address, so it is
+    /// shown once while it unwinds.
+    reported_error: usize,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -311,6 +345,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ai,
             fs,
             lambdas: HashMap::new(),
+            debugger: None,
+            calls: Vec::new(),
+            reported_error: 0,
             unit_enums: program
                 .items
                 .iter()
@@ -405,6 +442,35 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     fn exec(&mut self, stmt: &'p Stmt) -> Exec<()> {
+        if self.debugger.is_none() {
+            return self.exec_stmt(stmt);
+        }
+        if let Some(call) = self.calls.last_mut() {
+            call.span = stmt.span;
+        }
+        let mut debugger = self.debugger.take().expect("debugger");
+        let resume = debugger.statement(&*self, stmt.span);
+        self.debugger = Some(debugger);
+        if resume == Resume::Stop {
+            return Err(RuntimeError::exit(0).into());
+        }
+        let result = self.exec_stmt(stmt);
+        if let Err(Flow::Error(err)) = &result {
+            let address = &**err as *const RuntimeError as usize;
+            if address != self.reported_error && err.exit.is_none() {
+                self.reported_error = address;
+                let mut debugger = self.debugger.take().expect("debugger");
+                let resume = debugger.error(&*self, stmt.span, err);
+                self.debugger = Some(debugger);
+                if resume == Resume::Stop {
+                    return Err(RuntimeError::exit(0).into());
+                }
+            }
+        }
+        result
+    }
+
+    fn exec_stmt(&mut self, stmt: &'p Stmt) -> Exec<()> {
         match &stmt.kind {
             StmtKind::Let { name, value, .. } => {
                 let v = self.eval(value)?;
@@ -1009,11 +1075,20 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     .zip(args)
                     .collect();
                 self.frames.push(vec![captured.clone(), params]);
+                if self.debugger.is_some() {
+                    self.calls.push(StackFrame {
+                        name: "<closure>".into(),
+                        span,
+                    });
+                }
                 let result = match &**body {
                     ArmBody::Expr(e) => self.eval(e),
                     ArmBody::Block(b) => self.exec_block(b).map(|()| Value::Unit),
                 };
                 self.frames.pop();
+                if self.debugger.is_some() {
+                    self.calls.pop();
+                }
                 match result {
                     Ok(v) | Err(Flow::Return(v)) => Ok(v),
                     Err(Flow::Error(mut err)) => {
@@ -1627,8 +1702,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             .zip(args)
             .collect();
         self.frames.push(vec![params]);
+        if self.debugger.is_some() {
+            self.calls.push(StackFrame {
+                name: f.name.name.clone(),
+                span: call_span,
+            });
+        }
         let result = self.exec_block(&f.body);
         self.frames.pop();
+        if self.debugger.is_some() {
+            self.calls.pop();
+        }
         match result {
             Ok(()) => Ok(Value::Unit),
             Err(Flow::Return(v)) => Ok(v),
@@ -1760,3 +1844,41 @@ fn match_pattern(p: &Pattern, v: &Value, bindings: &mut Vec<(String, Value)>) ->
 
 #[cfg(test)]
 mod tests;
+
+impl Inspect for Interpreter<'_, '_> {
+    fn depth(&self) -> usize {
+        self.calls.len()
+    }
+
+    fn stack(&self) -> Vec<StackFrame> {
+        self.calls.iter().rev().cloned().collect()
+    }
+
+    fn locals(&self, frame: usize) -> Vec<(String, Value)> {
+        let Some(index) = self.calls.len().checked_sub(frame + 1) else {
+            return Vec::new();
+        };
+        let Some(scopes) = self.frames.get(index + 1) else {
+            return Vec::new();
+        };
+        // Inner scopes and later definitions shadow earlier ones.
+        let mut out: Vec<(String, Value)> = Vec::new();
+        for (name, value) in scopes.iter().flatten() {
+            match out.iter_mut().find(|(n, _)| n == name) {
+                Some(slot) => slot.1 = value.clone(),
+                None => out.push((name.clone(), value.clone())),
+            }
+        }
+        out
+    }
+
+    fn globals(&self) -> Vec<(String, Value)> {
+        let mut out: Vec<(String, Value)> = self
+            .globals
+            .iter()
+            .map(|(n, v)| (n.clone(), v.clone()))
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    }
+}

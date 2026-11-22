@@ -82,6 +82,9 @@ enum Command {
     Repl,
     /// Run the language server (LSP) on standard input/output, for editors
     Lsp,
+    /// Run the debugger (Debug Adapter Protocol) on standard input/output,
+    /// for editors
+    Dap,
     /// Add a dependency to elomar.toml and download it: from the registry
     /// (`strings` or `strings@1.2`), a folder (`--path`) or git (`--git`)
     Add {
@@ -215,6 +218,7 @@ fn main() -> ExitCode {
         Command::New { name } => return scaffold::new_project(name, &reporter),
         Command::Lsp => return lsp::serve(lang),
         Command::Repl => return repl::run(&reporter),
+        Command::Dap => return dap::serve(lang),
         Command::Add {
             name,
             path,
@@ -353,6 +357,7 @@ fn run_file(path: &Path, execute: bool, args: Vec<String>, reporter: &Reporter) 
     }
 }
 
+mod dap;
 mod editor;
 mod fmt;
 mod lsp;

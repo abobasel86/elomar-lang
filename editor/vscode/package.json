@@ -25,7 +25,8 @@
     "عربي",
     "ai",
     "language server",
-    "lsp"
+    "lsp",
+    "debugger"
   ],
   "engines": {
     "vscode": "^1.85.0"
@@ -112,8 +113,21 @@
             "properties": {
               "program": {
                 "type": "string",
-                "description": "The .elo file to run.",
+                "description": "The .elo file to debug.",
                 "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Arguments for the program (`os.args()`).",
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop at the first statement of `main`.",
+                "default": false
               }
             }
           }
@@ -122,18 +136,18 @@
           {
             "type": "elomar",
             "request": "launch",
-            "name": "Run Elomar file",
+            "name": "Debug Elomar file",
             "program": "${file}"
           }
         ],
         "configurationSnippets": [
           {
-            "label": "Elomar-Lang: Run file",
-            "description": "Run an .elo file with F5 (no breakpoints yet)",
+            "label": "Elomar-Lang: Debug file",
+            "description": "Debug an .elo file with breakpoints (F5)",
             "body": {
               "type": "elomar",
               "request": "launch",
-              "name": "Run Elomar file",
+              "name": "Debug Elomar file",
               "program": "^\"\\${file}\""
             }
           }
@@ -190,6 +204,11 @@
           "description": "Check while typing (otherwise only when a file is opened or saved)."
         }
       }
-    }
+    },
+    "breakpoints": [
+      {
+        "language": "elomar"
+      }
+    ]
   }
 }

@@ -108,6 +108,12 @@ extension from the same release page (`elomar-lang-<version>.vsix`, then
 You get colors, errors while you type, hover information, completion and a
 **Run** button.
 
+To find a mistake, click left of a line number to set a breakpoint (a red
+dot) and press **F5**. The program stops there: you see the value of every
+variable, and can go on one line at a time (F10), step into a function
+(F11) or continue (F5). If the program fails, it stops on the failing line
+so you can see why.
+
 ## Commands you will use
 
 | Command | What it does |

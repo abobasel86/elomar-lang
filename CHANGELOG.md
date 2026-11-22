@@ -4,6 +4,17 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Tools
+
+- A debugger: `elomar dap` speaks the Debug Adapter Protocol, and the VS
+  Code extension uses it for **F5**. Breakpoints, step over / into / out,
+  the call stack, variables (lists, records and maps open up), variables
+  and fields in the Debug Console and on hover, and a stop at the statement
+  where a runtime error happens. Output goes to the Debug Console, where
+  `input(...)` also reads. **Ctrl+F5** still runs the file in a terminal.
+
 ## [0.4.0] - 2026-11-22
 
 ### Language
