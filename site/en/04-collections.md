@@ -60,6 +60,26 @@ fn main() {
 }
 ```
 
+Pair two lists with `zip`, look at neighbors with `windows(n)`, and add up
+or pick by a key with `sum_by`, `max_by` and `min_by`:
+
+```elomar
+type Student = { name: String, grade: Int }
+
+fn main() {
+    let names = ["Lina", "Omar"]
+    let grades = [91, 55]
+    for (name, grade) in names.zip(grades) {
+        print("{name}: {grade}")
+    }
+    print([3, 5, 9].windows(2))              // [[3, 5], [5, 9]]
+
+    let class: List<Student> = [{ name: "Lina", grade: 91 }, { name: "Omar", grade: 55 }]
+    print(class.sum_by(|s| s.grade))         // 146
+    print(class.max_by(|s| s.grade).map(|s| s.name))   // Some("Lina")
+}
+```
+
 ## Maps
 
 A map connects keys to values:

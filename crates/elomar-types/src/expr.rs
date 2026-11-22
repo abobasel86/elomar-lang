@@ -777,6 +777,10 @@ impl Checker {
                 {
                     name.name = "sum.float".into();
                 }
+                // The same for `sum_by` whose function returns a `Float`.
+                if method.name == "sum_by" && self.subst.resolve(&ty) == Ty::Float {
+                    name.name = "sum_by.float".into();
+                }
                 ty
             }
             _ => {

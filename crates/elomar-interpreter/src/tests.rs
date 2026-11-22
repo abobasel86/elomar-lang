@@ -825,6 +825,40 @@ fn more_methods() {
 }
 
 #[test]
+fn zip_windows_and_key_methods() {
+    let src = r#"type P = { name: String, age: Int, score: Float }
+fn main() {
+  let names = ["Lina", "Omar", "Sara"]
+  print(names.zip([30, 25]))
+  for (n, a) in names.zip([30, 25]) {
+    print("{n}={a}")
+  }
+  print([1, 2, 3, 4].windows(2), [1, 2].windows(5))
+  let ps: List<P> = [{ name: "Lina", age: 30, score: 9.5 }, { name: "Omar", age: 25, score: 7.0 }, { name: "Sara", age: 30, score: 8.0 }]
+  let none: List<P> = []
+  print(ps.sum_by(|p| p.age), ps.sum_by(|p| p.score))
+  print(none.sum_by(|p| p.score), none.sum_by(|p| p.age))
+  print(ps.max_by(|p| p.age), ps.min_by(|p| p.score).map(|p| p.name))
+  print(none.max_by(|p| p.age), ps.max_by(|p| (p.age, p.score)).map(|p| p.name))
+}"#;
+    assert_eq!(
+        out(src),
+        "[(\"Lina\", 30), (\"Omar\", 25)]\n\
+         Lina=30\nOmar=25\n\
+         [[1, 2], [2, 3], [3, 4]] []\n\
+         85 24.5\n\
+         0.0 0\n\
+         Some({ name: \"Lina\", age: 30, score: 9.5 }) Some(\"Omar\")\n\
+         None Some(\"Lina\")\n"
+    );
+    assert_eq!(err_code("fn main() {\n  print([1].windows(0))\n}"), "R0006");
+    assert_eq!(
+        err_code("fn main() {\n  print([9223372036854775807, 1].sum_by(|x| x))\n}"),
+        "R0002"
+    );
+}
+
+#[test]
 fn math_random_time_os() {
     let src = r#"use std.math
 use std.random
@@ -925,6 +959,9 @@ fn http_client(port: u16, requests: Vec<String>) -> std::thread::JoinHandle<Vec<
                     Err(_) => std::thread::sleep(std::time::Duration::from_millis(20)),
                 }
             };
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(20)))
+                .expect("timeout");
             stream.write_all(req.as_bytes()).expect("send");
             let mut resp = String::new();
             stream.read_to_string(&mut resp).expect("read");
@@ -934,13 +971,22 @@ fn http_client(port: u16, requests: Vec<String>) -> std::thread::JoinHandle<Vec<
     })
 }
 
+/// A free port for the server test. A port from `bind("127.0.0.1:0")` comes
+/// from the system's dynamic range, where other tests get their listeners
+/// too: once released, it could go to one of them before the server binds
+/// it, and the server would then wait forever for requests sent elsewhere.
+/// Ports below that range are not handed out like that.
+fn server_test_port() -> u16 {
+    let start = 20000 + (std::process::id() % 5000) as u16;
+    (start..25000)
+        .chain(20000..start)
+        .find(|p| std::net::TcpListener::bind(("127.0.0.1", *p)).is_ok())
+        .expect("a free port")
+}
+
 #[test]
 fn http_server() {
-    let port = std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
+    let port = server_test_port();
     let src = format!(
         r#"use std.server
 type Item = {{ name: String, qty: Int }}
@@ -987,12 +1033,21 @@ fn main() {{
         listen: vec![format!("127.0.0.1:{port}")],
         ..Default::default()
     };
-    let output = with_large_stack(|| {
-        let mut host = BufferHost::default();
-        let mut ai = AiRuntime::default().with_permissions(permissions);
-        run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(".")).expect("run");
-        host.output
+    // The server runs on its own thread, so a lost request fails the test
+    // instead of hanging it.
+    let (done, finished) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let output = with_large_stack(|| {
+            let mut host = BufferHost::default();
+            let mut ai = AiRuntime::default().with_permissions(permissions);
+            run_with(&program, &mut host, &mut ai, FsPolicy::deny_all(".")).expect("run");
+            host.output
+        });
+        let _ = done.send(output);
     });
+    let output = finished
+        .recv_timeout(std::time::Duration::from_secs(60))
+        .expect("the server did not stop within 60 seconds");
     let responses = client.join().unwrap();
     let body = |r: &str| {
         r.split_once("\r\n\r\n")

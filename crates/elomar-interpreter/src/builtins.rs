@@ -571,6 +571,34 @@ fn list_method(items: &Rc<Vec<Value>>, method: &str, args: &[Value], span: Span)
                     .collect(),
             )
         }
+        "windows" => {
+            let n = arg_int(&args[0]);
+            if n <= 0 {
+                return Err(invalid_arg(
+                    span,
+                    format!("`windows` needs a size of 1 or more, got {n}"),
+                    format!("`windows` تحتاج حجمًا 1 أو أكبر، والموجود {n}"),
+                ));
+            }
+            Value::list(
+                items
+                    .windows(n as usize)
+                    .map(|w| Value::list(w.to_vec()))
+                    .collect(),
+            )
+        }
+        "zip" => {
+            let Value::List(other) = &args[0] else {
+                unreachable!("checked list argument");
+            };
+            Value::list(
+                items
+                    .iter()
+                    .zip(other.iter())
+                    .map(|(a, b)| Value::Tuple(Rc::new(vec![a.clone(), b.clone()])))
+                    .collect(),
+            )
+        }
         "join" => Value::str(
             items
                 .iter()

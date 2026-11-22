@@ -59,6 +59,26 @@ fn main() {
 }
 ```
 
+واجمع قائمتين بـ `zip`، وانظر إلى العناصر المتجاورة بـ `windows(n)`، واجمع أو اختر حسب
+مفتاح بـ `sum_by` و`max_by` و`min_by`:
+
+```elomar
+type Student = { name: String, grade: Int }
+
+fn main() {
+    let الأسماء = ["لينا", "عمر"]
+    let الدرجات = [91, 55]
+    for (الاسم, الدرجة) in الأسماء.zip(الدرجات) {
+        print("{الاسم}: {الدرجة}")
+    }
+    print([3, 5, 9].windows(2))              // [[3, 5], [5, 9]]
+
+    let الصف: List<Student> = [{ name: "لينا", grade: 91 }, { name: "عمر", grade: 55 }]
+    print(الصف.sum_by(|s| s.grade))          // 146
+    print(الصف.max_by(|s| s.grade).map(|s| s.name))   // Some("لينا")
+}
+```
+
 ## القواميس (Map)
 
 القاموس يربط مفاتيح بقيم:

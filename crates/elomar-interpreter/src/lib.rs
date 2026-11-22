@@ -1204,6 +1204,42 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                         .collect(),
                 ))
             }
+            "sum_by" => {
+                let mut total: i64 = 0;
+                for x in items.iter() {
+                    let Value::Int(n) = self.call_value(&f, vec![x.clone()], span)? else {
+                        unreachable!("checked Int function");
+                    };
+                    total = total
+                        .checked_add(n)
+                        .ok_or_else(|| builtins::overflow(span))?;
+                }
+                Value::Int(total)
+            }
+            "sum_by.float" => {
+                let mut total = 0.0;
+                for x in items.iter() {
+                    let v = self.call_value(&f, vec![x.clone()], span)?;
+                    total += v.as_f64().expect("checked Float function");
+                }
+                Value::Float(total)
+            }
+            "min_by" | "max_by" => {
+                let mut best: Option<(Value, Value)> = None;
+                for x in items.iter() {
+                    let key = self.call_value(&f, vec![x.clone()], span)?;
+                    let better = match &best {
+                        None => true,
+                        // The first of equal keys wins.
+                        Some((k, _)) if method == "min_by" => key.compare(k).is_lt(),
+                        Some((k, _)) => key.compare(k).is_gt(),
+                    };
+                    if better {
+                        best = Some((key, x.clone()));
+                    }
+                }
+                best.map_or(Value::none(), |(_, x)| Value::some(x))
+            }
             "sort_by" => {
                 let mut keyed = Vec::with_capacity(items.len());
                 for x in items.iter() {
@@ -1609,7 +1645,20 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 
 /// List methods that take a function argument.
 const HIGHER_ORDER: &[&str] = &[
-    "map", "filter", "any", "all", "find", "count", "fold", "sort_by", "flat_map", "group_by",
+    "map",
+    "filter",
+    "any",
+    "all",
+    "find",
+    "count",
+    "fold",
+    "sort_by",
+    "flat_map",
+    "group_by",
+    "sum_by",
+    "sum_by.float",
+    "min_by",
+    "max_by",
 ];
 
 /// The future for `ai.infer<T>(model, instructions, input[, timeout])`;

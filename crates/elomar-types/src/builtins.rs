@@ -91,6 +91,11 @@ const LIST_METHODS: &[&str] = &[
     "chunks",
     "flat_map",
     "group_by",
+    "zip",
+    "windows",
+    "sum_by",
+    "min_by",
+    "max_by",
     "to_string",
 ];
 const STR_METHODS: &[&str] = &[
@@ -690,9 +695,51 @@ impl Checker {
                 self.arity(m, args, 0, 0, span);
                 list
             }
-            "chunks" => {
+            "chunks" | "windows" => {
                 self.typed_args(m, args, &[Ty::Int], span);
                 Ty::list(list)
+            }
+            "zip" => {
+                let other = self.subst.fresh();
+                self.typed_args(m, args, &[Ty::list(other.clone())], span);
+                Ty::list(Ty::Tuple(vec![elem, other]))
+            }
+            "sum_by" => {
+                let out = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(out.clone()));
+                self.typed_args(m, args, &[f], span);
+                let n = self.subst.shallow(&out);
+                if !matches!(n, Ty::Int | Ty::Float | Ty::Error) {
+                    let shown = self.subst.show(&n);
+                    self.error(
+                        "E2005",
+                        span,
+                        Text::new(
+                            format!("`sum_by` needs a function that returns `Int` or `Float`, not `{shown}`"),
+                            format!("`sum_by` تحتاج دالة تعيد `Int` أو `Float`، لا `{shown}`"),
+                        ),
+                    );
+                    return Some(Ty::Error);
+                }
+                out
+            }
+            "min_by" | "max_by" => {
+                let key = self.subst.fresh();
+                let f = Ty::Fn(vec![elem.clone()], Box::new(key.clone()));
+                self.typed_args(m, args, &[f], span);
+                let k = self.subst.shallow(&key);
+                if !self.sortable(&k) {
+                    let shown = self.subst.show(&k);
+                    self.error(
+                        "E2005",
+                        span,
+                        Text::new(
+                            format!("`{m}` needs a key of type `Int`, `Float`, `String` or a tuple of these, not `{shown}`"),
+                            format!("`{m}` تحتاج مفتاحًا من النوع `Int` أو `Float` أو `String` أو صفًّا منها، لا `{shown}`"),
+                        ),
+                    );
+                }
+                Ty::option(elem)
             }
             "enumerate" => {
                 self.arity(m, args, 0, 0, span);
