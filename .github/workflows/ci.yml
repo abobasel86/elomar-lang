@@ -69,3 +69,22 @@ jobs:
         run: cargo clippy --locked -p elomar-playground --target wasm32-unknown-unknown -- -D warnings
       - name: Tests (native, same code paths)
         run: cargo test --locked -p elomar-playground
+
+  fuzz:
+    name: Fuzz testing (1 minute)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Mutated programs through the parser, checker, formatter and
+      # interpreter. A different seed each run widens what is tried; a
+      # crash is saved, with its seed, as an artifact to reproduce.
+      - name: Fuzz
+        run: cargo run --locked --profile fuzzing -p elomar-fuzz -- --seconds 60 --seed ${{ github.run_id }}
+      - name: Keep the programs that crashed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: target/fuzz-results/

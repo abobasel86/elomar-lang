@@ -667,6 +667,14 @@ fn str_method(s: &str, method: &str, args: &[Value], span: Span) -> R<Value> {
                 ));
             }
             let have = graphemes(s).count();
+            // The same limit as `repeat`: a mistake, not a huge string.
+            if width > 100_000_000 {
+                return Err(invalid_arg(
+                    span,
+                    format!("cannot pad a string to {width} letters"),
+                    format!("لا يمكن إكمال نص إلى {width} حرفًا"),
+                ));
+            }
             let mut pad = String::new();
             let fill_parts: Vec<&str> = graphemes(fill).collect();
             for i in 0..width.saturating_sub(have) {

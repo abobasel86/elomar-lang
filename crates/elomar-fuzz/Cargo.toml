@@ -1,0 +1,18 @@
+[package]
+name = "elomar-fuzz"
+description = "Feeds mutated programs to the parser, checker, formatter and interpreter to find crashes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+elomar-diagnostics.workspace = true
+elomar-parser.workspace = true
+elomar-types.workspace = true
+elomar-fmt.workspace = true
+elomar-interpreter.workspace = true
+elomar-ai-core.workspace = true
+elomar-ai-provider-mock.workspace = true

@@ -11,6 +11,11 @@ programming language with AI built in, in Arabic and English.
   signature of functions and methods (with their effects).
 - **Go to Definition** (F12) for variables, functions, methods, types,
   enums and traits, also into imported modules.
+- **Find All References** (Shift+F12) and **Rename** (F2) of variables,
+  functions, methods, types and enum variants, across the files of the
+  project. A name that is not valid, such as a keyword, is refused.
+- **Parameter hints** while you type a call: `twice(` shows
+  `fn twice(n: Int) -> Int`.
 - **Outline** of functions, types, enums, traits and `impl` blocks.
 - **Completion**: keywords, built-ins, your functions and variables, and
   fields and methods after `.` (also `fs.`, `json.`, `db.`, ...).

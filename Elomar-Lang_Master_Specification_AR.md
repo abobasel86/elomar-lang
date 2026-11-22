@@ -4,10 +4,10 @@ project: Elomar-Lang
 language_id: elomar
 file_extension: .elo
 cli_name: elomar
-specification_version: "0.1.0-draft.2"
+specification_version: "1.0.0-rc.1"
 document_version: "1.1"
 date: "2026-10-27"
-status: "Phase 2 — Typed AI (mock + OpenAI) implemented; Preview hardening pending"
+status: "Historical vision document; the binding specification is docs/grammar.md (frozen at 1.0.0-rc.1)"
 document_language: "ar"
 ---
 
@@ -1845,4 +1845,4 @@ Apache-2.0, subject to ownership and licensing review.
 
 ينبغي أن تُراجع هذه الوثيقة وتُجزّأ إلى RFCs وقصص مستخدم واختبارات قبل تنفيذها. وبعد نجاح أول برنامج حقيقي ومستودع مُختبَر، يمكن عرض المشروع بصورة صادقة على GitHub وإتاحة المساهمات وفق حقوق وترخيص موثقين.
 
-**الحالة المعتمدة لهذه النسخة: `Elomar-Lang Specification 0.1.0-draft.2` — تاريخ 2026-10-27 — المرحلتان 1 و2 منفذتان (`async`/`await` و`ai.infer<T>` مع Mock وOpenAI، وصلاحيات الشبكة، وتأثير `net`)؛ صلاحيات الملفات والعمليات الفرعية لم تُطبق بعد. المرجع الملزم للمنفذ: `docs/grammar.md`.**
+**هذه الوثيقة رؤية المشروع الأولى، وتُحفظ للتاريخ. المرجع الملزم للغة هو `docs/grammar.md`، المجمّد عند `1.0.0-rc.1`، ووعد التوافق في `docs/stability.md`.**

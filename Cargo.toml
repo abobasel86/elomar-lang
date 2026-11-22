@@ -18,6 +18,7 @@ members = [
     "crates/elomar-interpreter",
     "crates/elomar-cli",
     "crates/elomar-playground",
+    "crates/elomar-fuzz",
 ]
 
 [workspace.package]
@@ -72,3 +73,11 @@ percent-encoding = "2"
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+# Fuzz testing: optimized, without the slow cross-crate optimization.
+[profile.fuzzing]
+inherits = "release"
+lto = false
+codegen-units = 16
+debug-assertions = true
+overflow-checks = true

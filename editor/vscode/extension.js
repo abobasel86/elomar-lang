@@ -115,13 +115,13 @@ class Server {
     this.child.stdin.write(body);
   }
 
-  request(method, params) {
+  request(method, params, wantError = false) {
     if (this.failed) {
       return Promise.resolve(null);
     }
     const id = ++this.nextId;
     return new Promise((resolve) => {
-      this.pending.set(id, { resolve });
+      this.pending.set(id, { resolve, wantError });
       this.send({ jsonrpc: '2.0', id, method, params });
     });
   }
@@ -153,7 +153,12 @@ class Server {
         continue;
       }
       if (message.id !== undefined && this.pending.has(message.id)) {
-        this.pending.get(message.id).resolve(message.result === undefined ? null : message.result);
+        const { resolve, wantError } = this.pending.get(message.id);
+        if (message.error && wantError) {
+          resolve({ error: message.error });
+        } else {
+          resolve(message.result === undefined ? null : message.result);
+        }
         this.pending.delete(message.id);
       } else if (message.method === 'textDocument/publishDiagnostics') {
         publish(message.params);
@@ -336,6 +341,72 @@ const completionProvider = {
   },
 };
 
+const referenceProvider = {
+  async provideReferences(doc, position) {
+    const s = await current(doc);
+    const r = await s.request('textDocument/references', {
+      textDocument: { uri: doc.uri.toString() },
+      position: toPosition(position),
+      context: { includeDeclaration: true },
+    });
+    return (r || []).map((l) => new vscode.Location(vscode.Uri.parse(l.uri), toRange(l.range)));
+  },
+};
+
+const renameProvider = {
+  async prepareRename(doc, position) {
+    const s = await current(doc);
+    const r = await s.request('textDocument/prepareRename', {
+      textDocument: { uri: doc.uri.toString() },
+      position: toPosition(position),
+    });
+    if (!r || !r.range) {
+      throw new Error('Elomar: there is no name here to rename.');
+    }
+    return { range: toRange(r.range), placeholder: r.placeholder };
+  },
+  async provideRenameEdits(doc, position, newName) {
+    const s = await current(doc);
+    const r = await s.request(
+      'textDocument/rename',
+      { textDocument: { uri: doc.uri.toString() }, position: toPosition(position), newName },
+      true,
+    );
+    if (r && r.error) {
+      throw new Error(`Elomar: ${r.error.message}`);
+    }
+    const edit = new vscode.WorkspaceEdit();
+    for (const [uri, edits] of Object.entries((r && r.changes) || {})) {
+      for (const e of edits) {
+        edit.replace(vscode.Uri.parse(uri), toRange(e.range), e.newText);
+      }
+    }
+    return edit;
+  },
+};
+
+const signatureProvider = {
+  async provideSignatureHelp(doc, position) {
+    const s = await current(doc);
+    const r = await s.request('textDocument/signatureHelp', {
+      textDocument: { uri: doc.uri.toString() },
+      position: toPosition(position),
+    });
+    if (!r || !r.signatures || !r.signatures.length) {
+      return undefined;
+    }
+    const help = new vscode.SignatureHelp();
+    help.signatures = r.signatures.map((sig) => {
+      const info = new vscode.SignatureInformation(sig.label);
+      info.parameters = (sig.parameters || []).map((p) => new vscode.ParameterInformation(p.label));
+      return info;
+    });
+    help.activeSignature = r.activeSignature || 0;
+    help.activeParameter = r.activeParameter || 0;
+    return help;
+  },
+};
+
 // ----- run and format ----------------------------------------------------------------
 
 async function runCurrentFile() {
@@ -483,6 +554,9 @@ function activate(context) {
     vscode.languages.registerDefinitionProvider(selector, definitionProvider),
     vscode.languages.registerDocumentSymbolProvider(selector, symbolProvider),
     vscode.languages.registerCompletionItemProvider(selector, completionProvider, '.'),
+    vscode.languages.registerReferenceProvider(selector, referenceProvider),
+    vscode.languages.registerRenameProvider(selector, renameProvider),
+    vscode.languages.registerSignatureHelpProvider(selector, signatureProvider, '(', ','),
     vscode.debug.registerDebugConfigurationProvider('elomar', launchProvider),
     vscode.debug.registerDebugAdapterDescriptorFactory('elomar', adapterFactory),
   );

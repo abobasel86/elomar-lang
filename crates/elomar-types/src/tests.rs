@@ -1202,3 +1202,12 @@ fn generic_impl_types_flow() {
     let src = "type Stack<T> = { items: List<T> }\nimpl<T> Stack<T> {\n  fn push(self, x: T) -> Stack<T> {\n    return { items: self.items + [x] }\n  }\n}\nfn main() {\n  let s: Stack<Int> = { items: [] }\n  print(s.push(\"no\"))\n}";
     assert_eq!(codes(src), vec!["E2001"]);
 }
+
+#[test]
+fn unknown_type_in_ai_infer_is_an_error_not_a_crash() {
+    // Found by fuzz testing.
+    let codes = codes(
+        "use std.ai\nasync fn main() {\n    let r = await ai.infer<selfResult<Int, String>>(\"mock\", \"Count\", \"x\")\n}",
+    );
+    assert!(!codes.is_empty(), "{codes:?}");
+}

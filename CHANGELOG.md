@@ -6,6 +6,29 @@ change the language.
 
 ## [Unreleased]
 
+### Editors
+
+- Find all references (Shift+F12), rename (F2) and parameter hints while
+  typing a call, in `elomar lsp` and the VS Code extension. Rename changes
+  every file of the project and refuses names that are not valid.
+
+### Reliability
+
+- `elomar-fuzz` feeds the parser, checker, formatter and interpreter
+  mutated programs and reports any crash; CI runs it for a minute on every
+  change. About a million programs ran without a crash after these fixes:
+  - an unknown type in `ai.infer<...>` crashed the checker; it is an error;
+  - `pad_start` / `pad_end` to billions of letters ran out of memory; like
+    `repeat`, more than 100 million letters is error `R0006`.
+- The browser playground stops a program after 8 seconds with error
+  `R0013`, keeping what it printed, instead of losing the output.
+
+### Specification
+
+- The specification is frozen at `1.0.0-rc.1` (`elomar --version`), and
+  [`docs/stability.md`](docs/stability.md) states what 1.0 promises:
+  programs written for 1.0 keep working in every 1.x.
+
 ### Performance
 
 - Programs run about 1.25 times faster than 0.7.0 (`python bench/run.py`:

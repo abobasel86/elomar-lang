@@ -148,6 +148,61 @@ fn language_server_session() {
     );
     assert_eq!(def["range"]["start"], json!({ "line": 2, "character": 3 }));
 
+    // References: the definition and every use.
+    let refs = s.request(
+        "textDocument/references",
+        json!({ "textDocument": doc, "position": pos("average(", 1, 2), "context": { "includeDeclaration": true } }),
+    );
+    let lines: Vec<u64> = refs
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["range"]["start"]["line"].as_u64().unwrap())
+        .collect();
+    assert_eq!(lines, [2, 10], "{refs}");
+
+    // Rename a parameter: its definition and both uses.
+    let prepared = s.request(
+        "textDocument/prepareRename",
+        json!({ "textDocument": doc, "position": pos("xs.sum", 0, 1) }),
+    );
+    assert_eq!(prepared["placeholder"], "xs");
+    let edit = s.request(
+        "textDocument/rename",
+        json!({ "textDocument": doc, "position": pos("xs.sum", 0, 1), "newName": "values" }),
+    );
+    let edits = edit["changes"][uri.as_str()]
+        .as_array()
+        .expect("edits")
+        .clone();
+    assert_eq!(edits.len(), 3, "{edit}");
+    assert!(edits.iter().all(|e| e["newText"] == "values"));
+    assert_eq!(
+        edits[0]["range"],
+        json!({ "start": { "line": 2, "character": 11 }, "end": { "line": 2, "character": 13 } })
+    );
+    // A keyword is not a name.
+    let refused = s.request(
+        "textDocument/rename",
+        json!({ "textDocument": doc, "position": pos("xs.sum", 0, 1), "newName": "while" }),
+    );
+    assert!(refused.is_null());
+
+    // Parameter hints while typing a call.
+    let help = s.request(
+        "textDocument/signatureHelp",
+        json!({ "textDocument": doc, "position": pos("average(s.grades", 0, 8) }),
+    );
+    assert_eq!(
+        help["signatures"][0]["label"],
+        "fn average(xs: List<Int>) -> Float"
+    );
+    assert_eq!(
+        help["signatures"][0]["parameters"][0]["label"],
+        "xs: List<Int>"
+    );
+    assert_eq!(help["activeParameter"], 0);
+
     let completion = s.request(
         "textDocument/completion",
         json!({ "textDocument": doc, "position": pos("s.name", 0, 2) }),

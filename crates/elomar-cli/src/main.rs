@@ -15,7 +15,7 @@ use elomar_interpreter::{FsPolicy, Host};
 #[derive(Parser)]
 #[command(
     name = "elomar",
-    version = concat!(env!("CARGO_PKG_VERSION"), " (Elomar-Lang spec 0.1.0-draft.2)"),
+    version = concat!(env!("CARGO_PKG_VERSION"), " (Elomar-Lang spec 1.0.0-rc.1)"),
     about = "Elomar-Lang — a general-purpose, AI-native programming language\nلغة Elomar-Lang — لغة برمجة عامة الأغراض، أصلية التكامل مع الذكاء الاصطناعي"
 )]
 struct Cli {

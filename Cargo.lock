@@ -306,6 +306,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "elomar-fuzz"
+version = "0.7.0"
+dependencies = [
+ "elomar-ai-core",
+ "elomar-ai-provider-mock",
+ "elomar-diagnostics",
+ "elomar-fmt",
+ "elomar-interpreter",
+ "elomar-parser",
+ "elomar-types",
+]
+
+[[package]]
 name = "elomar-interpreter"
 version = "0.7.0"
 dependencies = [

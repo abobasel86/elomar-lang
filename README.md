@@ -283,6 +283,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-loader` | Loads the main file and the modules and packages it imports |
 | `crates/elomar-pkg` | Dependencies: path and git packages, cache, `elomar.lock` |
 | `crates/elomar-fmt` | The formatter behind `elomar fmt` |
+| `crates/elomar-fuzz` | Fuzz testing: mutated programs through every stage, to find crashes |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
 | `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
 | `crates/elomar-ai-core` | Schemas (shared with `std.json`), AI errors, `elomar.toml`, answer validation |
@@ -294,7 +295,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
 | `tests/fail/` | Programs that must fail with specific error codes |
-| `docs/grammar.md` | Authoritative grammar, semantics and error codes |
+| `docs/grammar.md` | Authoritative grammar, semantics and error codes (frozen at 1.0.0-rc.1) |
+| `docs/stability.md` | What 1.0 promises: programs written for 1.0 keep working in every 1.x |
 | `Elomar-Lang_Master_Specification_AR.md` | Vision, architecture and roadmap (Arabic) |
 
 ## Testing
@@ -311,6 +313,13 @@ To time the interpreter, build it in release mode and run the programs in
 
 ```bash
 cargo build --release -p elomar-cli && python bench/run.py
+```
+
+To look for crashes, feed the parser, checker, formatter and interpreter
+mutated programs for a minute (CI does this on every change):
+
+```bash
+cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 ```
 
 ## Roadmap
@@ -330,7 +339,8 @@ cargo build --release -p elomar-cli && python bench/run.py
 
 `elomar lsp` speaks the Language Server Protocol on standard input/output:
 diagnostics (English or Arabic with `--lang ar`), hover, go to definition,
-document symbols, completion and formatting.
+find references, rename, parameter hints, document symbols, completion and
+formatting.
 
 - **VS Code:** the extension in [`editor/vscode`](editor/vscode) starts it.
 - **Neovim** (0.11+):

@@ -145,6 +145,15 @@ fn constants() {
 
 #[test]
 fn runtime_errors() {
+    // A huge string is a mistake, not a crash from running out of memory.
+    assert_eq!(
+        err_code(
+            "fn main() {
+  print(\"x\".pad_start(10000000000))
+}"
+        ),
+        "R0006"
+    );
     assert_eq!(
         err_code("fn main() {\n  let z = 0\n  print(1 / z)\n}"),
         "R0001"

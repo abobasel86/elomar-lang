@@ -197,7 +197,20 @@ pub fn run_function(
     ai: &mut AiRuntime,
     fs: FsPolicy,
 ) -> Result<Value, RuntimeError> {
-    run_function_with(program, name, host, ai, fs, None)
+    run_function_with(program, name, host, ai, fs, None, None)
+}
+
+/// Like [`run_with`], stopping the program with error `R0013` once it has
+/// run for `limit_ms` milliseconds (checked at every statement and loop
+/// step, like `timeout`).
+pub fn run_limited(
+    program: &Program,
+    host: &mut dyn Host,
+    ai: &mut AiRuntime,
+    fs: FsPolicy,
+    limit_ms: i64,
+) -> Result<(), RuntimeError> {
+    run_function_with(program, "main", host, ai, fs, None, Some(limit_ms)).map(|_| ())
 }
 
 /// Like [`run_with`], reporting each statement and runtime error to
@@ -209,7 +222,7 @@ pub fn run_debug(
     fs: FsPolicy,
     debugger: Box<dyn Debugger>,
 ) -> Result<(), RuntimeError> {
-    run_function_with(program, "main", host, ai, fs, Some(debugger)).map(|_| ())
+    run_function_with(program, "main", host, ai, fs, Some(debugger), None).map(|_| ())
 }
 
 fn run_function_with(
@@ -219,9 +232,15 @@ fn run_function_with(
     ai: &mut AiRuntime,
     fs: FsPolicy,
     debugger: Option<Box<dyn Debugger>>,
+    limit_ms: Option<i64>,
 ) -> Result<Value, RuntimeError> {
     let mut interp = Interpreter::new(program, host, ai, fs);
     interp.debugger = debugger;
+    if let Some(ms) = limit_ms {
+        interp
+            .deadlines
+            .push(stdextra::now_ms().saturating_add(ms.max(0)));
+    }
     for item in &program.items {
         if let Item::Const(c) = item {
             let v = interp.eval(&c.value).map_err(Flow::into_error)?;
@@ -347,6 +366,15 @@ impl Flow {
     fn into_error(self) -> RuntimeError {
         match self {
             Flow::Error(e) => *e,
+            // Only the whole program's time limit reaches the top.
+            Flow::Timeout(_) => RuntimeError::new(
+                "R0013",
+                Span::default(),
+                Text::new(
+                    "the program ran longer than its time limit and was stopped",
+                    "استغرق البرنامج أكثر من الوقت المسموح له فأُوقف",
+                ),
+            ),
             // The checker rejects break/continue outside loops, and `main`
             // and constants absorb returns.
             _ => RuntimeError::new(

@@ -96,6 +96,20 @@ pub(crate) fn serve(lang: Lang) -> ExitCode {
             "textDocument/documentSymbol" => Some(server.symbols(params)),
             "textDocument/completion" => Some(server.completion(params)),
             "textDocument/formatting" => Some(server.formatting(params)),
+            "textDocument/references" => Some(server.references(params)),
+            "textDocument/prepareRename" => Some(server.prepare_rename(params)),
+            "textDocument/rename" => match server.rename(params) {
+                Ok(edit) => Some(edit),
+                Err(message) => {
+                    server.send(&json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32803, "message": message },
+                    }));
+                    None
+                }
+            },
+            "textDocument/signatureHelp" => Some(server.signature_help(params)),
             _ => {
                 if id.is_some() && !method.is_empty() {
                     // Unknown request: "method not found".
@@ -123,6 +137,9 @@ fn capabilities() -> Value {
             "documentSymbolProvider": true,
             "documentFormattingProvider": true,
             "completionProvider": { "triggerCharacters": ["."] },
+            "referencesProvider": true,
+            "renameProvider": { "prepareProvider": true },
+            "signatureHelpProvider": { "triggerCharacters": ["(", ","] },
         },
         "serverInfo": { "name": "elomar", "version": env!("CARGO_PKG_VERSION") },
     })
@@ -426,6 +443,173 @@ impl Server {
         }
     }
 
+    /// The name under the cursor: its definition and every use of it, in
+    /// every file of the program, each narrowed to just the name.
+    fn occurrences(&self, params: &Value) -> Option<(String, Vec<Place>, &Doc)> {
+        let (doc, offset) = self.doc_at(params)?;
+        let a = doc.analysis.as_ref().filter(|a| a.text == doc.text)?;
+        let defs = &a.info.definitions;
+        // A use of the name, or the definition itself.
+        let def = match innermost(defs.iter().copied(), offset, a.text.len()) {
+            Some((_, def)) => def,
+            None => {
+                let mut own: Vec<(Span, ())> = defs.iter().map(|(_, d)| (*d, ())).collect();
+                own.extend(a.info.hovers.iter().map(|h| (h.span, ())));
+                innermost(own.into_iter(), offset, a.text.len())?.0
+            }
+        };
+        let name = name_in(&a.sources, def)?;
+        let mut spans = vec![def];
+        spans.extend(defs.iter().filter(|(_, d)| *d == def).map(|(u, _)| *u));
+        spans.sort_by_key(|s| s.start);
+        spans.dedup();
+        let mut out = Vec::new();
+        for span in spans {
+            // `lib.shout`: only `shout` is the name.
+            let (file, base) = a.sources.file_at(span.start as usize);
+            let text = file
+                .text
+                .get(span.start as usize - base..span.end as usize - base)?;
+            let start = if text == name {
+                span.start
+            } else if text.ends_with(&format!(".{name}")) {
+                span.end - name.len() as u32
+            } else {
+                continue;
+            };
+            let narrowed = Span {
+                start,
+                end: start + name.len() as u32,
+            };
+            out.push(locate(narrowed, &a.sources, &a.paths));
+        }
+        Some((name, out, doc))
+    }
+
+    fn references(&self, params: &Value) -> Value {
+        let Some((_, found, doc)) = self.occurrences(params) else {
+            return Value::Null;
+        };
+        let uri = str_of(&params["textDocument"]["uri"]).to_string();
+        Value::Array(
+            found
+                .into_iter()
+                .map(|(path, range)| {
+                    let file = if same_path(&path, &doc.path) {
+                        uri.clone()
+                    } else {
+                        path_to_uri(&path)
+                    };
+                    json!({ "uri": file, "range": range })
+                })
+                .collect(),
+        )
+    }
+
+    fn prepare_rename(&self, params: &Value) -> Value {
+        let Some((doc, offset)) = self.doc_at(params) else {
+            return Value::Null;
+        };
+        let Some((name, found, _)) = self.occurrences(params) else {
+            return Value::Null;
+        };
+        // The occurrence under the cursor.
+        let file = SourceFile::new("", doc.text.clone());
+        let cursor = file.position_utf16(offset);
+        for (path, range) in found {
+            if !same_path(&path, &doc.path) {
+                continue;
+            }
+            let at = |k: &str| {
+                (
+                    range[k]["line"].as_u64().unwrap_or(0) as usize,
+                    range[k]["character"].as_u64().unwrap_or(0) as usize,
+                )
+            };
+            if at("start") <= cursor && cursor <= at("end") {
+                return json!({ "range": range, "placeholder": name });
+            }
+        }
+        Value::Null
+    }
+
+    fn rename(&self, params: &Value) -> Result<Value, String> {
+        let new_name = str_of(&params["newName"]).to_string();
+        if !is_identifier(&new_name) {
+            return Err(format!(
+                "`{new_name}` is not a valid name (letters, digits and _, not starting with a digit, and not a keyword)"
+            ));
+        }
+        let Some((_, found, doc)) = self.occurrences(params) else {
+            return Err("there is no name to rename here".into());
+        };
+        let root = crate::project_root(&doc.path);
+        let uri = str_of(&params["textDocument"]["uri"]).to_string();
+        let mut changes = serde_json::Map::new();
+        for (path, range) in found {
+            if !same_path(&path, &doc.path) && !path.starts_with(&root) {
+                return Err(format!(
+                    "this name is defined in a package (`{}`), which cannot be changed from here",
+                    path.display()
+                ));
+            }
+            let file = if same_path(&path, &doc.path) {
+                uri.clone()
+            } else {
+                path_to_uri(&path)
+            };
+            let edits = changes
+                .entry(file)
+                .or_insert_with(|| Value::Array(Vec::new()));
+            if let Value::Array(list) = edits {
+                list.push(json!({ "range": range, "newText": new_name }));
+            }
+        }
+        Ok(json!({ "changes": changes }))
+    }
+
+    /// The parameters of the function being called at the cursor, from the
+    /// last successful analysis (the call being typed rarely parses).
+    fn signature_help(&self, params: &Value) -> Value {
+        let Some((doc, offset)) = self.doc_at(params) else {
+            return Value::Null;
+        };
+        let Some(a) = doc.analysis.as_ref() else {
+            return Value::Null;
+        };
+        let Some((callee, active)) = call_at(&doc.text, offset) else {
+            return Value::Null;
+        };
+        // Any hover showing this function's signature.
+        let signature = a.info.hovers.iter().map(|h| h.text.as_str()).find(|t| {
+            let t = t
+                .trim_start_matches("pub ")
+                .trim_start_matches("async ")
+                .trim_start_matches("fn ");
+            let base = t.split('(').next().unwrap_or("");
+            let base = base.split('<').next().unwrap_or("");
+            base == callee || base.rsplit("::").next() == Some(callee.as_str())
+        });
+        let Some(signature) = signature else {
+            return Value::Null;
+        };
+        let inside = signature
+            .split_once('(')
+            .map(|(_, rest)| rest)
+            .and_then(|rest| rest.rsplit_once(')').map(|(inner, _)| inner))
+            .unwrap_or("");
+        let parameters: Vec<Value> = split_top_level(inside)
+            .into_iter()
+            .filter(|p| !p.is_empty() && *p != "self")
+            .map(|p| json!({ "label": p }))
+            .collect();
+        json!({
+            "signatures": [{ "label": signature, "parameters": parameters }],
+            "activeSignature": 0,
+            "activeParameter": active.min(parameters.len().saturating_sub(1)),
+        })
+    }
+
     fn symbols(&self, params: &Value) -> Value {
         match self.docs.get(str_of(&params["textDocument"]["uri"])) {
             Some(doc) => Value::Array(document_symbols(&doc.text)),
@@ -537,6 +721,82 @@ impl Server {
         }
         Value::Array(items)
     }
+}
+
+/// A file and an LSP range in it.
+type Place = (PathBuf, Value);
+
+/// The text of `span`, if it is a single name.
+fn name_in(sources: &SourceMap, span: Span) -> Option<String> {
+    let (file, base) = sources.file_at(span.start as usize);
+    let text = file
+        .text
+        .get(span.start as usize - base..span.end as usize - base)?;
+    let name = text.rsplit('.').next().unwrap_or(text);
+    is_identifier(name).then(|| name.to_string())
+}
+
+/// A name a program could define: what the lexer reads as one identifier.
+fn is_identifier(name: &str) -> bool {
+    if name.is_empty() || name == "_" {
+        return false;
+    }
+    let (program, diags) = elomar_parser::parse(&format!("fn {name}() {{}}"));
+    diags.is_empty()
+        && matches!(program.items.as_slice(), [elomar_ast::Item::Fn(f)] if f.name.name == name)
+}
+
+/// The function called around `offset` and which argument the cursor is
+/// in: `greet("a", |` gives `("greet", 1)`.
+fn call_at(text: &str, offset: usize) -> Option<(String, usize)> {
+    let before = text.get(..offset.min(text.len()))?;
+    let mut depth = 0usize;
+    let mut commas = 0usize;
+    let mut in_string = false;
+    for (i, c) in before.char_indices().rev() {
+        match c {
+            '"' => in_string = !in_string,
+            _ if in_string => {}
+            ')' | ']' | '}' => depth += 1,
+            '[' | '{' if depth > 0 => depth -= 1,
+            '[' | '{' => return None,
+            '(' if depth > 0 => depth -= 1,
+            '(' => {
+                let name: String = before[..i]
+                    .chars()
+                    .rev()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect();
+                return (!name.is_empty()).then_some((name, commas));
+            }
+            ',' if depth == 0 => commas += 1,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// `a: Int, b: List<Map<String, Int>>` → the two parameters.
+fn split_top_level(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    for (i, c) in s.char_indices() {
+        match c {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => {
+                out.push(s[start..i].trim());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    out.push(s[start..].trim());
+    out
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {

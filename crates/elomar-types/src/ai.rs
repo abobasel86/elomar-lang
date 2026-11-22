@@ -734,6 +734,8 @@ pub(crate) fn type_expr_of(ty: &Ty, span: Span) -> TypeExpr {
             ),
             span,
         },
+        // An unknown type was already reported; the program will not run.
+        Ty::Error => named("Unit", vec![]),
         other => unreachable!("not JSON data: {other:?}"),
     }
 }

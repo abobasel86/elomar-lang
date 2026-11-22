@@ -17,7 +17,7 @@ use elomar_ai_core::AiRuntime;
 use elomar_ai_provider_mock::MockProvider;
 use elomar_ast::{Item, Program};
 use elomar_diagnostics::{Diagnostic, Lang, RenderOptions, SourceFile, render};
-use elomar_interpreter::{BufferHost, run_with};
+use elomar_interpreter::{BufferHost, run_limited};
 use elomar_policy::FsPolicy;
 use serde_json::{Value, json};
 
@@ -46,7 +46,13 @@ struct Ran {
     error: Option<String>,
 }
 
-fn execute(program: &Program, file: &SourceFile, opts: RenderOptions, inputs: Vec<String>) -> Ran {
+fn execute(
+    program: &Program,
+    file: &SourceFile,
+    opts: RenderOptions,
+    inputs: Vec<String>,
+    limit_ms: i64,
+) -> Ran {
     let mut host = BufferHost {
         inputs,
         ..Default::default()
@@ -56,7 +62,15 @@ fn execute(program: &Program, file: &SourceFile, opts: RenderOptions, inputs: Ve
         "mock",
         Box::new(MockProvider::new(Vec::new()).expect("no rules to validate")),
     );
-    let error = match run_with(program, &mut host, &mut ai, FsPolicy::deny_all(".")) {
+    // Stops cleanly, keeping the output so far, before the page's own
+    // 10-second limit has to end the worker.
+    let error = match run_limited(
+        program,
+        &mut host,
+        &mut ai,
+        FsPolicy::deny_all("."),
+        limit_ms,
+    ) {
         Ok(()) => None,
         Err(e) if e.exit == Some(0) => None,
         Err(e) if e.exit.is_some() => Some(String::new()),
@@ -70,6 +84,11 @@ fn execute(program: &Program, file: &SourceFile, opts: RenderOptions, inputs: Ve
 
 /// Checks and runs `source`. `inputs` answer `input()` in order.
 pub fn run_program(source: &str, lang: Lang, inputs: Vec<String>) -> Value {
+    run_program_limited(source, lang, inputs, 8_000)
+}
+
+/// Like [`run_program`], stopping the program after `limit_ms`.
+pub fn run_program_limited(source: &str, lang: Lang, inputs: Vec<String>, limit_ms: i64) -> Value {
     let file = SourceFile::new("main.elo", source);
     let opts = RenderOptions { lang, color: false };
     let (program, diags) = compile(source);
@@ -77,7 +96,7 @@ pub fn run_program(source: &str, lang: Lang, inputs: Vec<String>) -> Value {
     let Some(program) = program else {
         return json!({ "ok": false, "output": "", "errors": rendered });
     };
-    let ran = execute(&program, &file, opts, inputs);
+    let ran = execute(&program, &file, opts, inputs, limit_ms);
     let ok = ran.error.is_none();
     let errors = rendered + &ran.error.unwrap_or_default();
     json!({ "ok": ok, "output": ran.output, "errors": errors })
@@ -165,7 +184,7 @@ pub fn check_exercise(source: &str, lang: Lang, mode: &str, cases: &[Value]) -> 
                     .collect()
             })
             .unwrap_or_default();
-        let ran = execute(&program, &file, opts, inputs);
+        let ran = execute(&program, &file, opts, inputs, 3_000);
         let expect = normalize(case["expect"].as_str().unwrap_or(""));
         let got = normalize(&ran.output);
         let pass = ran.error.is_none() && got == expect;
@@ -196,7 +215,8 @@ pub fn run_json(request: &str) -> String {
         let cases = check["cases"].as_array().cloned().unwrap_or_default();
         return check_exercise(source, lang, mode, &cases).to_string();
     }
-    run_program(source, lang, inputs).to_string()
+    let limit = req["limit_ms"].as_i64().unwrap_or(8_000);
+    run_program_limited(source, lang, inputs, limit).to_string()
 }
 
 thread_local! {
@@ -371,5 +391,22 @@ mod exercise_tests {
             .to_string(),
         );
         assert!(r.contains("\"ok\":true"), "{r}");
+    }
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+
+    #[test]
+    fn endless_programs_stop_and_keep_their_output() {
+        let src = "fn main() {\n    print(\"start\")\n    var i = 0\n    while true {\n        i += 1\n    }\n}";
+        let r: Value = serde_json::from_str(&run_json(
+            &json!({ "source": src, "lang": "en", "inputs": [], "limit_ms": 200 }).to_string(),
+        ))
+        .unwrap();
+        assert_eq!(r["ok"], false);
+        assert_eq!(r["output"], "start\n");
+        assert!(r["errors"].as_str().unwrap().contains("R0013"), "{r}");
     }
 }
