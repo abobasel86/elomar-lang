@@ -188,7 +188,7 @@ pub(crate) fn build(source: &Path, output: Option<&Path>, reporter: &Reporter) -
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "program".into());
     let bundle = json!({
-        "name": format!("{stem}"),
+        "name": &stem,
         "entry": entry.display().to_string(),
         "root": root.display().to_string(),
         "module_dir": elomar_loader::module_dir(&root).display().to_string(),
