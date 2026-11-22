@@ -48,7 +48,7 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v0.7.0, early development. Not production-ready.**
+> **Project status: v0.9.0, release candidate for 1.0. The specification is frozen.**
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
@@ -330,8 +330,8 @@ cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 4. ✅ v0.3: generic functions, types and enums, closures and `map`/`filter`/`fold`, `std.http` client, traits and methods, SQLite (`std.db`), AI tools (`ai.run`), Python bridge (`std.py`), language server (`elomar lsp`), packages (`elomar add`), agents and MCP (`agent.run`, `std.mcp`), a package registry (`elomar publish`, `elomar search`).
 5. ✅ v0.4–v0.5: `elomar repl`, a debugger (`elomar dap`, F5 in VS Code), new list methods, a faster interpreter.
 6. ✅ v0.6–v0.7: `timeout`, folder and file functions, `std.csv`, date arithmetic, `elomar build` (one executable file).
-7. 🟡 v0.8: a faster interpreter (smaller values, cheaper calls, LTO builds).
-8. v0.9: fuzz testing of the parser and interpreter, rename and find references in editors, the specification frozen.
+7. ✅ v0.8: a faster interpreter (smaller values, cheaper calls, LTO builds).
+8. ✅ v0.9: fuzz testing of the parser and interpreter, rename and find references in editors, the specification frozen.
 9. v1.0: a stable release; programs written for 1.0 keep working in every 1.x.
 10. After 1.0: a bytecode engine, and `async` work on several processor cores.
 

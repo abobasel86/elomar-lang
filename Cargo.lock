@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-core"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-anthropic"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ai-core",
  "serde_json",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-mock"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ai-core",
  "serde_json",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-openai"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ai-core",
  "serde_json",
@@ -266,14 +266,14 @@ dependencies = [
 
 [[package]]
 name = "elomar-ast"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-diagnostics",
 ]
 
 [[package]]
 name = "elomar-cli"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "clap",
  "elomar-ai-core",
@@ -295,11 +295,11 @@ dependencies = [
 
 [[package]]
 name = "elomar-diagnostics"
-version = "0.7.0"
+version = "0.9.0"
 
 [[package]]
 name = "elomar-fmt"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-diagnostics",
  "elomar-lexer",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-fuzz"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-interpreter"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "base64",
  "elomar-ai-core",
@@ -345,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-lexer"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-diagnostics",
  "unicode-ident",
@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-loader"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
@@ -364,14 +364,14 @@ dependencies = [
 
 [[package]]
 name = "elomar-mcp"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "elomar-parser"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-pkg"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "semver",
  "serde",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-playground"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
@@ -404,11 +404,11 @@ dependencies = [
 
 [[package]]
 name = "elomar-policy"
-version = "0.7.0"
+version = "0.9.0"
 
 [[package]]
 name = "elomar-types"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",

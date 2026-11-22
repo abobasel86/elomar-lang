@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 0.9.0
+
+**Find All References** (Shift+F12), **Rename** (F2) across the project's
+files, and **parameter hints** while typing a call. Needs `elomar` 0.9.0.
+
 ## 0.7.0
 
 Works with the 0.7.0 language: `timeout`, `std.csv`, the new file and date
