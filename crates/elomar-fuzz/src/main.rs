@@ -13,17 +13,22 @@
 //! or running out of memory, which cannot be caught), that file is the
 //! culprit. Programs run with no file, network, Python or process access,
 //! the offline AI model `mock`, and a time limit.
+//!
+//! Each program runs twice, in the bytecode engine and in the tree-walking
+//! interpreter, and the two must print the same and fail with the same
+//! error: a difference is reported like a crash.
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use elomar_ai_core::AiRuntime;
 use elomar_ai_provider_mock::MockProvider;
 use elomar_diagnostics::{Lang, RenderOptions, SourceFile, render};
-use elomar_interpreter::{BufferHost, FsPolicy};
+use elomar_interpreter::{BufferHost, Engine, FsPolicy};
 
 /// Pieces inserted into programs: syntax that tends to reach unusual paths.
 const TOKENS: &[&str] = &[
@@ -144,6 +149,10 @@ const TOKENS: &[&str] = &[
     "\"a\".repeat(3)",
 ];
 
+/// Calls whose results change from run to run: the engines are not
+/// compared on programs that use them.
+const NONDETERMINISTIC: &[&str] = &["random", "uuid", "now", "today", "time."];
+
 /// Calls that reach outside the process or wait; programs using them are
 /// checked and formatted, but not run.
 const NOT_RUN: &[&str] = &[
@@ -241,16 +250,33 @@ fn run_case(src: &str) {
     if diags.iter().any(|d| d.is_error()) || NOT_RUN.iter().any(|n| src.contains(n)) {
         return;
     }
-    let result = elomar_interpreter::with_large_stack(|| {
-        let mut host = BufferHost::default();
-        let mut ai = AiRuntime::default();
-        ai.register(
-            "mock",
-            Box::new(MockProvider::new(Vec::new()).expect("no rules")),
+    RAN.fetch_add(1, Ordering::Relaxed);
+    let bytecode = run_engine(&program, Engine::Bytecode);
+    let tree = run_engine(&program, Engine::Tree);
+    // The two engines must agree, unless the time limit or something random
+    // decided the result.
+    let timed_out = |r: &Outcome| matches!(&r.1, Err(e) if e.code == "R0013");
+    if !timed_out(&bytecode)
+        && !timed_out(&tree)
+        && !NONDETERMINISTIC.iter().any(|n| src.contains(n))
+    {
+        let show = |r: &Outcome| match &r.1 {
+            Ok(()) => format!("output {:?}", r.0),
+            Err(e) => format!(
+                "output {:?}, error {} at {:?}: {:?}, trace {:?}",
+                r.0, e.code, e.span, e.message, e.trace
+            ),
+        };
+        COMPARED.fetch_add(1, Ordering::Relaxed);
+        let (a, b) = (show(&bytecode), show(&tree));
+        assert!(
+            a == b,
+            "the engines differ:
+  bytecode: {a}
+  tree:     {b}"
         );
-        elomar_interpreter::run_limited(&program, &mut host, &mut ai, FsPolicy::deny_all("."), 300)
-    });
-    if let Err(e) = result {
+    }
+    if let Err(e) = bytecode.1 {
         let _ = render(
             &e.to_diagnostic(),
             &file,
@@ -260,6 +286,31 @@ fn run_case(src: &str) {
             },
         );
     }
+}
+
+/// What a program printed, and how it ended.
+type Outcome = (String, Result<(), elomar_interpreter::RuntimeError>);
+
+fn run_engine(program: &elomar_ast::Program, engine: Engine) -> Outcome {
+    elomar_interpreter::set_engine(engine);
+    let outcome = elomar_interpreter::with_large_stack(|| {
+        let mut host = BufferHost::default();
+        let mut ai = AiRuntime::default();
+        ai.register(
+            "mock",
+            Box::new(MockProvider::new(Vec::new()).expect("no rules")),
+        );
+        let result = elomar_interpreter::run_limited(
+            program,
+            &mut host,
+            &mut ai,
+            FsPolicy::deny_all("."),
+            300,
+        );
+        (host.output, result)
+    });
+    elomar_interpreter::set_engine(Engine::Bytecode);
+    outcome
 }
 
 fn collect_seeds(root: &Path) -> Vec<String> {
@@ -305,6 +356,10 @@ fn collect_seeds(root: &Path) -> Vec<String> {
 }
 
 static LAST_PANIC: Mutex<String> = Mutex::new(String::new());
+
+/// Programs that ran, and those whose results were compared.
+static RAN: AtomicU64 = AtomicU64::new(0);
+static COMPARED: AtomicU64 = AtomicU64::new(0);
 
 fn main() {
     let mut seconds = 30u64;
@@ -384,6 +439,11 @@ fn main() {
         start.elapsed().as_secs(),
         seeds.len(),
         crashes.len()
+    );
+    println!(
+        "  {} ran, {} compared in both engines",
+        RAN.load(Ordering::Relaxed),
+        COMPARED.load(Ordering::Relaxed)
     );
     for (n, (place, (_, count))) in crashes.iter().enumerate() {
         println!("  crash-{n}.elo  ({count}×)  {place}");

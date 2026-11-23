@@ -1,0 +1,9 @@
+// Too deep: R0005 at the same call in both engines.
+
+fn down(n: Int) -> Int {
+    return down(n + 1) + 1
+}
+
+fn main() {
+    print(down(0))
+}

@@ -1,0 +1,53 @@
+// Variables, shadowing, blocks and closures: what each one sees.
+
+fn counter(start: Int) -> fn(Int) -> Int {
+    let base = start * 10
+    return |n| base + n
+}
+
+fn main() {
+    let x = 1
+    var total = 0
+    {
+        let x = x + 10
+        total += x
+        let y = x * 2
+        total += y
+    }
+    total += x
+    print("total", total)
+
+    // A closure keeps copies of every variable visible where it is made.
+    var n = 5
+    let add = |k| n + k + x
+    n = 100
+    print("closure", add(1), n)
+
+    let f = counter(3)
+    print("counter", f(4), f(5))
+
+    // Shadowing in an inner block: the closure sees the inner `v`.
+    let v = 1
+    {
+        let v = v + 1
+        let g = || v * 100
+        print("shadow", g())
+    }
+    print("outer", v)
+
+    // Loops: `for` variables are fresh each round.
+    var outs: List<Int> = []
+    for i in 0..3 {
+        let j = i * i
+        let h = || i + j
+        outs.push(h())
+    }
+    print("loops", outs)
+
+    // Named arguments run in the order written.
+    print("named", sub(b: 1, a: 10), sub(5, 3))
+}
+
+fn sub(a: Int, b: Int) -> Int {
+    return a - b
+}

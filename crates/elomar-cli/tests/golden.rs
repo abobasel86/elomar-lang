@@ -51,6 +51,64 @@ fn examples_produce_expected_output() {
     assert!(count >= 5, "expected at least 5 examples, found {count}");
 }
 
+/// Runs `main` with `ELOMAR_ENGINE` set to `engine`.
+fn run_in(engine: &str, main: &Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_elomar"))
+        .args(["--no-color", "--lang", "en", "run"])
+        .arg(main)
+        .env("ELOMAR_ENGINE", engine)
+        .output()
+        .expect("run elomar")
+}
+
+/// The bytecode engine and the tree-walking interpreter must print the same
+/// and fail with the same errors, on the programs in `tests/engines`
+/// (which also print their `.out` file) and on the examples.
+#[test]
+fn engines_agree() {
+    let mut programs: Vec<(PathBuf, Option<PathBuf>)> = Vec::new();
+    for entry in std::fs::read_dir(root().join("tests/engines")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|e| e == "elo") {
+            programs.push((path.clone(), Some(path.with_extension("out"))));
+        }
+    }
+    for entry in std::fs::read_dir(root().join("examples")).unwrap() {
+        let dir = entry.unwrap().path();
+        if !dir.join("expected.out").exists() {
+            continue;
+        }
+        if let Some(main) = [dir.join("main.elo"), dir.join("src/main.elo")]
+            .into_iter()
+            .find(|p| p.exists())
+        {
+            programs.push((main, None));
+        }
+    }
+    assert!(programs.len() >= 10);
+    for (main, expected) in programs {
+        let bytecode = run_in("bytecode", &main);
+        let tree = run_in("tree", &main);
+        let show = |o: &std::process::Output| {
+            format!(
+                "exit {:?}\n{}\n{}",
+                o.status.code(),
+                lines(&String::from_utf8_lossy(&o.stdout)),
+                lines(&String::from_utf8_lossy(&o.stderr))
+            )
+        };
+        assert_eq!(show(&bytecode), show(&tree), "{}", main.display());
+        if let Some(expected) = expected {
+            assert_eq!(
+                lines(&String::from_utf8_lossy(&bytecode.stdout)),
+                lines(&std::fs::read_to_string(&expected).unwrap()),
+                "output of {}",
+                main.display()
+            );
+        }
+    }
+}
+
 #[test]
 fn failing_programs_report_expected_codes() {
     let mut count = 0;

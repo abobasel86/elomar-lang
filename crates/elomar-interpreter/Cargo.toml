@@ -1,6 +1,6 @@
 [package]
 name = "elomar-interpreter"
-description = "Tree-walking interpreter for Elomar-Lang"
+description = "Bytecode engine and tree-walking interpreter for Elomar-Lang"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

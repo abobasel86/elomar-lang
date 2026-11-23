@@ -9,6 +9,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+elomar-ast.workspace = true
 elomar-diagnostics.workspace = true
 elomar-parser.workspace = true
 elomar-types.workspace = true

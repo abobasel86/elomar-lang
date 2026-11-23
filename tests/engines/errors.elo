@@ -1,0 +1,15 @@
+// A runtime error deep in calls: the error and its trace.
+
+fn pick(xs: List<Int>, i: Int) -> Int {
+    return xs[i]
+}
+
+fn middle(xs: List<Int>) -> Int {
+    return pick(xs, xs.length) + 1
+}
+
+fn main() {
+    print("before")
+    print(middle([1, 2, 3]))
+    print("never")
+}

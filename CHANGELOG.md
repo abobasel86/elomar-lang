@@ -4,6 +4,28 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [1.1.0] - 2026-11-23
+
+### Faster
+
+- **A bytecode engine.** The first time a function is called, it is compiled
+  into instructions over numbered registers: a variable is read by its
+  number instead of being searched for by name, and loops are jumps.
+  Closures are compiled too. On the programs in `bench/` (made ten times
+  larger), it is about twice as fast as 1.0 overall: loops about 5 times,
+  function calls about 2 times.
+- Nothing else changes: programs print the same and fail with the same
+  errors, at the same places. The tree-walking interpreter is still there,
+  for the debugger, and to check the engine against: `ELOMAR_ENGINE=tree`
+  runs a program in it only.
+
+### Testing
+
+- The fuzzer runs every program in both engines and reports any difference
+  in output or errors, and `tests/engines/` holds programs for the cases
+  where the two could differ (closures, the order things run in, errors and
+  their call traces, `break` in nested loops, `timeout`).
+
 ## [1.0.0] - 2026-11-22
 
 The first stable version. From now on, a program that works with 1.0 keeps

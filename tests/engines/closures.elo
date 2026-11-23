@@ -1,0 +1,66 @@
+// Closures inside closures, closures as values, and errors inside them.
+
+fn adder(n: Int) -> fn(Int) -> Int {
+    return |x| x + n
+}
+
+fn twice(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(f(x))
+}
+
+fn safe_div(a: Int, b: Int) -> Result<Int, String> {
+    if b == 0 {
+        return Err("zero")
+    }
+    return Ok(a div b)
+}
+
+fn main() {
+    let base = 7
+    // A closure that makes closures: the inner one sees both.
+    let make = |k: Int| |x: Int| x * k + base
+    let times3 = make(3)
+    print(times3(2), make(10)(1))
+
+    let add5 = adder(5)
+    print(twice(add5, 1), twice(|x| x * x, 3))
+
+    // A captured function called by name.
+    let wrap = |x: Int| add5(x) * 2
+    print([1, 2, 3].map(wrap))
+
+    // Blocks, loops and `?` inside a closure body.
+    let total = |xs: List<Int>| {
+        var t = 0
+        for x in xs {
+            if x < 0 {
+                continue
+            }
+            t += x
+        }
+        return t
+    }
+    print(total([1, -5, 4]))
+    let check = |xs: List<Int>, d: Int| {
+        var n = 0
+        for x in xs {
+            match safe_div(x, d) {
+                Ok(v) => {
+                    n += v
+                }
+                Err(e) => {
+                    print("skip", x, e)
+                }
+            }
+        }
+        return n
+    }
+    print(check([10, 20, 3], 5), check([1], 0))
+
+    let words = ["kiwi", "fig", "banana"]
+    print(words.sort_by(|w| w.length), words.group_by(|w| w.length))
+    print(words.fold("", |acc, w| acc + w.slice(0, 1)))
+
+    // An error inside a closure called by `map`.
+    print(["1", "2", "x"].map(|s| 100 div (parse_int(s).unwrap_or(0) - 2)))
+}

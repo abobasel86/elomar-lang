@@ -196,6 +196,11 @@ impl Reporter {
 static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() -> ExitCode {
+    // `ELOMAR_ENGINE=tree` runs programs in the tree-walking interpreter
+    // only, to compare it with the bytecode engine.
+    if std::env::var("ELOMAR_ENGINE").is_ok_and(|e| e == "tree") {
+        elomar_interpreter::set_engine(elomar_interpreter::Engine::Tree);
+    }
     // A program made by `elomar build`: run it, with every argument its own.
     if let Some(bundle) = build::embedded() {
         let lang = std::env::var("ELOMAR_LANG")

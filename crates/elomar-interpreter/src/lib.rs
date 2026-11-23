@@ -1,4 +1,5 @@
-//! Tree-walking interpreter for Elomar-Lang (spec §7, phase A).
+//! Interpreter for Elomar-Lang (spec §7): a tree walker, and the bytecode
+//! engine in [`vm`] that runs functions it can compile, faster.
 //!
 //! The interpreter assumes the program passed `elomar_types::check`; it
 //! trusts static types and only checks what can fail at run time (division
@@ -19,6 +20,7 @@ mod session;
 mod stdextra;
 mod stdlib;
 mod value;
+mod vm;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -34,6 +36,7 @@ pub use ai::{InferCall, RunCall, RunTool};
 pub use debug::{Debugger, Inspect, Resume, StackFrame};
 pub use session::Session;
 pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
+pub use vm::{Engine, engine, set_engine};
 
 /// Services the running program can use. Implemented by the CLI with real
 /// stdin/stdout and by tests with in-memory buffers.
@@ -235,6 +238,9 @@ fn run_function_with(
     limit_ms: Option<i64>,
 ) -> Result<Value, RuntimeError> {
     let mut interp = Interpreter::new(program, host, ai, fs);
+    // The debugger follows statements in the tree, so it turns the bytecode
+    // engine off.
+    interp.vm.enabled &= debugger.is_none();
     interp.debugger = debugger;
     if let Some(ms) = limit_ms {
         interp
@@ -398,10 +404,74 @@ impl From<RuntimeError> for Flow {
 type Exec<T> = Result<T, Flow>;
 
 /// One step in an assignable place: `.field` or `[index]`.
-enum Step {
-    Field(String),
+enum Step<'a> {
+    Field(&'a str),
     /// A list index or a map key.
     Index(Value, Span),
+}
+
+/// The modules whose functions [`Interpreter::call_module`] runs.
+const MODULES: &[&str] = &[
+    "std.ai",
+    "std.agent",
+    "std.mcp",
+    "std.server",
+    "std.process",
+    "std.time",
+    "std.math",
+    "std.random",
+    "std.os",
+    "std.regex",
+    "std.encoding",
+    "std.crypto",
+    "std.csv",
+    "std.fs",
+    "std.db",
+    "std.py",
+    "std.http",
+    "std.json",
+];
+
+/// Follows `steps` from `slot` to the value they name, copying shared
+/// lists, maps and records on the way (copy-on-write). With
+/// `insert_missing_key`, a missing key at the last step is added.
+fn walk_place<'v>(
+    mut slot: &'v mut Value,
+    steps: &[Step<'_>],
+    insert_missing_key: bool,
+) -> Result<&'v mut Value, RuntimeError> {
+    let last = steps.len().saturating_sub(1);
+    for (i, step) in steps.iter().enumerate() {
+        slot = match (step, slot) {
+            (Step::Field(name), Value::Record(fields)) => {
+                let fields = Rc::make_mut(fields);
+                &mut fields
+                    .iter_mut()
+                    .find(|(n, _)| &**n == *name)
+                    .expect("checked field")
+                    .1
+            }
+            (Step::Index(Value::Int(n), span), Value::List(items)) => {
+                let len = items.len();
+                let idx = builtins::check_index(*n, len, *span)?;
+                &mut Rc::make_mut(items)[idx]
+            }
+            (Step::Index(key, span), Value::Map(entries)) => {
+                let entries = Rc::make_mut(entries);
+                let k = MapKey::from_value(key);
+                if insert_missing_key && i == last {
+                    entries.entry(k).or_insert(Value::Unit)
+                } else {
+                    match entries.get_mut(&k) {
+                        Some(v) => v,
+                        None => return Err(builtins::missing_key(key, *span)),
+                    }
+                }
+            }
+            _ => unreachable!("checked place"),
+        };
+    }
+    Ok(slot)
 }
 
 struct Interpreter<'p, 'h> {
@@ -435,6 +505,8 @@ struct Interpreter<'p, 'h> {
     /// One shared copy of each record field name written in the program,
     /// by the address of its text, so making a record allocates no names.
     field_names: FastMap<usize, Rc<str>>,
+    /// The bytecode engine: compiled functions and their registers.
+    vm: vm::Vm<'p>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -468,6 +540,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             deadlines: Vec::new(),
             spare: Vec::new(),
             field_names: FastMap::default(),
+            vm: vm::Vm::new(program),
             unit_enums: program
                 .items
                 .iter()
@@ -869,7 +942,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             match &cur.kind {
                 ExprKind::Name(n) => break n.as_str(),
                 ExprKind::Field { target, name } => {
-                    steps.push(Step::Field(name.name.clone()));
+                    steps.push(Step::Field(&name.name));
                     cur = target;
                 }
                 ExprKind::Index { target, index } => {
@@ -881,40 +954,10 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
         };
         steps.reverse();
-        let Some(mut slot) = self.lookup_mut(root) else {
+        let Some(slot) = self.lookup_mut(root) else {
             unreachable!("checker only allows local `var` roots");
         };
-        let last = steps.len().saturating_sub(1);
-        for (i, step) in steps.iter().enumerate() {
-            slot = match (step, slot) {
-                (Step::Field(name), Value::Record(fields)) => {
-                    let fields = Rc::make_mut(fields);
-                    &mut fields
-                        .iter_mut()
-                        .find(|(n, _)| &**n == name)
-                        .expect("checked field")
-                        .1
-                }
-                (Step::Index(Value::Int(n), span), Value::List(items)) => {
-                    let len = items.len();
-                    let idx = builtins::check_index(*n, len, *span)?;
-                    &mut Rc::make_mut(items)[idx]
-                }
-                (Step::Index(key, span), Value::Map(entries)) => {
-                    let entries = Rc::make_mut(entries);
-                    let k = MapKey::from_value(key);
-                    if insert_missing_key && i == last {
-                        entries.entry(k).or_insert(Value::Unit)
-                    } else {
-                        match entries.get_mut(&k) {
-                            Some(v) => v,
-                            None => return Err(builtins::missing_key(key, *span).into()),
-                        }
-                    }
-                }
-                _ => unreachable!("checked place"),
-            };
-        }
+        let slot = walk_place(slot, &steps, insert_missing_key)?;
         Ok(f(slot)?)
     }
 
@@ -1248,93 +1291,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 builtins::call_function(&mut *self.host, name, values, span).map_err(Flow::from)
             }
             ExprKind::Field { target, name } => {
-                let mut values = Vec::with_capacity(args.len());
-                for arg in args {
-                    values.push(self.eval(&arg.value)?);
-                }
-                if let ExprKind::Name(module) = &target.kind {
-                    match module.as_str() {
-                        "std.ai" if name.name == "run" => {
-                            return Ok(self.run_future(type_args, values, false));
-                        }
-                        "std.agent" => return Ok(self.run_future(type_args, values, true)),
-                        "std.mcp" => return Ok(mcp::call(&mut self.mcp, &name.name, &values)),
-                        "std.server" if name.name == "serve" => return self.serve(values, span),
-                        "std.process" => {
-                            return Ok(process::run(
-                                self.ai.permissions(),
-                                self.fs.base(),
-                                &values,
-                            ));
-                        }
-                        "std.server" => return Ok(server::helper(&name.name, &values)),
-                        "std.time" if name.name == "sleep" && !self.deadlines.is_empty() => {
-                            // Sleep no longer than the nearest `timeout` allows.
-                            let ms = match values.first() {
-                                Some(Value::Duration(ms)) => *ms,
-                                _ => 0,
-                            };
-                            let nearest = self.deadlines.iter().min().copied().unwrap_or(i64::MAX);
-                            let left = (nearest - stdextra::now_ms()).max(0);
-                            stdextra::call(
-                                module,
-                                "sleep",
-                                &[Value::Duration(ms.min(left))],
-                                &mut *self.host,
-                                span,
-                            )
-                            .map_err(Flow::from)?;
-                            self.check_deadlines()?;
-                            return Ok(Value::Unit);
-                        }
-                        "std.math" | "std.random" | "std.time" | "std.os" | "std.regex"
-                        | "std.encoding" | "std.crypto" | "std.csv" => {
-                            return stdextra::call(
-                                module,
-                                &name.name,
-                                &values,
-                                &mut *self.host,
-                                span,
-                            )
-                            .map_err(Flow::from);
-                        }
-                        "std.ai" => return Ok(infer_future(type_args, values, &self.unit_enums)),
-                        "std.fs" => return Ok(stdlib::fs_call(&self.fs, &name.name, &values)),
-                        "std.db" => {
-                            return Ok(db::call(
-                                &self.fs,
-                                &name.name,
-                                type_args,
-                                &values,
-                                &self.unit_enums,
-                            ));
-                        }
-                        "std.py" => {
-                            let (value, printed) = py::call(
-                                self.ai.permissions(),
-                                self.fs.base(),
-                                type_args,
-                                &values,
-                                &self.unit_enums,
-                            );
-                            if !printed.is_empty() {
-                                self.host.print(&printed);
-                            }
-                            return Ok(value);
-                        }
-                        "std.http" => {
-                            return Ok(http::call(self.ai.permissions(), &name.name, &values));
-                        }
-                        "std.json" => {
-                            return Ok(stdlib::json_call(
-                                &name.name,
-                                type_args,
-                                &values,
-                                &self.unit_enums,
-                            ));
-                        }
-                        _ => {}
-                    }
+                let values = self.eval_args(args)?;
+                if let ExprKind::Name(module) = &target.kind
+                    && MODULES.contains(&module.as_str())
+                {
+                    return self.call_module(module, &name.name, type_args, values, span);
                 }
                 let method = name.name.as_str();
                 if builtins::is_mutating(method) {
@@ -1343,17 +1304,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     });
                 }
                 let recv = self.eval(target)?;
-                if let Value::List(items) = &recv
-                    && HIGHER_ORDER.contains(&method)
-                {
-                    return self.list_higher_order(items, method, values, span);
-                }
-                if matches!(recv, Value::Option(_) | Value::Result(_))
-                    && let Some(v) = self.option_result_method(&recv, method, &values, span)?
-                {
-                    return Ok(v);
-                }
-                builtins::call_method(recv, method, values, span).map_err(Flow::from)
+                self.call_method_value(recv, method, values, span)
             }
             _ => match self.eval(callee)? {
                 Value::Function(func) => {
@@ -1363,6 +1314,99 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 _ => unreachable!("checked callee"),
             },
         }
+    }
+
+    /// A function of a standard module (one of [`MODULES`]).
+    fn call_module(
+        &mut self,
+        module: &str,
+        name: &str,
+        type_args: &'p [TypeExpr],
+        values: Vec<Value>,
+        span: Span,
+    ) -> Exec<Value> {
+        match module {
+            "std.ai" if name == "run" => Ok(self.run_future(type_args, values, false)),
+            "std.agent" => Ok(self.run_future(type_args, values, true)),
+            "std.mcp" => Ok(mcp::call(&mut self.mcp, name, &values)),
+            "std.server" if name == "serve" => self.serve(values, span),
+            "std.process" => Ok(process::run(self.ai.permissions(), self.fs.base(), &values)),
+            "std.server" => Ok(server::helper(name, &values)),
+            "std.time" if name == "sleep" && !self.deadlines.is_empty() => {
+                // Sleep no longer than the nearest `timeout` allows.
+                let ms = match values.first() {
+                    Some(Value::Duration(ms)) => *ms,
+                    _ => 0,
+                };
+                let nearest = self.deadlines.iter().min().copied().unwrap_or(i64::MAX);
+                let left = (nearest - stdextra::now_ms()).max(0);
+                stdextra::call(
+                    module,
+                    "sleep",
+                    &[Value::Duration(ms.min(left))],
+                    &mut *self.host,
+                    span,
+                )
+                .map_err(Flow::from)?;
+                self.check_deadlines()?;
+                Ok(Value::Unit)
+            }
+            "std.math" | "std.random" | "std.time" | "std.os" | "std.regex" | "std.encoding"
+            | "std.crypto" | "std.csv" => {
+                stdextra::call(module, name, &values, &mut *self.host, span).map_err(Flow::from)
+            }
+            "std.ai" => Ok(infer_future(type_args, values, &self.unit_enums)),
+            "std.fs" => Ok(stdlib::fs_call(&self.fs, name, &values)),
+            "std.db" => Ok(db::call(
+                &self.fs,
+                name,
+                type_args,
+                &values,
+                &self.unit_enums,
+            )),
+            "std.py" => {
+                let (value, printed) = py::call(
+                    self.ai.permissions(),
+                    self.fs.base(),
+                    type_args,
+                    &values,
+                    &self.unit_enums,
+                );
+                if !printed.is_empty() {
+                    self.host.print(&printed);
+                }
+                Ok(value)
+            }
+            "std.http" => Ok(http::call(self.ai.permissions(), name, &values)),
+            "std.json" => Ok(stdlib::json_call(
+                name,
+                type_args,
+                &values,
+                &self.unit_enums,
+            )),
+            _ => unreachable!("not a module: {module}"),
+        }
+    }
+
+    /// `recv.method(values)` for a method that does not change `recv`.
+    fn call_method_value(
+        &mut self,
+        recv: Value,
+        method: &str,
+        values: Vec<Value>,
+        span: Span,
+    ) -> Exec<Value> {
+        if let Value::List(items) = &recv
+            && HIGHER_ORDER.contains(&method)
+        {
+            return self.list_higher_order(items, method, values, span);
+        }
+        if matches!(recv, Value::Option(_) | Value::Result(_))
+            && let Some(v) = self.option_result_method(&recv, method, &values, span)?
+        {
+            return Ok(v);
+        }
+        builtins::call_method(recv, method, values, span).map_err(Flow::from)
     }
 
     fn eval_args(&mut self, args: &'p [Arg]) -> Exec<Vec<Value>> {
@@ -1391,6 +1435,11 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 let ExprKind::Lambda { params, body } = &self.lambdas[key].kind else {
                     unreachable!("lambda table holds closures");
                 };
+                if self.vm.enabled
+                    && let Some(code) = self.vm.lambdas.get(key).cloned()
+                {
+                    return self.call_closure_compiled(&code, params.len(), captured, args, span);
+                }
                 self.check_depth(span)?;
                 let params = params
                     .iter()
@@ -2057,7 +2106,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     fn check_depth(&self, call_span: Span) -> Exec<()> {
-        if self.frames.len() > MAX_CALL_DEPTH {
+        if self.frames.len() + self.vm.depth > MAX_CALL_DEPTH {
             return Err(RuntimeError::new(
                 "R0005",
                 call_span,
@@ -2108,7 +2157,15 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     /// Runs `f` with its parameters already in `frame`.
-    fn enter_fn(&mut self, f: &'p FnDecl, frame: Frame<'p>, call_span: Span) -> Exec<Value> {
+    fn enter_fn(&mut self, f: &'p FnDecl, mut frame: Frame<'p>, call_span: Span) -> Exec<Value> {
+        if self.vm.enabled
+            && let Some(code) = self.compiled(f)
+        {
+            let args = frame.vars.drain(..).map(|(_, v)| v);
+            self.vm.stack.extend(args);
+            self.recycle(frame);
+            return self.call_compiled(f, &code, call_span);
+        }
         if let Err(e) = self.check_depth(call_span) {
             self.recycle(frame);
             return Err(e);

@@ -1,0 +1,21 @@
+[10, 11, 20, 21, 40, 41, 50, 51, 70, 71, 80, 81, 100, 101, 110, 111, 130, 131]
+while 17 81
+Some(8) None
+Ok(42) Err("bad a") Err("bad b")
+["zero", "small", "medium", "large"]
+order 3 50
+loud true
+loud false
+false true true false
+1 one
+2 two
+Lina 30
+Omar 25
+س
+ل
+ا
+م
+3
+4
+5
+4

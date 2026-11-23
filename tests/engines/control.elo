@@ -1,0 +1,98 @@
+// Loops, break and continue, `match` and `?`.
+
+fn first_even(xs: List<Int>) -> Option<Int> {
+    for x in xs {
+        if x % 2 == 0 {
+            return Some(x)
+        }
+    }
+    return None
+}
+
+fn parse_both(a: String, b: String) -> Result<Int, String> {
+    let x = parse_int(a).ok_or("bad a")?
+    let y = parse_int(b).ok_or("bad b")?
+    return Ok(x + y)
+}
+
+fn classify(n: Int) -> String {
+    return match n {
+        0 => "zero"
+        1 | 2 | 3 => "small"
+        4..=9 => "medium"
+        _ => "large"
+    }
+}
+
+fn loud(b: Bool) -> Bool {
+    print("loud", b)
+    return b
+}
+
+fn main() {
+    var out: List<Int> = []
+    for i in 0..20 {
+        if i % 3 == 0 {
+            continue
+        }
+        if i > 13 {
+            break
+        }
+        for j in 0..10 {
+            if j > 1 {
+                break
+            }
+            out.push(i * 10 + j)
+        }
+    }
+    print(out)
+
+    var k = 0
+    var seen = 0
+    while true {
+        k += 1
+        if k % 2 == 0 {
+            continue
+        }
+        seen += k
+        if k > 15 {
+            break
+        }
+    }
+    print("while", k, seen)
+
+    print(first_even([1, 3, 8, 5, 10]), first_even([1, 3]))
+    print(parse_both("2", "40"), parse_both("x", "1"), parse_both("1", "y"))
+    print([0, 2, 7, 12].map(classify))
+
+    // A `match` arm block that changes a variable read in the same expression.
+    var a = 1
+    let r = a + match a {
+        1 => {
+            a = 50
+        }
+        _ => {}
+    }.to_string().length
+    print("order", r, a)
+
+    // `&&` and `||` stop early.
+    print(false && loud(true), true || loud(false), true && loud(true), false || loud(false))
+
+    // Tuples and maps in `for`.
+    let pairs = [(1, "one"), (2, "two")]
+    for (n, name) in pairs {
+        print(n, name)
+    }
+    let ages = ["Lina": 30, "Omar": 25]
+    for (name, age) in ages {
+        print(name, age)
+    }
+    for ch in "سلام" {
+        print(ch)
+    }
+    for x in 3..=5 {
+        print(x)
+    }
+    let (p, _, q) = (1, 2, 3)
+    print(p + q)
+}

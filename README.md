@@ -48,7 +48,7 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v1.0.0, stable.** Programs written for 1.0 keep working in
+> **Project status: v1.1.0, stable.** Programs written for 1.0 keep working in
 > every 1.x version: see [`docs/stability.md`](docs/stability.md).
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
@@ -286,7 +286,7 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-fmt` | The formatter behind `elomar fmt` |
 | `crates/elomar-fuzz` | Fuzz testing: mutated programs through every stage, to find crashes |
 | `crates/elomar-types` | Name resolution, type inference, effect checking |
-| `crates/elomar-interpreter` | Tree-walking interpreter, futures, `ai.infer` execution |
+| `crates/elomar-interpreter` | Bytecode engine and tree-walking interpreter, futures, `ai.infer` execution |
 | `crates/elomar-ai-core` | Schemas (shared with `std.json`), AI errors, `elomar.toml`, answer validation |
 | `crates/elomar-policy` | File-system permission checks |
 | `crates/elomar-ai-provider-mock` | Deterministic offline model provider |
@@ -309,6 +309,16 @@ cargo test --workspace
 Every example in `examples/` is executed through the real `elomar` binary
 and compared with its `expected.out`.
 
+Programs run in a bytecode engine: each function is compiled to register
+instructions the first time it is called. The tree-walking interpreter it
+replaced is still there, and the two must agree exactly: the programs in
+`tests/engines/` and the examples run in both, and so does every program the
+fuzzer makes. To run a program in the tree walker only:
+
+```bash
+ELOMAR_ENGINE=tree elomar run main.elo
+```
+
 To time the interpreter, build it in release mode and run the programs in
 `bench/`:
 
@@ -317,7 +327,8 @@ cargo build --release -p elomar-cli && python bench/run.py
 ```
 
 To look for crashes, feed the parser, checker, formatter and interpreter
-mutated programs for a minute (CI does this on every change):
+mutated programs for a minute, each run in both engines (CI does this on
+every change):
 
 ```bash
 cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
@@ -334,7 +345,8 @@ cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 7. ✅ v0.8: a faster interpreter (smaller values, cheaper calls, LTO builds).
 8. ✅ v0.9: fuzz testing of the parser and interpreter, rename and find references in editors, the specification frozen.
 9. ✅ v1.0: a stable release; programs written for 1.0 keep working in every 1.x.
-10. After 1.0: a bytecode engine, and `async` work on several processor cores.
+10. ✅ v1.1: a bytecode engine, about twice as fast overall and up to five times on loops.
+11. Next: `async` work on several processor cores.
 
 ## Editors
 

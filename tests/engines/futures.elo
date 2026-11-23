@@ -1,0 +1,22 @@
+// `async` functions, `all` and `timeout`.
+
+async fn square(n: Int) -> Int {
+    return n * n
+}
+
+async fn slow() -> Int {
+    var i = 0
+    while true {
+        i += 1
+    }
+    return i
+}
+
+async fn main() {
+    let a = square(3)
+    let b = square(4)
+    print(await a + await b, await a)
+    print(await all([square(1), square(2), square(5)]))
+    print(await timeout(square(6), 1s))
+    print(await timeout(slow(), 50ms))
+}
