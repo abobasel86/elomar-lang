@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.1.1
+
+Works with Elomar-Lang 1.1.1 (two fixes in the formatter and the checker).
+
 ## 1.1.0
 
 Works with Elomar-Lang 1.1, whose programs run about twice as fast. No new
