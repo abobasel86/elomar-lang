@@ -370,7 +370,8 @@ fn type_brackets(tokens: &[&Token]) -> Vec<bool> {
                         break;
                     }
                 }
-                Ident(_) | Comma | Dot | Colon | Plus => {}
+                // `fn(Int) -> Bool` is a type too.
+                Ident(_) | Comma | Dot | Colon | Plus | Fn | LParen | RParen | Arrow => {}
                 _ => break,
             }
         }
@@ -480,6 +481,24 @@ mod tests {
         assert_eq!(
             fmt("use app.students.{ Student ,average }\n"),
             "use app.students.{Student, average}\n"
+        );
+    }
+
+    #[test]
+    fn function_types_in_type_arguments() {
+        assert_eq!(
+            fmt("var fs: List<fn() -> Int> = []
+let m: Map<String, fn(Int, Int) -> Bool> = [:]
+"),
+            "var fs: List<fn() -> Int> = []
+let m: Map<String, fn(Int, Int) -> Bool> = [:]
+"
+        );
+        assert_eq!(
+            fmt("let ok = a<f(b) && c>d
+"),
+            "let ok = a < f(b) && c > d
+"
         );
     }
 

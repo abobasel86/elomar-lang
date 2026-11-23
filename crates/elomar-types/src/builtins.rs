@@ -766,14 +766,19 @@ impl Checker {
                 let f = Ty::Fn(vec![elem], Box::new(key.clone()));
                 self.typed_args(m, args, &[f], span);
                 let k = self.subst.shallow(&key);
-                if !matches!(k, Ty::Int | Ty::Str | Ty::Bool | Ty::Error | Ty::Var(_)) {
+                // The result is a `Map`, whose keys are `String` or `Int`.
+                if !matches!(k, Ty::Int | Ty::Str | Ty::Error | Ty::Var(_)) {
                     let shown = self.subst.show(&k);
                     self.error(
                         "E2005",
                         span,
                         Text::new(
-                            format!("`group_by` needs a key of type `Int`, `String` or `Bool`, not `{shown}`"),
-                            format!("`group_by` تحتاج مفتاحًا من النوع `Int` أو `String` أو `Bool`، لا `{shown}`"),
+                            format!(
+                                "`group_by` needs a key of type `Int` or `String`, not `{shown}`"
+                            ),
+                            format!(
+                                "`group_by` تحتاج مفتاحًا من النوع `Int` أو `String`، لا `{shown}`"
+                            ),
                         ),
                     );
                 }

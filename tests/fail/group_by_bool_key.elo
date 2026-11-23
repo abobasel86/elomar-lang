@@ -1,0 +1,5 @@
+// expect: E2005
+fn main() {
+    let words = ["kiwi", "fig", "banana"]
+    print(words.group_by(|w| w.length > 3))
+}
