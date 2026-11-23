@@ -4,6 +4,28 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Faster
+
+- **`await all([...])` uses several processor cores.** Neighbouring calls
+  to `async fn`s that are isolated run at the same time, each in its own
+  interpreter on its own thread: eight computations in `bench/parallel.elo`
+  take 139 ms instead of 337 ms (1.1) and 1787 ms (1.0).
+- A call is isolated when it, and every function it may call, prints
+  nothing, reads no input, and uses no file, database, process, Python,
+  MCP, AI model or random number; it may compute and make HTTP requests.
+  Its arguments hold no futures and no functions that are not isolated.
+- The results are the ones running the calls one after another gives: in
+  the same order; if one fails, the first failure in the list is the
+  error, and the calls after it are stopped and left not started; the
+  call depth limit and `timeout` around `all` apply in the threads. Other
+  calls still run one after another, as before.
+- `ELOMAR_PARALLEL=0` runs every call one after another. The comparison of
+  the two engines now runs the bytecode engine on several cores and the
+  tree walker one call after another; `tests/engines/parallel.elo` covers
+  failures, endless calls, `timeout` and closures as results.
+
 ## [1.1.1] - 2026-11-23
 
 ### Fixed

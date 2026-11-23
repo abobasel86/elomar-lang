@@ -1,0 +1,89 @@
+// `await all([...])`: calls that can run in parallel give the results of
+// running them one after another.
+
+type Point = { x: Int, y: Int }
+
+enum Shape {
+    Dot
+    Line(Point, Point)
+}
+
+let SCALE = 3
+let NAMES = ["a": 1, "b": 2]
+
+async fn work(n: Int) -> Int {
+    var total = 0
+    for i in 0..20000 {
+        total += (i * n) % (n + 7)
+    }
+    return total * SCALE + NAMES["b"]
+}
+
+async fn shape(n: Int) -> Shape {
+    if n == 0 {
+        return Shape.Dot
+    }
+    return Shape.Line({ x: n, y: n * 2 }, { x: -n, y: 0 })
+}
+
+async fn maker(n: Int) -> fn(Int) -> Int {
+    return |x| x * 10 + n
+}
+
+fn double(x: Int) -> Int {
+    return x * 2
+}
+
+async fn apply(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(x)
+}
+
+async fn noisy(n: Int) -> Int {
+    print("noisy", n)
+    return n
+}
+
+async fn spin() -> Int {
+    var i = 0
+    while true {
+        i += 1
+    }
+    return i
+}
+
+async fn check(n: Int) -> Result<Int, String> {
+    if n < 0 {
+        return Err("negative {n}")
+    }
+    return Ok(n * n)
+}
+
+async fn crash(n: Int) -> Int {
+    return 100 div (n - n)
+}
+
+async fn main() {
+    print(await all([work(1), work(2), work(3), work(4)]))
+    print(await all([shape(0), shape(2)]))
+    print(await all([check(3), check(-1), check(5)]))
+
+    let makers = await all([maker(1), maker(2)])
+    print(makers.map(|f| f(4)))
+    print(await all([apply(double, 3), apply(double, 21)]))
+
+    // One future twice: it runs once.
+    let w = work(5)
+    print(await all([w, w, work(6)]), await w)
+
+    // A call that prints keeps its place between the others.
+    print(await all([work(1), work(2), noisy(3), work(4), noisy(5)]))
+
+    // `timeout` around `all`: calls that never end are stopped.
+    print(await timeout(all([spin(), spin(), spin()]), 100ms))
+    print(await timeout(all([work(1), work(2)]), 10s))
+
+    // The first failure wins; the endless call after it is stopped.
+    print("before the crash")
+    print(await all([work(7), crash(1), spin()]))
+    print("never")
+}

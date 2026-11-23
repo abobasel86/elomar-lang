@@ -1577,7 +1577,7 @@ impl<'p> Interpreter<'p, '_> {
                 self.vm.stack[base + $r as usize]
             };
         }
-        if !self.deadlines.is_empty() {
+        if self.watching() {
             self.check_deadlines()?;
         }
         let ops = &code.ops[..];
@@ -1647,7 +1647,7 @@ impl<'p> Interpreter<'p, '_> {
                     }
                 }
                 Op::Tick => {
-                    if !self.deadlines.is_empty() {
+                    if self.watching() {
                         self.check_deadlines()?;
                     }
                 }

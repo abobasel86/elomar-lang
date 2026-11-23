@@ -13,6 +13,7 @@ mod debug;
 #[cfg_attr(not(feature = "native"), path = "stubs/http.rs")]
 mod http;
 mod mcp;
+mod parallel;
 mod process;
 mod py;
 mod server;
@@ -25,6 +26,8 @@ mod vm;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use elomar_ai_core::{AiRuntime, Schema};
 pub use elomar_policy::FsPolicy;
@@ -34,6 +37,7 @@ use elomar_diagnostics::{Diagnostic, Text};
 
 pub use ai::{InferCall, RunCall, RunTool};
 pub use debug::{Debugger, Inspect, Resume, StackFrame};
+pub use parallel::{parallel, set_parallel};
 pub use session::Session;
 pub use value::{Function, FutureState, MapKey, Thunk, Value, format_duration, format_float};
 pub use vm::{Engine, engine, set_engine};
@@ -507,6 +511,11 @@ struct Interpreter<'p, 'h> {
     field_names: FastMap<usize, Rc<str>>,
     /// The bytecode engine: compiled functions and their registers.
     vm: vm::Vm<'p>,
+    program: &'p Program,
+    /// Running `await all([...])` on several cores.
+    par: parallel::Par<'p>,
+    /// In a thread of `await all([...])`: set when the call must stop.
+    stop: Option<Arc<AtomicBool>>,
 }
 
 impl<'p, 'h> Interpreter<'p, 'h> {
@@ -541,6 +550,9 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             spare: Vec::new(),
             field_names: FastMap::default(),
             vm: vm::Vm::new(program),
+            program,
+            par: parallel::Par::new(),
+            stop: None,
             unit_enums: program
                 .items
                 .iter()
@@ -637,7 +649,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     fn exec(&mut self, stmt: &'p Stmt) -> Exec<()> {
-        if !self.deadlines.is_empty() {
+        if self.watching() {
             self.check_deadlines()?;
         }
         if self.debugger.is_none() {
@@ -747,7 +759,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             StmtKind::While { cond, body } => {
                 while self.eval_bool(cond)? {
-                    if !self.deadlines.is_empty() {
+                    if self.watching() {
                         // Also stops loops whose body is empty.
                         self.check_deadlines()?;
                     }
@@ -827,7 +839,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             StmtKind::For { vars, iter, body } => {
                 let items = self.eval(iter)?;
                 let run = |this: &mut Self, item: Value| -> Exec<bool> {
-                    if !this.deadlines.is_empty() {
+                    if this.watching() {
                         this.check_deadlines()?;
                     }
                     let r = this.in_scope(|this| {
@@ -1748,9 +1760,24 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         Ok(result)
     }
 
+    /// Whether statements and loop steps must check the time limits (or
+    /// whether a parallel call was stopped).
+    #[inline]
+    fn watching(&self) -> bool {
+        !self.deadlines.is_empty() || self.stop.is_some()
+    }
+
     /// Unwinds to the outermost `timeout` whose time is up, if any.
     #[inline(never)]
     fn check_deadlines(&self) -> Exec<()> {
+        if let Some(stop) = &self.stop
+            && stop.load(std::sync::atomic::Ordering::Relaxed)
+        {
+            return Err(Flow::Timeout(parallel::STOPPED));
+        }
+        if self.deadlines.is_empty() {
+            return Ok(());
+        }
         let now = stdextra::now_ms();
         match self.deadlines.iter().position(|d| now >= *d) {
             Some(i) => Err(Flow::Timeout(i)),
@@ -1821,14 +1848,29 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
         }
         let mut out = Vec::with_capacity(items.len());
-        for (item, done) in items.iter().zip(results) {
-            out.push(match done {
+        let mut i = 0;
+        while i < items.len() {
+            // Neighbouring calls that can run in parallel do (see `parallel`).
+            if results[i].is_none() {
+                let ran = self.run_parallel(items, i, &mut results)?;
+                if ran > 0 {
+                    out.extend(
+                        results[i..i + ran]
+                            .iter_mut()
+                            .map(|r| r.take().expect("ran")),
+                    );
+                    i += ran;
+                    continue;
+                }
+            }
+            out.push(match results[i].take() {
                 Some(v) => v,
-                None => match item {
+                None => match &items[i] {
                     Value::Future(state) => self.force(state, span)?,
                     other => other.clone(),
                 },
             });
+            i += 1;
         }
         Ok(Value::list(out))
     }

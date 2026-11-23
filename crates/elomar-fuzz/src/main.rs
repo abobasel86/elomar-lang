@@ -149,9 +149,10 @@ const TOKENS: &[&str] = &[
     "\"a\".repeat(3)",
 ];
 
-/// Calls whose results change from run to run: the engines are not
+/// Calls whose results change from run to run (or with speed, as what a
+/// `timeout` stops): the engines are not
 /// compared on programs that use them.
-const NONDETERMINISTIC: &[&str] = &["random", "uuid", "now", "today", "time."];
+const NONDETERMINISTIC: &[&str] = &["random", "uuid", "now", "today", "time.", "timeout("];
 
 /// Calls that reach outside the process or wait; programs using them are
 /// checked and formatted, but not run.
@@ -293,6 +294,9 @@ type Outcome = (String, Result<(), elomar_interpreter::RuntimeError>);
 
 fn run_engine(program: &elomar_ast::Program, engine: Engine) -> Outcome {
     elomar_interpreter::set_engine(engine);
+    // The tree walker runs `await all` one call after another, the bytecode
+    // engine on several cores: they must still agree.
+    elomar_interpreter::set_parallel(engine == Engine::Bytecode);
     let outcome = elomar_interpreter::with_large_stack(|| {
         let mut host = BufferHost::default();
         let mut ai = AiRuntime::default();
@@ -310,6 +314,7 @@ fn run_engine(program: &elomar_ast::Program, engine: Engine) -> Outcome {
         (host.output, result)
     });
     elomar_interpreter::set_engine(Engine::Bytecode);
+    elomar_interpreter::set_parallel(true);
     outcome
 }
 

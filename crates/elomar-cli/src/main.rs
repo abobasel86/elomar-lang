@@ -201,6 +201,11 @@ fn main() -> ExitCode {
     if std::env::var("ELOMAR_ENGINE").is_ok_and(|e| e == "tree") {
         elomar_interpreter::set_engine(elomar_interpreter::Engine::Tree);
     }
+    // `ELOMAR_PARALLEL=0` runs the calls in `await all([...])` one after
+    // another, never on several cores.
+    if std::env::var("ELOMAR_PARALLEL").is_ok_and(|p| p == "0") {
+        elomar_interpreter::set_parallel(false);
+    }
     // A program made by `elomar build`: run it, with every argument its own.
     if let Some(bundle) = build::embedded() {
         let lang = std::env::var("ELOMAR_LANG")

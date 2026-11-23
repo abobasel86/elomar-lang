@@ -51,17 +51,20 @@ fn examples_produce_expected_output() {
     assert!(count >= 5, "expected at least 5 examples, found {count}");
 }
 
-/// Runs `main` with `ELOMAR_ENGINE` set to `engine`.
+/// Runs `main` with `ELOMAR_ENGINE` set to `engine`; the tree walker also
+/// runs the calls in `await all` one after another.
 fn run_in(engine: &str, main: &Path) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_elomar"))
         .args(["--no-color", "--lang", "en", "run"])
         .arg(main)
         .env("ELOMAR_ENGINE", engine)
+        .env("ELOMAR_PARALLEL", if engine == "tree" { "0" } else { "1" })
         .output()
         .expect("run elomar")
 }
 
-/// The bytecode engine and the tree-walking interpreter must print the same
+/// The bytecode engine (with `await all` on several cores) and the
+/// tree-walking interpreter (one call after another) must print the same
 /// and fail with the same errors, on the programs in `tests/engines`
 /// (which also print their `.out` file) and on the examples.
 #[test]

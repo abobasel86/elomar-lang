@@ -1,0 +1,27 @@
+// Eight independent computations in `await all`: on several cores when
+// there are.
+
+async fn primes_below(n: Int) -> Int {
+    var count = 0
+    for k in 2..n {
+        var prime = true
+        var d = 2
+        while d * d <= k {
+            if k % d == 0 {
+                prime = false
+                break
+            }
+            d += 1
+        }
+        if prime {
+            count += 1
+        }
+    }
+    return count
+}
+
+async fn main() {
+    let sizes = [60000, 60001, 60002, 60003, 60004, 60005, 60006, 60007]
+    let counts = await all(sizes.map(primes_below))
+    print(counts.sum())
+}
