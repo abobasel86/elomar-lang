@@ -1588,7 +1588,12 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             ))
         };
         Ok(match method {
-            "map" => {
+            "map" | "par_map" => {
+                if method == "par_map"
+                    && let Some(out) = self.par_map(items, &f, span)?
+                {
+                    return Ok(out);
+                }
                 let mut out = Vec::with_capacity(items.len());
                 for x in items.iter() {
                     out.push(self.call_value(&f, vec![x.clone()], span)?);
@@ -2243,6 +2248,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
 /// List methods that take a function argument.
 const HIGHER_ORDER: &[&str] = &[
     "map",
+    "par_map",
     "filter",
     "any",
     "all",

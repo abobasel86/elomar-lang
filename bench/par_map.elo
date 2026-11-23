@@ -1,0 +1,38 @@
+// `par_map` over a heavy computation: with a named function, then with a
+// closure that captures a variable. Prints each result and its time in ms;
+// compare with `ELOMAR_PARALLEL=0`, which runs it like `map`.
+
+use std.time
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn collatz(n: Int) -> Int {
+    var x = n
+    var steps = 0
+    while x != 1 {
+        if x % 2 == 0 {
+            x = x div 2
+        } else {
+            x = 3 * x + 1
+        }
+        steps += 1
+    }
+    return steps
+}
+
+fn main() {
+    let xs = upto(300000)
+    var start = time.now()
+    let a = xs.par_map(collatz).sum()
+    print("named:   {a} in {time.now() - start} ms")
+    let k = 2
+    start = time.now()
+    let b = xs.par_map(|n| collatz(n * k)).sum()
+    print("closure: {b} in {time.now() - start} ms")
+}

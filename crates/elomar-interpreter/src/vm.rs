@@ -1478,6 +1478,28 @@ impl<'p> Interpreter<'p, '_> {
         }
     }
 
+    /// Compiles the code of closure `f` if it has none yet: a closure copied
+    /// into a thread was made by code this interpreter did not compile.
+    pub(crate) fn prepare_closure(&mut self, f: &Function) {
+        let Function::Closure { key, captured } = f else {
+            return;
+        };
+        if !self.vm.enabled || self.vm.lambdas.contains_key(key) {
+            return;
+        }
+        let Some(&e) = self.lambdas.get(key) else {
+            return;
+        };
+        let ExprKind::Lambda { params, body } = &e.kind else {
+            return;
+        };
+        let names = captured.iter().map(|(n, _)| n.clone()).collect();
+        if let Some(mut code) = compile_lambda(&self.vm, params, body, names) {
+            self.install_closures(&mut code);
+            self.vm.lambdas.insert(*key, Rc::new(code));
+        }
+    }
+
     /// Calls a compiled closure.
     pub(crate) fn call_closure_compiled(
         &mut self,

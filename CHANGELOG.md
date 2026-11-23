@@ -4,6 +4,23 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **`xs.par_map(f)`**: the list `xs.map(f)` gives, computed on several
+  processor cores. The list is split into parts that run in threads when
+  `f` is isolated (the same rule as in `await all`: a named function that
+  is not `async`, or a closure whose body is isolated); otherwise it runs
+  like `map`. If items fail, the error is the first one's, and the parts
+  after it are stopped. In `bench/par_map.elo`, 300,000 Collatz counts
+  take 193 ms instead of 1199 ms one after another, and 7453 ms in the
+  tree walker of 1.0.
+
+### Changed
+
+- The GitHub workflows use actions that run on Node.js 24.
+
 ## [1.2.0] - 2026-11-23
 
 ### Faster

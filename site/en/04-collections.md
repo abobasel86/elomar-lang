@@ -80,6 +80,36 @@ fn main() {
 }
 ```
 
+For heavy work on a long list, `par_map(f)` gives the same list as
+`map(f)`, but splits the work over the processor's cores. It does so only
+when `f` just computes: it prints nothing, reads no input, and uses no
+files, databases or random numbers. Otherwise it runs like `map`, so the
+result never changes:
+
+```elomar
+fn steps(n: Int) -> Int {
+    var x = n
+    var count = 0
+    while x != 1 {
+        if x % 2 == 0 {
+            x = x div 2
+        } else {
+            x = 3 * x + 1
+        }
+        count += 1
+    }
+    return count
+}
+
+fn main() {
+    var numbers: List<Int> = []
+    for i in 1..=100000 {
+        numbers.push(i)
+    }
+    print(numbers.par_map(steps).sum())   // like map, several times faster
+}
+```
+
 ## Maps
 
 A map connects keys to values:

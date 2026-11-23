@@ -1,10 +1,11 @@
-//! Running `await all([...])` on several processor cores.
+//! Running `await all([...])` and `par_map` on several processor cores.
 //!
 //! The values of the interpreter are shared through `Rc`, so they cannot
 //! move between threads. Instead, a call to an `async fn` that is isolated
-//! (see [`Interpreter::isolated`]) runs in a separate interpreter on its own
-//! thread, with copies of its arguments and of the file-level constants; its
-//! result is copied back.
+//! (see [`Interpreter::isolated`]), or a part of the list `par_map` goes
+//! through with an isolated function, runs in a separate interpreter on its
+//! own thread, with copies of its arguments and of the file-level constants;
+//! its result is copied back.
 //!
 //! The results are the ones running the calls one after another would give:
 //! - only calls that cannot be told apart from running alone are run in
@@ -16,7 +17,8 @@
 //!   else is kept;
 //! - if a call fails, the first one in the list wins, as it would have
 //!   stopped the others: the calls after it are stopped, and their futures
-//!   are left as they were, not started;
+//!   are left as they were, not started (`par_map` likewise fails with the
+//!   error of the first item that fails);
 //! - the call depth limit counts the calls already running, and `timeout`s
 //!   around `all` apply inside the threads.
 
@@ -84,13 +86,13 @@ impl Par<'_> {
 // ----- which calls are isolated ------------------------------------------
 
 /// Calls `f` on every expression in `b`, closures' bodies included.
-fn each_expr_in_block<'p>(b: &'p Block, f: &mut impl FnMut(&'p Expr)) {
+fn each_expr_in_block<'p, F: FnMut(&'p Expr) + ?Sized>(b: &'p Block, f: &mut F) {
     for s in &b.stmts {
         each_expr_in_stmt(s, f);
     }
 }
 
-fn each_expr_in_stmt<'p>(s: &'p Stmt, f: &mut impl FnMut(&'p Expr)) {
+fn each_expr_in_stmt<'p, F: FnMut(&'p Expr) + ?Sized>(s: &'p Stmt, f: &mut F) {
     match &s.kind {
         StmtKind::Let { value, .. } | StmtKind::LetTuple { value, .. } => each_expr(value, f),
         StmtKind::Assign { target, value, .. } => {
@@ -129,7 +131,7 @@ fn each_expr_in_stmt<'p>(s: &'p Stmt, f: &mut impl FnMut(&'p Expr)) {
     }
 }
 
-fn each_expr<'p>(e: &'p Expr, f: &mut impl FnMut(&'p Expr)) {
+fn each_expr<'p, F: FnMut(&'p Expr) + ?Sized>(e: &'p Expr, f: &mut F) {
     f(e);
     match &e.kind {
         ExprKind::Interp(parts) => {
@@ -207,10 +209,16 @@ fn each_expr<'p>(e: &'p Expr, f: &mut impl FnMut(&'p Expr)) {
 impl<'p> Interpreter<'p, '_> {
     /// Whether `f`'s body is isolated by itself, and the functions it uses.
     fn facts(&mut self, f: &'p FnDecl) -> (bool, Vec<&'p str>) {
+        self.scan(|visit| each_expr_in_block(&f.body, visit))
+    }
+
+    /// Whether the expressions `walk` visits are isolated by themselves, and
+    /// the functions they use.
+    fn scan(&self, walk: impl FnOnce(&mut dyn FnMut(&'p Expr))) -> (bool, Vec<&'p str>) {
         let fns = &self.fns;
         let mut ok = true;
         let mut uses = Vec::new();
-        each_expr_in_block(&f.body, &mut |e| match &e.kind {
+        walk(&mut |e| match &e.kind {
             ExprKind::Name(n) => {
                 if let Some((name, _)) = fns.get_key_value(n.as_str()) {
                     uses.push(*name);
@@ -231,6 +239,19 @@ impl<'p> Interpreter<'p, '_> {
             _ => {}
         });
         (ok, uses)
+    }
+
+    /// Whether the closure expression `e` is isolated: its body, and every
+    /// function it may call.
+    fn lambda_isolated(&mut self, e: &'p Expr) -> bool {
+        let ExprKind::Lambda { body, .. } = &e.kind else {
+            return false;
+        };
+        let (own, uses) = self.scan(|visit| match &**body {
+            ArmBody::Expr(x) => each_expr(x, visit),
+            ArmBody::Block(b) => each_expr_in_block(b, visit),
+        });
+        own && uses.iter().all(|n| self.isolated(n))
     }
 
     /// Whether calling `name` can be told apart from running it alone: see
@@ -551,11 +572,17 @@ enum Outcome {
     Stopped,
 }
 
-/// One call to run: the function, its arguments, the call site.
+/// What one thread runs at a time, and the call site.
 struct Task {
-    name: String,
-    args: Vec<Portable>,
+    job: Job,
     span: Span,
+}
+
+enum Job {
+    /// A call to the `async fn` `name`.
+    Call { name: String, args: Vec<Portable> },
+    /// `f` on each item of a part of a list, for `par_map`.
+    Map { f: Portable, items: Vec<Portable> },
 }
 
 /// The value used to stop a thread's call: never reaches the program.
@@ -579,7 +606,10 @@ impl<'p> Interpreter<'p, '_> {
             return None;
         }
         let args = self.copy_out(&args)?;
-        Some(Task { name, args, span })
+        Some(Task {
+            job: Job::Call { name, args },
+            span,
+        })
     }
 
     /// Copies of `values` for a thread; `None` if one holds something that
@@ -599,6 +629,120 @@ impl<'p> Interpreter<'p, '_> {
             futures: Vec::new(),
         };
         out.all(values)
+    }
+
+    /// Copies of the file-level constants for the threads; `None` if one
+    /// cannot be copied.
+    fn copy_globals(&mut self) -> Option<Vec<(String, Portable)>> {
+        let constants: Vec<(String, Value)> = self
+            .globals
+            .iter()
+            .map(|(n, v)| (n.clone(), v.clone()))
+            .collect();
+        let mut globals = Vec::with_capacity(constants.len());
+        for (name, v) in &constants {
+            let copy = self.copy_out(std::slice::from_ref(v))?;
+            globals.push((name.clone(), copy.into_iter().next().expect("one value")));
+        }
+        Some(globals)
+    }
+
+    /// `items.par_map(f)` on several cores: `None` when it should run like
+    /// `map` instead (parallelism is off, the list is short, `f` is not
+    /// isolated, or something cannot be copied). The result and the error
+    /// are the ones `map` gives.
+    pub(crate) fn par_map(
+        &mut self,
+        items: &[Value],
+        f: &Function,
+        span: Span,
+    ) -> Exec<Option<Value>> {
+        if !self.par.enabled || self.debugger.is_some() || items.len() < 2 {
+            return Ok(None);
+        }
+        let f = match f {
+            Function::Named(name) => {
+                let async_fn = self.fns.get(name.as_str()).is_none_or(|d| d.is_async);
+                if async_fn || !self.isolated(name) {
+                    return Ok(None);
+                }
+                Portable::Named(name.clone())
+            }
+            Function::Closure { key, captured } => {
+                let Some(&e) = self.lambdas.get(key) else {
+                    return Ok(None);
+                };
+                if !self.lambda_isolated(e) {
+                    return Ok(None);
+                }
+                // A closure holds every variable visible where it was made;
+                // only the ones its body (or a closure in it) names are
+                // copied to the threads, the others become `()`. The names
+                // stay, in order: compiled code finds a variable by its
+                // place, and closures made in a thread come back here.
+                let read = names_in(e);
+                let values: Vec<Value> = captured
+                    .iter()
+                    .map(|(n, v)| match read.contains_key(&**n) {
+                        true => v.clone(),
+                        false => Value::Unit,
+                    })
+                    .collect();
+                let Some(values) = self.copy_out(&values) else {
+                    return Ok(None);
+                };
+                Portable::Closure {
+                    key: *key,
+                    captured: captured
+                        .iter()
+                        .map(|(n, _)| n.to_string())
+                        .zip(values)
+                        .collect(),
+                }
+            }
+        };
+        let Some(copies) = self.copy_out(items) else {
+            return Ok(None);
+        };
+        let Some(globals) = self.copy_globals() else {
+            return Ok(None);
+        };
+        // Several parts per thread, so a thread that finishes early takes
+        // another.
+        let parts = (threads() * 4).min(copies.len());
+        let size = copies.len().div_ceil(parts);
+        let mut tasks = Vec::with_capacity(parts);
+        let mut copies = copies.into_iter().peekable();
+        while copies.peek().is_some() {
+            tasks.push(Task {
+                job: Job::Map {
+                    f: copy_portable(&f),
+                    items: copies.by_ref().take(size).collect(),
+                },
+                span,
+            });
+        }
+        let outcomes = self.run_threads(tasks, globals);
+        let lambdas = self.lambda_index();
+        let mut out = Vec::with_capacity(items.len());
+        for outcome in outcomes {
+            match outcome {
+                Outcome::Done(Portable::List(values), futures) => {
+                    let mut back = In {
+                        lambdas: &lambdas,
+                        registered: &mut self.lambdas,
+                        made: Vec::new(),
+                        futures,
+                    };
+                    out.extend(back.all(values));
+                }
+                Outcome::Done(..) => unreachable!("a part's result is a list"),
+                Outcome::Error(err) => return Err(Flow::Error(err)),
+                Outcome::Timeout(level) => return Err(Flow::Timeout(level)),
+                Outcome::Stopped => unreachable!("only parts after a failure are stopped"),
+            }
+        }
+        Ok(Some(Value::list(out)))
     }
 
     /// `await all([...])` for `items[from..]`: runs the neighbouring calls
@@ -635,18 +779,9 @@ impl<'p> Interpreter<'p, '_> {
         if tasks.len() < 2 {
             return Ok(0);
         }
-        let mut globals = Vec::with_capacity(self.globals.len());
-        let constants: Vec<(String, Value)> = self
-            .globals
-            .iter()
-            .map(|(n, v)| (n.clone(), v.clone()))
-            .collect();
-        for (name, v) in &constants {
-            let Some(copy) = self.copy_out(std::slice::from_ref(v)) else {
-                return Ok(0);
-            };
-            globals.push((name.clone(), copy.into_iter().next().expect("one value")));
-        }
+        let Some(globals) = self.copy_globals() else {
+            return Ok(0);
+        };
         let count = tasks.len();
         let outcomes = self.run_threads(tasks, globals);
         let lambdas = self.lambda_index();
@@ -720,6 +855,8 @@ impl<'p> Interpreter<'p, '_> {
     /// each ended, in order. When one fails, the ones after it are stopped.
     fn run_threads(&mut self, tasks: Vec<Task>, globals: Vec<(String, Portable)>) -> Vec<Outcome> {
         let program = self.program;
+        let lambdas = self.lambda_index();
+        let lambdas = &lambdas;
         let count = tasks.len();
         let stop: Vec<Arc<AtomicBool>> = (0..count).map(|_| Arc::default()).collect();
         let next = AtomicUsize::new(0);
@@ -730,10 +867,7 @@ impl<'p> Interpreter<'p, '_> {
         let depth = self.frames.len() - 1 + self.vm.depth;
         let permissions = self.ai.permissions().clone();
         let fs = self.fs.clone();
-        let threads = std::thread::available_parallelism()
-            .map_or(4, |n| n.get())
-            .clamp(2, 16)
-            .min(count);
+        let threads = threads().min(count);
         let globals = &globals;
         std::thread::scope(|scope| {
             for _ in 0..threads {
@@ -766,7 +900,7 @@ impl<'p> Interpreter<'p, '_> {
                             let outcome = if stop[i].load(Ordering::Relaxed) {
                                 Outcome::Stopped
                             } else {
-                                interp.run_task(task, &stop[i], deadlines, depth)
+                                interp.run_task(task, lambdas, &stop[i], deadlines, depth)
                             };
                             let failed = !matches!(outcome, Outcome::Done(..) | Outcome::Stopped);
                             if failed {
@@ -792,6 +926,7 @@ impl<'p> Interpreter<'p, '_> {
     fn run_task(
         &mut self,
         task: Task,
+        lambdas: &FastMap<usize, &'p Expr>,
         stop: &Arc<AtomicBool>,
         deadlines: &[i64],
         depth: usize,
@@ -803,14 +938,42 @@ impl<'p> Interpreter<'p, '_> {
         self.deadlines = deadlines.to_vec();
         self.stop = Some(stop.clone());
         let mut back = In {
-            lambdas: &FastMap::default(),
-            registered: &mut FastMap::default(),
+            lambdas,
+            registered: &mut self.lambdas,
             futures: Vec::new(),
             made: Vec::new(),
         };
-        let args = back.all(task.args);
-        let f = self.fns[task.name.as_str()];
-        match self.call_fn(f, args, task.span) {
+        let result = match task.job {
+            Job::Call { name, args } => {
+                let args = back.all(args);
+                let f = self.fns[name.as_str()];
+                self.call_fn(f, args, task.span)
+            }
+            Job::Map { f, items } => {
+                let f = back.value(f);
+                let items = back.all(items);
+                let Value::Function(f) = f else {
+                    unreachable!("par_map copies a function")
+                };
+                self.prepare_closure(&f);
+                let mut out = Vec::with_capacity(items.len());
+                let mut failed = None;
+                for x in items {
+                    match self.call_value(&f, vec![x], task.span) {
+                        Ok(v) => out.push(v),
+                        Err(e) => {
+                            failed = Some(e);
+                            break;
+                        }
+                    }
+                }
+                match failed {
+                    Some(e) => Err(e),
+                    None => Ok(Value::list(out)),
+                }
+            }
+        };
+        match result {
             Ok(v) => {
                 let named = |_: &str| true;
                 let mut out = Out {
@@ -837,6 +1000,25 @@ impl<'p> Interpreter<'p, '_> {
             Err(other) => Outcome::Error(Box::new(other.into_error())),
         }
     }
+}
+
+/// The names the closure expression `e` reads, in its body and in the
+/// closures inside it.
+fn names_in(e: &Expr) -> FastMap<&str, ()> {
+    let mut names = FastMap::default();
+    each_expr(e, &mut |x| {
+        if let ExprKind::Name(n) = &x.kind {
+            names.insert(n.as_str(), ());
+        }
+    });
+    names
+}
+
+/// How many threads to use.
+fn threads() -> usize {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .clamp(2, 16)
 }
 
 /// The names of the functions held by `values`.

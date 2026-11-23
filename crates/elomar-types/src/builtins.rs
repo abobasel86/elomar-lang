@@ -76,6 +76,7 @@ const LIST_METHODS: &[&str] = &[
     "sum",
     "slice",
     "map",
+    "par_map",
     "filter",
     "any",
     "all",
@@ -818,7 +819,7 @@ impl Checker {
                     _ => Ty::option(elem),
                 }
             }
-            "map" => {
+            "map" | "par_map" => {
                 let out = self.subst.fresh();
                 let f = Ty::Fn(vec![elem], Box::new(out.clone()));
                 self.typed_args(m, args, &[f], span);
