@@ -43,7 +43,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -71,7 +71,7 @@ jobs:
           fi
           rm -rf "$name"
           ls -l
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: elomar-${{ matrix.target }}
           path: dist/*
@@ -81,15 +81,15 @@ jobs:
     name: VS Code extension
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Package
         run: |
           version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           python -I editor/vscode/build_vsix.py "dist/elomar-lang-$version.vsix"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: elomar-vscode
           path: dist/*
@@ -103,8 +103,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true

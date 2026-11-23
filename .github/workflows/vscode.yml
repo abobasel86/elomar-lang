@@ -30,8 +30,8 @@ jobs:
       run:
         working-directory: editor/vscode
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Check the version matches the tag
@@ -44,7 +44,7 @@ jobs:
           fi
       - name: Package with vsce
         run: npx --yes @vscode/vsce@3 package --no-dependencies --out elomar-lang.vsix
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsce-package
           path: editor/vscode/elomar-lang.vsix
@@ -59,10 +59,10 @@ jobs:
       # publish (Trusted Publishing).
       id-token: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: vsce-package
       - name: Open VSX
