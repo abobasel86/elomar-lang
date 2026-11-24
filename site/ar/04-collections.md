@@ -122,8 +122,9 @@ fn main() {
 }
 ```
 
-وكذلك تعطي `par_any` و`par_all` و`par_find` و`par_count` و`par_sort_by` ما تعطيه `any` و`all` و`find` و`count`
-و`sort_by`، مع توزيع العمل على الأنوية.
+وكذلك تعطي `par_any` و`par_all` و`par_find` و`par_count` و`par_sort_by` و`par_flat_map` و`par_group_by` و`par_sum_by`
+و`par_min_by` و`par_max_by` ما تعطيه الدوال نفسها بلا `par_`، مع توزيع العمل على الأنوية. ويشرح درس
+[السرعة والتوازي](11-speed.html) أي الدوال تعمل على الأنوية وكيف تجعل برامجك سريعة.
 
 ## القواميس (Map)
 

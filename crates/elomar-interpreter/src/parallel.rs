@@ -1,5 +1,6 @@
-//! Running `await all([...])`, `par_map`, `par_filter` and `par_fold` on
-//! several processor cores.
+//! Running `await all([...])` and the `par_` list methods (`par_map`,
+//! `par_fold`, `par_find` and those built on them) on several processor
+//! cores.
 //!
 //! The values of the interpreter are shared through `Rc`, so they cannot
 //! move between threads. Instead, a call to an `async fn` that is isolated

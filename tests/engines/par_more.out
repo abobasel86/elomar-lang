@@ -1,0 +1,14 @@
+13501 13501
+true
+Some(1) Some(999) Some(1)
+Some(1000)
+[1, -1, 2, -2, 3, -3] 2000
+27 [1, 10, 100, 1000] [999]
+true
+[3: ["fig"], 4: ["pear", "kiwi"], 5: ["apple"]]
+0 None []
+[:] Some(5)
+noisy 1
+noisy 2
+noisy 3
+2

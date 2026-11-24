@@ -16,7 +16,10 @@
 //!
 //! Each program runs twice, in the bytecode engine and in the tree-walking
 //! interpreter, and the two must print the same and fail with the same
-//! error: a difference is reported like a crash.
+//! error: a difference is reported like a crash. A fifth of the programs
+//! are made for the `par_` list methods (see `par_program`), so that what
+//! they give on several cores is compared with what they give one item
+//! after another.
 
 use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -318,6 +321,109 @@ fn run_engine(program: &elomar_ast::Program, engine: Engine) -> Outcome {
     outcome
 }
 
+/// A program built to exercise the `par_` list methods: random lists,
+/// conditions that are true here and there, fail at one item, or never end
+/// after another, and functions that print. The tree walker runs them one
+/// item after another, the bytecode engine on several cores: they must
+/// print the same and fail with the same error.
+fn par_program(rng: &mut Rng) -> String {
+    let pick = |rng: &mut Rng, xs: &[i64]| xs[rng.below(xs.len())];
+    let len = pick(rng, &[0, 1, 2, 3, 7, 64, 300, 1000, 4000]);
+    let small = len <= 7;
+    let pred = |rng: &mut Rng| -> String {
+        let c = rng.below(len.max(1) as usize + 3) as i64;
+        match rng.below(if small { 9 } else { 8 }) {
+            0 => format!("x % {} == {}", 2 + rng.below(9), rng.below(3)),
+            1 => format!("x > {c}"),
+            2 => format!("x == {c}"),
+            3 => format!("10 div (x - {c}) > 0"),
+            4 => "x % k == 0".to_string(),
+            5 => format!("x > {c} && spin(x) > 0"),
+            6 => format!("x < {c} || 10 div (x - {}) > 0", c + 5),
+            7 => format!("x != {c} && x % {} == 1", 2 + rng.below(4)),
+            _ => "noisy(x)".to_string(),
+        }
+    };
+    let key = |rng: &mut Rng| -> String {
+        let c = rng.below(len.max(1) as usize + 3);
+        match rng.below(5) {
+            0 => format!("x % {}", 2 + rng.below(9)),
+            1 => "-x".to_string(),
+            2 => format!("10 div (x - {c})"),
+            3 => "x * x % 97".to_string(),
+            _ => "x % k".to_string(),
+        }
+    };
+    let mut body = String::new();
+    for _ in 0..1 + rng.below(4) {
+        let line = match rng.below(13) {
+            0 => format!("xs.par_map(|x| {})", key(rng)),
+            1 => format!("xs.par_filter(|x| {})", pred(rng)),
+            2 => {
+                let c = rng.below(len.max(1) as usize + 3);
+                let f = [
+                    "a + b".to_string(),
+                    "a * 31 + b".to_string(),
+                    "a - b".to_string(),
+                    format!("a + 10 div (b - {c})"),
+                ][rng.below(4)]
+                .clone();
+                format!("xs.par_fold({}, |a, b| {f})", rng.below(3))
+            }
+            3 => format!("xs.par_any(|x| {})", pred(rng)),
+            4 => format!("xs.par_all(|x| {})", pred(rng)),
+            5 => format!("xs.par_find(|x| {})", pred(rng)),
+            6 => format!("xs.par_count(|x| {})", pred(rng)),
+            7 => format!("xs.par_sort_by(|x| {}).take(8)", key(rng)),
+            8 => format!("xs.par_sum_by(|x| {})", key(rng)),
+            9 => format!(
+                "xs.par_{}_by(|x| {})",
+                ["min", "max"][rng.below(2)],
+                key(rng)
+            ),
+            10 => format!("xs.par_flat_map(|x| [{}, x]).take(6)", key(rng)),
+            11 => format!("xs.par_group_by(|x| {}).length", key(rng)),
+            _ => "xs.par_map(|x| \"{x}\").par_sort_by(|s| s.length).take(5)".to_string(),
+        };
+        body.push_str(&format!(
+            "    print({line})
+"
+        ));
+    }
+    format!(
+        "fn upto(n: Int) -> List<Int> {{
+    var out: List<Int> = []
+    for i in 1..=n {{
+        out.push(i)
+    }}
+    return out
+}}
+
+fn spin(n: Int) -> Int {{
+    var x = n
+    while true {{
+        x += 1
+    }}
+    return x
+}}
+
+fn noisy(x: Int) -> Bool {{
+    print(\"noisy {{x}}\")
+    return x % 3 == 0
+}}
+
+fn main() {{
+    let k = {k}
+    let xs = upto({len}).map(|x| (x * {a} + {b}) % {m})
+{body}}}
+",
+        k = 2 + rng.below(5),
+        a = 1 + rng.below(13),
+        b = rng.below(50),
+        m = pick(rng, &[7, 101, 100_003]),
+    )
+}
+
 fn collect_seeds(root: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack: Vec<PathBuf> = [
@@ -365,6 +471,8 @@ static LAST_PANIC: Mutex<String> = Mutex::new(String::new());
 /// Programs that ran, and those whose results were compared.
 static RAN: AtomicU64 = AtomicU64::new(0);
 static COMPARED: AtomicU64 = AtomicU64::new(0);
+/// Programs made by [`par_program`].
+static PAR: AtomicU64 = AtomicU64::new(0);
 
 fn main() {
     let mut seconds = 30u64;
@@ -412,7 +520,10 @@ fn main() {
     let current = out_dir.join("current.elo");
     while start.elapsed() < Duration::from_secs(seconds) {
         let base = &seeds[rng.below(seeds.len())];
-        let src = if rng.below(10) == 0 {
+        let src = if rng.below(5) == 0 {
+            PAR.fetch_add(1, Ordering::Relaxed);
+            par_program(&mut rng)
+        } else if rng.below(10) == 0 {
             base.clone()
         } else {
             mutate(base, &seeds, &mut rng)
@@ -446,9 +557,10 @@ fn main() {
         crashes.len()
     );
     println!(
-        "  {} ran, {} compared in both engines",
+        "  {} ran, {} compared in both engines, {} made for the par_ methods",
         RAN.load(Ordering::Relaxed),
-        COMPARED.load(Ordering::Relaxed)
+        COMPARED.load(Ordering::Relaxed),
+        PAR.load(Ordering::Relaxed)
     );
     for (n, (place, (_, count))) in crashes.iter().enumerate() {
         println!("  crash-{n}.elo  ({count}×)  {place}");

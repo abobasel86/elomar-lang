@@ -1597,6 +1597,34 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 Value::Bool(true)
             ))
         };
+        // `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by` and
+        // `par_max_by`: `f` on every item first, on the cores, then the
+        // method itself over those results.
+        let (method, done) = match method.strip_prefix("par_") {
+            Some(
+                m @ ("flat_map" | "group_by" | "sum_by" | "sum_by.float" | "min_by" | "max_by"),
+            ) => {
+                let done = match self.par_map(items, &f, span) {
+                    Ok(Some(Value::List(results))) => Some(results),
+                    Ok(_) => None,
+                    // `sum_by` may overflow before the item that failed:
+                    // going over the items again in order gives the error
+                    // `sum_by` gives. The calls were isolated, so running
+                    // them again cannot be seen, and those before the
+                    // failing item ended.
+                    Err(Flow::Error(_)) if m.starts_with("sum_by") => None,
+                    Err(e) => return Err(e),
+                };
+                (m, done)
+            }
+            _ => (method, None),
+        };
+        let key = |this: &mut Self, i: usize, x: &Value| -> Exec<Value> {
+            match &done {
+                Some(results) => Ok(results[i].clone()),
+                None => this.call_value(&f, vec![x.clone()], span),
+            }
+        };
         Ok(match method {
             "map" | "par_map" => {
                 if method == "par_map"
@@ -1708,8 +1736,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             "flat_map" => {
                 let mut out = Vec::new();
-                for x in items.iter() {
-                    if let Value::List(part) = self.call_value(&f, vec![x.clone()], span)? {
+                for (i, x) in items.iter().enumerate() {
+                    if let Value::List(part) = key(self, i, x)? {
                         out.extend(part.iter().cloned());
                     }
                 }
@@ -1718,8 +1746,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             "group_by" => {
                 let mut groups: std::collections::BTreeMap<MapKey, Vec<Value>> =
                     std::collections::BTreeMap::new();
-                for x in items.iter() {
-                    let key = self.call_value(&f, vec![x.clone()], span)?;
+                for (i, x) in items.iter().enumerate() {
+                    let key = key(self, i, x)?;
                     groups
                         .entry(MapKey::from_value(&key))
                         .or_default()
@@ -1734,8 +1762,8 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             "sum_by" => {
                 let mut total: i64 = 0;
-                for x in items.iter() {
-                    let Value::Int(n) = self.call_value(&f, vec![x.clone()], span)? else {
+                for (i, x) in items.iter().enumerate() {
+                    let Value::Int(n) = key(self, i, x)? else {
                         unreachable!("checked Int function");
                     };
                     total = total
@@ -1746,16 +1774,16 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
             "sum_by.float" => {
                 let mut total = 0.0;
-                for x in items.iter() {
-                    let v = self.call_value(&f, vec![x.clone()], span)?;
+                for (i, x) in items.iter().enumerate() {
+                    let v = key(self, i, x)?;
                     total += v.as_f64().expect("checked Float function");
                 }
                 Value::Float(total)
             }
             "min_by" | "max_by" => {
                 let mut best: Option<(Value, Value)> = None;
-                for x in items.iter() {
-                    let key = self.call_value(&f, vec![x.clone()], span)?;
+                for (i, x) in items.iter().enumerate() {
+                    let key = key(self, i, x)?;
                     let better = match &best {
                         None => true,
                         // The first of equal keys wins.
@@ -2339,6 +2367,12 @@ const HIGHER_ORDER: &[&str] = &[
     "sum_by.float",
     "min_by",
     "max_by",
+    "par_flat_map",
+    "par_group_by",
+    "par_sum_by",
+    "par_sum_by.float",
+    "par_min_by",
+    "par_max_by",
 ];
 
 /// The future for `ai.infer<T>(model, instructions, input[, timeout])`;

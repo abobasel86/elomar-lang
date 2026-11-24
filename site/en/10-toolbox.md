@@ -145,6 +145,8 @@ with `python = true`.
 
 ## Where to go next
 
+- [Speed and parallelism](11-speed.html): using every core of the
+  processor, and keeping programs fast.
 - The [language reference](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md)
   lists every function, type and error code.
 - The [examples](https://github.com/abobasel86/elomar-lang/tree/main/examples)

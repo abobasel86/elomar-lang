@@ -1,0 +1,92 @@
+// Calls and records: the time of each part in ms.
+
+use std.time
+
+type Point = { x: Int, y: Int }
+
+enum Shape {
+    Circle(Int)
+    Square(Int)
+}
+
+impl Point {
+    fn sum(self) -> Int {
+        return self.x + self.y
+    }
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn fib(n: Int) -> Int {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn area(s: Shape) -> Int {
+    return match s {
+        Shape.Circle(r) => 3 * r * r
+        Shape.Square(a) => a * a
+    }
+}
+
+fn part(name: String, start: Int) {
+    print("{name}: {time.now() - start} ms")
+}
+
+fn main() {
+    var start = time.now()
+    print(fib(27))
+    part("fib", start)
+
+    start = time.now()
+    var total = 0
+    for i in 0..1000000 {
+        total = add(total, i)
+    }
+    part("calls {total}", start)
+
+    start = time.now()
+    let inc = |a: Int| a + 1
+    var n = 0
+    for i in 0..1000000 {
+        n = inc(n)
+    }
+    part("closure calls {n}", start)
+
+    start = time.now()
+    let p: Point = { x: 3, y: 4 }
+    var s = 0
+    for i in 0..1000000 {
+        s += p.x + p.y
+    }
+    part("fields {s}", start)
+
+    start = time.now()
+    var q: Point = { x: 0, y: 0 }
+    for i in 0..300000 {
+        q = { x: q.x + 1, y: q.y + q.x }
+    }
+    part("records {q.y}", start)
+
+    start = time.now()
+    var m = 0
+    for i in 0..1000000 {
+        m += p.sum()
+    }
+    part("methods {m}", start)
+
+    start = time.now()
+    var a = 0
+    for i in 0..300000 {
+        let shape = match i % 2 == 0 {
+            true => Shape.Circle(i % 10)
+            false => Shape.Square(i % 10)
+        }
+        a += area(shape)
+    }
+    part("enums {a}", start)
+}

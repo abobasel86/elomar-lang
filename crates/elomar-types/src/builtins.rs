@@ -91,6 +91,11 @@ const LIST_METHODS: &[&str] = &[
     "par_all",
     "par_find",
     "par_count",
+    "par_flat_map",
+    "par_group_by",
+    "par_sum_by",
+    "par_min_by",
+    "par_max_by",
     "take",
     "skip",
     "unique",
@@ -197,6 +202,22 @@ const SET_METHODS: &[&str] = &[
     "to_string",
 ];
 const OTHER_METHODS: &[&str] = &["to_string"];
+
+/// The methods of each kind of value, by the name of the type, for the
+/// reference on the site (`site/*/12-reference.md`) and editors.
+pub const TYPE_METHODS: [(&str, &[&str]); 11] = [
+    ("List", LIST_METHODS),
+    ("String", STR_METHODS),
+    ("Int", INT_METHODS),
+    ("Float", FLOAT_METHODS),
+    ("Option", OPTION_METHODS),
+    ("Result", RESULT_METHODS),
+    ("Duration", DURATION_METHODS),
+    ("Map", MAP_METHODS),
+    ("Set", SET_METHODS),
+    ("errors", ERROR_METHODS),
+    ("every type", OTHER_METHODS),
+];
 
 pub(crate) fn methods_of(ty: &Ty) -> &'static [&'static str] {
     match ty {
@@ -719,7 +740,7 @@ impl Checker {
                 self.typed_args(m, args, &[Ty::list(other.clone())], span);
                 Ty::list(Ty::Tuple(vec![elem, other]))
             }
-            "sum_by" => {
+            "sum_by" | "par_sum_by" => {
                 let out = self.subst.fresh();
                 let f = Ty::Fn(vec![elem], Box::new(out.clone()));
                 self.typed_args(m, args, &[f], span);
@@ -730,15 +751,15 @@ impl Checker {
                         "E2005",
                         span,
                         Text::new(
-                            format!("`sum_by` needs a function that returns `Int` or `Float`, not `{shown}`"),
-                            format!("`sum_by` تحتاج دالة تعيد `Int` أو `Float`، لا `{shown}`"),
+                            format!("`{m}` needs a function that returns `Int` or `Float`, not `{shown}`"),
+                            format!("`{m}` تحتاج دالة تعيد `Int` أو `Float`، لا `{shown}`"),
                         ),
                     );
                     return Some(Ty::Error);
                 }
                 out
             }
-            "min_by" | "max_by" => {
+            "min_by" | "max_by" | "par_min_by" | "par_max_by" => {
                 let key = self.subst.fresh();
                 let f = Ty::Fn(vec![elem.clone()], Box::new(key.clone()));
                 self.typed_args(m, args, &[f], span);
@@ -763,13 +784,13 @@ impl Checker {
                     ("value".into(), elem),
                 ]))
             }
-            "flat_map" => {
+            "flat_map" | "par_flat_map" => {
                 let out = self.subst.fresh();
                 let f = Ty::Fn(vec![elem], Box::new(Ty::list(out.clone())));
                 self.typed_args(m, args, &[f], span);
                 Ty::list(out)
             }
-            "group_by" => {
+            "group_by" | "par_group_by" => {
                 let key = self.subst.fresh();
                 let f = Ty::Fn(vec![elem], Box::new(key.clone()));
                 self.typed_args(m, args, &[f], span);
@@ -781,12 +802,8 @@ impl Checker {
                         "E2005",
                         span,
                         Text::new(
-                            format!(
-                                "`group_by` needs a key of type `Int` or `String`, not `{shown}`"
-                            ),
-                            format!(
-                                "`group_by` تحتاج مفتاحًا من النوع `Int` أو `String`، لا `{shown}`"
-                            ),
+                            format!("`{m}` needs a key of type `Int` or `String`, not `{shown}`"),
+                            format!("`{m}` تحتاج مفتاحًا من النوع `Int` أو `String`، لا `{shown}`"),
                         ),
                     );
                 }

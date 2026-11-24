@@ -141,6 +141,7 @@ py.call<Float>("statistics", "mean", [1, 2, 3])
 
 ## إلى أين بعد ذلك
 
+- [السرعة والتوازي](11-speed.html): كيف تستخدم كل أنوية المعالج، وكيف تبقى برامجك سريعة.
 - [مرجع اللغة](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md)
   يذكر كل دالة ونوع ورمز خطأ.
 - [الأمثلة](https://github.com/abobasel86/elomar-lang/tree/main/examples)

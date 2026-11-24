@@ -138,6 +138,9 @@ pub(crate) struct Code<'p> {
     modules: Vec<ModuleCall<'p>>,
     /// Closures made in this code that were compiled too, by key.
     nested: Vec<(usize, Code<'p>)>,
+    /// Where each field read last found its field: records of one type
+    /// keep their fields in one order, so the next read looks there first.
+    field_slots: Vec<std::cell::Cell<u32>>,
 }
 
 enum Part<'p> {
@@ -315,6 +318,8 @@ enum Op<'p> {
         dst: R,
         src: R,
         name: &'p str,
+        /// The place of the read in [`Code::field_slots`].
+        slot: u32,
     },
     Index {
         dst: R,
@@ -499,6 +504,7 @@ fn new_code<'p>() -> Code<'p> {
         places: Vec::new(),
         modules: Vec::new(),
         nested: Vec::new(),
+        field_slots: Vec::new(),
     }
 }
 
@@ -1136,11 +1142,14 @@ impl<'p> Compiler<'p, '_> {
                     return Ok(());
                 }
                 let src = self.operand(target)?;
+                self.code.field_slots.push(std::cell::Cell::new(0));
+                let slot = self.code.field_slots.len() as u32 - 1;
                 self.emit(
                     Op::Field {
                         dst,
                         src,
                         name: &name.name,
+                        slot,
                     },
                     span,
                 );
@@ -1528,6 +1537,36 @@ impl<'p> Interpreter<'p, '_> {
         }
     }
 
+    /// Runs a compiled closure whose `argc` arguments are the last values on
+    /// the register stack; the same as [`Self::call_closure_compiled`].
+    fn call_closure_on_stack(
+        &mut self,
+        code: &Code<'p>,
+        argc: usize,
+        captured: &Captured,
+        span: Span,
+    ) -> Exec<Value> {
+        let base = self.vm.stack.len() - argc;
+        if let Err(e) = self.check_depth(span) {
+            self.vm.stack.truncate(base);
+            return Err(e);
+        }
+        self.vm.stack.resize(base + code.nregs, Value::Unit);
+        self.vm.depth += 1;
+        let result = self.run_code(code, base, Some(captured));
+        self.vm.depth -= 1;
+        self.vm.stack.truncate(base);
+        match result {
+            Err(Flow::Error(mut err)) => {
+                if err.trace.len() < 64 {
+                    err.trace.push(("<closure>".into(), span));
+                }
+                Err(Flow::Error(err))
+            }
+            other => other,
+        }
+    }
+
     /// Runs compiled `f`, whose arguments are the last values on the
     /// register stack.
     pub(crate) fn call_compiled(
@@ -1714,13 +1753,27 @@ impl<'p> Interpreter<'p, '_> {
                     };
                     reg!(dst) = v;
                 }
-                Op::Field { dst, src, name } => {
+                Op::Field {
+                    dst,
+                    src,
+                    name,
+                    slot,
+                } => {
                     let v = match &reg!(src) {
-                        Value::Record(fields) => fields
-                            .iter()
-                            .find(|(n, _)| **n == *name)
-                            .map(|(_, v)| v.clone())
-                            .expect("checked field"),
+                        Value::Record(fields) => {
+                            let last = &code.field_slots[slot as usize];
+                            match fields.get(last.get() as usize) {
+                                Some((n, v)) if **n == *name => v.clone(),
+                                _ => {
+                                    let i = fields
+                                        .iter()
+                                        .position(|(n, _)| **n == *name)
+                                        .expect("checked field");
+                                    last.set(i as u32);
+                                    fields[i].1.clone()
+                                }
+                            }
+                        }
                         Value::List(items) => Value::Int(items.len() as i64),
                         Value::Map(entries) => Value::Int(entries.len() as i64),
                         Value::Set(items) => Value::Int(items.len() as i64),
@@ -1852,18 +1905,36 @@ impl<'p> Interpreter<'p, '_> {
                 argc,
                 dst,
             } => {
-                let values = self.take_args(base, args, argc);
-                let v = match reg!(func).clone() {
-                    Value::Function(func) => self.call_value(&func, values, span)?,
-                    // A variable that is not a function, with the name
-                    // of one.
-                    _ if self.fns.contains_key(name) => {
-                        self.call_value(&Function::Named(name.to_string()), values, span)?
+                // A compiled closure: its arguments go straight onto the
+                // register stack, as for a named function.
+                if let Value::Function(fv) = &reg!(func)
+                    && let Function::Closure { key, captured } = &**fv
+                    && self.vm.enabled
+                    && let Some(callee_code) = self.vm.lambdas.get(key).cloned()
+                {
+                    let captured = captured.clone();
+                    let from = base + args as usize;
+                    for i in 0..argc as usize {
+                        let v = std::mem::replace(&mut self.vm.stack[from + i], Value::Unit);
+                        self.vm.stack.push(v);
                     }
-                    _ => builtins::call_function(&mut *self.host, name, values, span)
-                        .map_err(Flow::from)?,
-                };
-                reg!(dst) = v;
+                    let v =
+                        self.call_closure_on_stack(&callee_code, argc as usize, &captured, span)?;
+                    reg!(dst) = v;
+                } else {
+                    let values = self.take_args(base, args, argc);
+                    let v = match reg!(func).clone() {
+                        Value::Function(func) => self.call_value(&func, values, span)?,
+                        // A variable that is not a function, with the name
+                        // of one.
+                        _ if self.fns.contains_key(name) => {
+                            self.call_value(&Function::Named(name.to_string()), values, span)?
+                        }
+                        _ => builtins::call_function(&mut *self.host, name, values, span)
+                            .map_err(Flow::from)?,
+                    };
+                    reg!(dst) = v;
+                }
             }
             Op::CallBuiltin {
                 name,
@@ -1943,8 +2014,12 @@ impl<'p> Interpreter<'p, '_> {
             }
             Op::Record { dst, start, names } => {
                 let names = &code.records[names as usize];
-                let values = self.take_args(base, start, names.len() as u32);
-                reg!(dst) = Value::Record(Rc::new(names.iter().cloned().zip(values).collect()));
+                let from = base + start as usize;
+                let values = self.vm.stack[from..from + names.len()]
+                    .iter_mut()
+                    .map(|v| std::mem::replace(v, Value::Unit));
+                let fields = names.iter().cloned().zip(values).collect();
+                reg!(dst) = Value::Record(Rc::new(fields));
             }
             Op::Map { dst, start, n } => {
                 let items = self.take_args(base, start, n * 2);

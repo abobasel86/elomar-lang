@@ -22,7 +22,13 @@ use std::collections::{BTreeSet, HashMap};
 use elomar_ast::*;
 use elomar_diagnostics::{Diagnostic, Text};
 
-pub use builtins::{BUILTIN_FUNCTIONS, KNOWN_EFFECTS};
+pub use builtins::{BUILTIN_FUNCTIONS, KNOWN_EFFECTS, TYPE_METHODS};
+
+/// The short names of the standard modules (`use std.<name>`).
+pub const STD_MODULES: [&str; 18] = [
+    "ai", "fs", "json", "http", "db", "py", "mcp", "agent", "math", "random", "time", "os",
+    "regex", "encoding", "crypto", "server", "process", "csv",
+];
 pub use enums::{AI_ERROR_KINDS, FS_ERROR_KINDS, JSON_ERROR_KINDS};
 pub use ide::{Hover, IdeInfo};
 pub use ty::{Subst, Ty};

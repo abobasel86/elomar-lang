@@ -196,8 +196,10 @@ invalid answers and rate limits simulated by the mock.
 
 ## Learn
 
-The **[tutorial](https://abobasel86.github.io/elomar-lang/)** has ten short
-lessons in English and Arabic, from a first program to web servers and AI.
+The **[tutorial](https://abobasel86.github.io/elomar-lang/)** has twelve short
+lessons in English and Arabic, from a first program to web servers, AI and
+using every processor core, and a reference page with every function and
+method.
 Most lessons end with exercises you solve in the browser: press **Check**
 and your answer is tested on several cases, with hints and the solution
 when you need them. Every program in the tutorial is checked by the test

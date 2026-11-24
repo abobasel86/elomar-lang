@@ -1,0 +1,70 @@
+// `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by` and
+// `par_max_by` give what `flat_map`, `group_by`, `sum_by`, `min_by` and
+// `max_by` give, on several cores or not.
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn digits(n: Int) -> Int {
+    var x = n
+    var s = 0
+    while x > 0 {
+        s += x % 10
+        x = x div 10
+    }
+    return s
+}
+
+fn spin(n: Int) -> Int {
+    var x = n
+    while true {
+        x += 1
+    }
+    return x
+}
+
+// Fails at 700, never ends after 800; the sum overflows at 3 first.
+fn big(n: Int) -> Int {
+    if n == 700 {
+        return 1 div (n - 700)
+    }
+    if n > 800 {
+        return spin(n)
+    }
+    return 4611686018427387904
+}
+
+fn noisy(n: Int) -> Int {
+    print("noisy {n}")
+    return n % 2
+}
+
+fn main() {
+    let xs = upto(1000)
+
+    print(xs.par_sum_by(digits), xs.sum_by(digits))
+    print(xs.par_sum_by(|x| x.to_float() / 4.0) == xs.sum_by(|x| x.to_float() / 4.0))
+    print(xs.par_min_by(digits), xs.par_max_by(digits), xs.par_max_by(|x| -digits(x)))
+    print(xs.par_min_by(|x| (digits(x), -x)))
+    print(xs.par_flat_map(|x| [x, -x]).take(6), xs.par_flat_map(|x| [x, -x]).length)
+    let groups = xs.par_group_by(digits)
+    print(groups.length, groups[1], groups[27])
+    print(groups == xs.group_by(digits))
+    print(["fig", "pear", "kiwi", "apple"].par_group_by(|s| s.length))
+
+    // Short and empty lists.
+    let none: List<Int> = []
+    print(none.par_sum_by(digits), none.par_min_by(digits), none.par_flat_map(|x| [x]))
+    print(none.par_group_by(digits), [5].par_max_by(digits))
+
+    // Printing keeps its order: these run one after another.
+    print(upto(3).par_sum_by(noisy))
+
+    // The overflow comes before the item that fails, as in `sum_by`.
+    print(xs.par_sum_by(big))
+}

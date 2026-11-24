@@ -127,9 +127,11 @@ fn main() {
 }
 ```
 
-`par_any`, `par_all`, `par_find`, `par_count` and `par_sort_by` likewise
-give what `any`, `all`, `find`, `count` and `sort_by` give, with the work
-split over the cores.
+`par_any`, `par_all`, `par_find`, `par_count`, `par_sort_by`,
+`par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by` and
+`par_max_by` likewise give what the same methods without `par_` give, with
+the work split over the cores. [Speed and parallelism](11-speed.html) says
+which functions can run on the cores and how to make programs fast.
 
 ## Maps
 

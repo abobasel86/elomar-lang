@@ -4,6 +4,43 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **`par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by` and
+  `par_max_by`**: what `flat_map`, `group_by`, `sum_by`, `min_by` and
+  `max_by` give, with `f` run on every item on several processor cores
+  under the same rule as `par_map`, then the method finished in order.
+  When an item fails in `par_sum_by`, the items are gone through again in
+  order, so the error is `sum_by`'s (an overflow before that item comes
+  first). In `bench/par_more.elo`, over 300,000 numbers, they are 5 to 9
+  times faster (`par_sum_by` of Collatz steps: 140 ms instead of 1248 ms).
+- **The site has everything.** A lesson, *Speed and parallelism*, shows
+  every `par_` method, which functions run on the cores, `await all`,
+  writing fast code and `ELOMAR_PARALLEL` / `ELOMAR_ENGINE`. A reference
+  page lists every built-in function, every method of every type, every
+  function of the standard modules and every command, in English and
+  Arabic, and a test fails when one is added without a line there. A
+  *What's new* page tells what each version brought.
+
+### Changed
+
+- Reading a record's field remembers where the field was found, so the
+  next read with the same instruction looks there first, and a record is
+  built with one allocation instead of two: reading the sixth of six
+  fields a million times takes 20 ms instead of 29 ms, and building
+  300,000 records 18 ms instead of 23 ms (`bench/calls.elo`). Calling a
+  compiled closure passes its arguments straight to its registers.
+
+### Testing
+
+- A fifth of the programs the fuzzer makes are written for the `par_`
+  methods: random lists, conditions true here and there, failing at one
+  item or never ending after another, and functions that print. Each runs
+  on every core and on one, and the two must agree: about 9,000 such
+  programs ran without a difference.
+
 ## [1.5.0] - 2026-11-24
 
 ### Added

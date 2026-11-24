@@ -1080,3 +1080,45 @@ fn build_makes_a_standalone_executable() {
     assert!(!bad_exe.exists());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Everything the language offers is on the site: every built-in function,
+/// every method of every type and every function of the standard modules
+/// is named in the reference page, in English and in Arabic. Adding one
+/// without a line there fails here.
+#[test]
+fn site_reference_is_complete() {
+    for lang in ["en", "ar"] {
+        let page = root().join(format!("site/{lang}/12-reference.md"));
+        let text = std::fs::read_to_string(&page).unwrap();
+        let mut missing = Vec::new();
+        for name in elomar_types::BUILTIN_FUNCTIONS {
+            if !text.contains(&format!("`{name}(")) {
+                missing.push(name.to_string());
+            }
+        }
+        for (ty, methods) in elomar_types::TYPE_METHODS {
+            for m in methods.iter().filter(|m| !m.contains('.')) {
+                let named = [format!("`{m}("), format!("`.{m}`"), format!("`{m}`")];
+                if !named.iter().any(|n| text.contains(n.as_str())) {
+                    missing.push(format!("{ty}.{m}"));
+                }
+            }
+        }
+        for module in elomar_types::STD_MODULES {
+            if !text.contains(&format!("`std.{module}`")) {
+                missing.push(format!("std.{module}"));
+            }
+            for f in elomar_types::module_functions(module) {
+                if !text.contains(&format!("`{module}.{f}")) {
+                    missing.push(format!("{module}.{f}"));
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "{} does not name: {}",
+            page.display(),
+            missing.join(", ")
+        );
+    }
+}
