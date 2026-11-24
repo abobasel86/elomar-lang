@@ -1,0 +1,103 @@
+// `par_any`, `par_all`, `par_find`, `par_count` and `par_sort_by` give what
+// `any`, `all`, `find`, `count` and `sort_by` give, on several cores or not.
+
+let LIMIT = 900
+
+type Person = { name: String, age: Int }
+
+fn person(i: Int) -> Person {
+    return { name: "p{i % 7}", age: 20 + i % 13 }
+}
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    var d = 2
+    while d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d += 1
+    }
+    return true
+}
+
+fn spin(n: Int) -> Int {
+    var x = n
+    while true {
+        x += 1
+    }
+    return x
+}
+
+// Found at 500; after it, items fail or never end.
+fn tricky(n: Int) -> Bool {
+    if n == 500 {
+        return true
+    }
+    if n == 600 {
+        return 10 div (n - 600) > 0
+    }
+    if n > 700 {
+        return spin(n) > 0
+    }
+    return false
+}
+
+// Fails at 300, before anything is found; never ends after 700.
+fn failing(n: Int) -> Bool {
+    if n == 300 {
+        return 10 div (n - 300) > 0
+    }
+    if n > 700 {
+        return spin(n) > 0
+    }
+    return n == 500
+}
+
+fn noisy(n: Int) -> Bool {
+    print("noisy {n}")
+    return n == 3
+}
+
+fn main() {
+    let xs = upto(1000)
+
+    print(xs.par_any(prime), xs.par_all(prime), xs.par_count(prime))
+    print(xs.par_find(|x| x > LIMIT && prime(x)), xs.par_find(|x| x > 5000))
+    print(xs.par_all(|x| x > 0), xs.par_any(|x| x < 0))
+    print(xs.par_count(|x| x % 3 == 0) == xs.count(|x| x % 3 == 0))
+
+    // The first match wins; what comes after it does not matter.
+    print(xs.par_find(tricky), xs.par_any(tricky), xs.par_all(|x| !tricky(x)))
+
+    // par_sort_by is stable, with keys of every kind.
+    let people = upto(40).map(person)
+    let by_age = people.par_sort_by(|p| p.age)
+    print(by_age.take(6))
+    print(by_age == people.sort_by(|p| p.age))
+    print(people.par_sort_by(|p| (p.name, -p.age)).take(4))
+    print(xs.par_sort_by(|x| -(x % 10)).take(5))
+    print(["pear", "fig", "apple"].par_sort_by(|s| s.length))
+
+    // Short and empty lists.
+    let none: List<Int> = []
+    print(none.par_any(prime), none.par_all(prime), none.par_find(prime), none.par_count(prime))
+    print(none.par_sort_by(|x| x), [7].par_find(prime), [8].par_all(prime))
+
+    // Printing keeps its order: these run one after another.
+    print(upto(5).par_find(noisy))
+    print(upto(4).par_count(noisy))
+
+    // An error before the match wins, and the endless calls are stopped.
+    print(xs.par_find(failing))
+}

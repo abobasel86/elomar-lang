@@ -319,9 +319,9 @@ fuzzer makes. To run a program in the tree walker only:
 ELOMAR_ENGINE=tree elomar run main.elo
 ```
 
-`await all([...])`, `par_map`, `par_filter` and `par_fold` run isolated
-calls on several cores; the comparison runs them one after another in the
-tree walker.
+`await all([...])` and the `par_` list methods (`par_map`, `par_filter`,
+`par_fold`, `par_any`, ...) run isolated calls on several cores; the
+comparison runs them one after another in the tree walker.
 `ELOMAR_PARALLEL=0` runs them one after another in any engine.
 
 To time the interpreter, build it in release mode and run the programs in

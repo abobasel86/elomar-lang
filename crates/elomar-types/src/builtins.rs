@@ -86,6 +86,11 @@ const LIST_METHODS: &[&str] = &[
     "fold",
     "par_fold",
     "sort_by",
+    "par_sort_by",
+    "par_any",
+    "par_all",
+    "par_find",
+    "par_count",
     "take",
     "skip",
     "unique",
@@ -827,13 +832,14 @@ impl Checker {
                 self.typed_args(m, args, &[f], span);
                 Ty::list(out)
             }
-            "filter" | "par_filter" | "any" | "all" | "find" | "count" => {
+            "filter" | "par_filter" | "any" | "all" | "find" | "count" | "par_any" | "par_all"
+            | "par_find" | "par_count" => {
                 let f = Ty::Fn(vec![elem.clone()], Box::new(Ty::Bool));
                 self.typed_args(m, args, &[f], span);
                 match m {
                     "filter" | "par_filter" => list,
-                    "find" => Ty::option(elem),
-                    "count" => Ty::Int,
+                    "find" | "par_find" => Ty::option(elem),
+                    "count" | "par_count" => Ty::Int,
                     _ => Ty::Bool,
                 }
             }
@@ -848,7 +854,7 @@ impl Checker {
                 self.typed_args(m, args, &[elem.clone(), f], span);
                 elem
             }
-            "sort_by" => {
+            "sort_by" | "par_sort_by" => {
                 let key = self.subst.fresh();
                 let f = Ty::Fn(vec![elem], Box::new(key.clone()));
                 self.typed_args(m, args, &[f], span);
@@ -859,8 +865,8 @@ impl Checker {
                         "E2005",
                         span,
                         Text::new(
-                            format!("`sort_by` needs a key of type `Int`, `Float`, `String` or a tuple of these, not `{shown}`"),
-                            format!("`sort_by` تحتاج مفتاحًا من النوع `Int` أو `Float` أو `String`، لا `{shown}`"),
+                            format!("`{m}` needs a key of type `Int`, `Float`, `String` or a tuple of these, not `{shown}`"),
+                            format!("`{m}` تحتاج مفتاحًا من النوع `Int` أو `Float` أو `String`، لا `{shown}`"),
                         ),
                     );
                 }

@@ -6,6 +6,19 @@ change the language.
 
 ## [Unreleased]
 
+### Added
+
+- **`par_any`, `par_all`, `par_find`, `par_count` and `par_sort_by`**: what
+  `any`, `all`, `find`, `count` and `sort_by` give, with `f` run on several
+  processor cores under the same rule as `par_map`. `par_any`, `par_all`
+  and `par_find` look in all the parts at once and stop the parts after
+  the first that finds the item; nothing after that item changes the
+  result, so an error or an endless loop there does not show, as `find`
+  never reaches it. `par_sort_by` computes the keys on the cores and keeps
+  the sort stable. In `bench/par_find.elo`, over 300,000 numbers, they are
+  5 to 7 times faster (`par_sort_by` with Collatz keys: 152 ms instead of
+  1040 ms).
+
 ### Changed
 
 - `s = s + t` and `s += t` append to a string or list in place when no

@@ -1629,6 +1629,27 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 Value::list(out)
             }
+            "par_any" | "par_all" | "par_find" => {
+                let want = method != "par_all";
+                let hit = match self.par_find(items, &f, want, span)? {
+                    Some(hit) => hit,
+                    None => {
+                        let mut hit = None;
+                        for (i, x) in items.iter().enumerate() {
+                            if test(self, x)? == want {
+                                hit = Some(i);
+                                break;
+                            }
+                        }
+                        hit
+                    }
+                };
+                match method {
+                    "par_find" => hit.map_or_else(Value::none, |i| Value::some(items[i].clone())),
+                    "par_any" => Value::Bool(hit.is_some()),
+                    _ => Value::Bool(hit.is_none()),
+                }
+            }
             "any" | "all" => {
                 let want = method == "any";
                 for x in items.iter() {
@@ -1646,7 +1667,16 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 Value::none()
             }
-            "count" => {
+            "count" | "par_count" => {
+                if method == "par_count"
+                    && let Some(Value::List(results)) = self.par_map(items, &f, span)?
+                {
+                    let n = results
+                        .iter()
+                        .filter(|r| matches!(r, Value::Bool(true)))
+                        .count();
+                    return Ok(Value::Int(n as i64));
+                }
                 let mut n = 0;
                 for x in items.iter() {
                     if test(self, x)? {
@@ -1738,10 +1768,16 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 best.map_or(Value::none(), |(_, x)| Value::some(x))
             }
-            "sort_by" => {
+            "sort_by" | "par_sort_by" => {
                 let mut keyed = Vec::with_capacity(items.len());
-                for x in items.iter() {
-                    keyed.push((self.call_value(&f, vec![x.clone()], span)?, x.clone()));
+                if method == "par_sort_by"
+                    && let Some(Value::List(keys)) = self.par_map(items, &f, span)?
+                {
+                    keyed.extend(keys.iter().cloned().zip(items.iter().cloned()));
+                } else {
+                    for x in items.iter() {
+                        keyed.push((self.call_value(&f, vec![x.clone()], span)?, x.clone()));
+                    }
                 }
                 // Stable: equal keys keep their order.
                 keyed.sort_by(|(a, _), (b, _)| a.compare(b));
@@ -2292,6 +2328,11 @@ const HIGHER_ORDER: &[&str] = &[
     "fold",
     "par_fold",
     "sort_by",
+    "par_sort_by",
+    "par_any",
+    "par_all",
+    "par_find",
+    "par_count",
     "flat_map",
     "group_by",
     "sum_by",

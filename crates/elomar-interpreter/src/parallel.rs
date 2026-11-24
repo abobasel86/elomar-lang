@@ -571,6 +571,9 @@ enum Outcome {
     Timeout(usize),
     /// Stopped because a call before it failed; or never started.
     Stopped,
+    /// The `i`th item of a part was the one looked for (`par_find`, `par_any`
+    /// and `par_all`); the parts after it are stopped, as after a failure.
+    Found(usize),
 }
 
 /// What one thread runs at a time, and the call site.
@@ -586,6 +589,20 @@ enum Job {
     Map { f: Portable, items: Vec<Portable> },
     /// `f` from the first item of a part over the others, for `par_fold`.
     Fold { f: Portable, items: Vec<Portable> },
+    /// `f` on the items of a part until it gives `want`.
+    Find {
+        f: Portable,
+        items: Vec<Portable>,
+        want: bool,
+    },
+}
+
+/// What [`Interpreter::run_parts`] does with each part.
+#[derive(Clone, Copy)]
+enum PartJob {
+    Map,
+    Fold,
+    Find(bool),
 }
 
 /// The value used to stop a thread's call: never reaches the program.
@@ -668,7 +685,7 @@ impl<'p> Interpreter<'p, '_> {
         // another.
         let size = items.len().div_ceil((threads() * 4).min(items.len()));
         let parts = items.chunks(size).map(<[Value]>::to_vec).collect();
-        let Some(results) = self.run_parts(parts, f, false, span)? else {
+        let Some(results) = self.run_parts(parts, f, PartJob::Map, span)? else {
             return Ok(None);
         };
         let mut out = Vec::with_capacity(items.len());
@@ -694,17 +711,49 @@ impl<'p> Interpreter<'p, '_> {
         if items.len() < 2 {
             return Ok(None);
         }
-        self.run_parts(fold_parts(init, items), f, true, span)
+        self.run_parts(fold_parts(init, items), f, PartJob::Fold, span)
     }
 
-    /// Runs `f` over each part on the threads (`fold`: from its first item
-    /// over the others; otherwise on each item, giving a list). The results
-    /// are in the order of the parts, and the error is the first part's.
+    /// The place of the first item of `items` for which `f` gives `want`,
+    /// found on several cores (for `par_find`, `par_any` and `par_all`);
+    /// `None` when it should be looked for here instead. An item after it
+    /// is never the cause of an error, as `find` would not have reached it.
+    pub(crate) fn par_find(
+        &mut self,
+        items: &[Value],
+        f: &Function,
+        want: bool,
+        span: Span,
+    ) -> Exec<Option<Option<usize>>> {
+        if items.len() < 2 {
+            return Ok(None);
+        }
+        let size = items.len().div_ceil((threads() * 4).min(items.len()));
+        let parts = items.chunks(size).map(<[Value]>::to_vec).collect();
+        let Some(results) = self.run_parts(parts, f, PartJob::Find(want), span)? else {
+            return Ok(None);
+        };
+        for (part, result) in results.iter().enumerate() {
+            if let Value::Int(i) = result
+                && *i >= 0
+            {
+                return Ok(Some(Some(part * size + *i as usize)));
+            }
+        }
+        Ok(Some(None))
+    }
+
+    /// Runs `f` over each part on the threads: on each item, giving a list
+    /// (`Map`); from the first item over the others (`Fold`); or until it
+    /// gives the value looked for, giving its place in the part or -1
+    /// (`Find`: the parts after the first that finds it are left out). The
+    /// results are in the order of the parts, and the error is the first
+    /// part's.
     fn run_parts(
         &mut self,
         parts: Vec<Vec<Value>>,
         f: &Function,
-        fold: bool,
+        job: PartJob,
         span: Span,
     ) -> Exec<Option<Vec<Value>>> {
         if !self.par.enabled || self.debugger.is_some() {
@@ -720,9 +769,10 @@ impl<'p> Interpreter<'p, '_> {
             };
             let f = copy_portable(&f);
             tasks.push(Task {
-                job: match fold {
-                    true => Job::Fold { f, items },
-                    false => Job::Map { f, items },
+                job: match job {
+                    PartJob::Map => Job::Map { f, items },
+                    PartJob::Fold => Job::Fold { f, items },
+                    PartJob::Find(want) => Job::Find { f, items, want },
                 },
                 span,
             });
@@ -743,6 +793,10 @@ impl<'p> Interpreter<'p, '_> {
                         futures,
                     };
                     out.push(back.value(value));
+                }
+                Outcome::Found(i) => {
+                    out.push(Value::Int(i as i64));
+                    break;
                 }
                 Outcome::Error(err) => return Err(Flow::Error(err)),
                 Outcome::Timeout(level) => return Err(Flow::Timeout(level)),
@@ -862,6 +916,7 @@ impl<'p> Interpreter<'p, '_> {
                     return Err(Flow::Timeout(level));
                 }
                 Outcome::Stopped => unreachable!("only calls after a failure are stopped"),
+                Outcome::Found(_) => unreachable!("calls look for nothing"),
             }
         }
         Ok(count)
@@ -1006,6 +1061,27 @@ impl<'p> Interpreter<'p, '_> {
                 self.prepare_closure(&f);
                 self.fold_part(&f, items, task.span)
             }
+            Job::Find { f, items, want } => {
+                let Value::Function(f) = back.value(f) else {
+                    unreachable!("par_find copies a function")
+                };
+                let items = back.all(items);
+                self.prepare_closure(&f);
+                let mut result = Ok(Value::Int(-1));
+                for (i, x) in items.into_iter().enumerate() {
+                    match self.call_value(&f, vec![x], task.span) {
+                        Ok(v) if matches!(v, Value::Bool(true)) == want => {
+                            return Outcome::Found(i);
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            result = Err(e);
+                            break;
+                        }
+                    }
+                }
+                result
+            }
             Job::Map { f, items } => {
                 let f = back.value(f);
                 let items = back.all(items);
@@ -1071,7 +1147,6 @@ fn names_in(e: &Expr) -> FastMap<&str, ()> {
     names
 }
 
-/// How many threads to use.
 /// The parts `par_fold` folds on their own, then together: at most
 /// [`FOLD_PARTS`] neighbouring runs of `items`, the first after `init`. They
 /// depend on the length alone, so the result is the same on every machine,
@@ -1095,6 +1170,7 @@ pub(crate) fn fold_parts(init: &Value, items: &[Value]) -> Vec<Vec<Value>> {
 /// How many parts `par_fold` splits a list into, at most.
 const FOLD_PARTS: usize = 64;
 
+/// How many threads to use.
 fn threads() -> usize {
     std::thread::available_parallelism()
         .map_or(4, |n| n.get())

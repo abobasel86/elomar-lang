@@ -122,6 +122,9 @@ fn main() {
 }
 ```
 
+وكذلك تعطي `par_any` و`par_all` و`par_find` و`par_count` و`par_sort_by` ما تعطيه `any` و`all` و`find` و`count`
+و`sort_by`، مع توزيع العمل على الأنوية.
+
 ## القواميس (Map)
 
 القاموس يربط مفاتيح بقيم:

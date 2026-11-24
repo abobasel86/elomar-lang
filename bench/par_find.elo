@@ -1,0 +1,58 @@
+// `par_count`, `par_find`, `par_all` and `par_sort_by` over heavy checks.
+// Prints each result and its time in ms; compare with
+// `ELOMAR_PARALLEL=0`, which runs them like `count`, `find`, `all` and
+// `sort_by`.
+
+use std.time
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    var d = 2
+    while d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d += 1
+    }
+    return true
+}
+
+fn collatz(n: Int) -> Int {
+    var x = n
+    var steps = 0
+    while x != 1 {
+        if x % 2 == 0 {
+            x = x div 2
+        } else {
+            x = 3 * x + 1
+        }
+        steps += 1
+    }
+    return steps
+}
+
+fn main() {
+    let xs = upto(300000)
+    var start = time.now()
+    let primes = xs.par_count(prime)
+    print("par_count:   {primes} in {time.now() - start} ms")
+    start = time.now()
+    let long = xs.par_find(|n| collatz(n) > 440)
+    print("par_find:    {long} in {time.now() - start} ms")
+    start = time.now()
+    let short = xs.par_all(|n| collatz(n) < 500)
+    print("par_all:     {short} in {time.now() - start} ms")
+    start = time.now()
+    let sorted = xs.par_sort_by(collatz)
+    print("par_sort_by: {sorted.last()} in {time.now() - start} ms")
+}

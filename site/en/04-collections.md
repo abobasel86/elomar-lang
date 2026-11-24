@@ -127,6 +127,10 @@ fn main() {
 }
 ```
 
+`par_any`, `par_all`, `par_find`, `par_count` and `par_sort_by` likewise
+give what `any`, `all`, `find`, `count` and `sort_by` give, with the work
+split over the cores.
+
 ## Maps
 
 A map connects keys to values:

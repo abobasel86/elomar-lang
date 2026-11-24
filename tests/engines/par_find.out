@@ -1,0 +1,21 @@
+true false 168
+Some(907) None
+true false
+true
+Some(500) true false
+[{ name: "p6", age: 20 }, { name: "p5", age: 20 }, { name: "p4", age: 20 }, { name: "p1", age: 21 }, { name: "p0", age: 21 }, { name: "p6", age: 21 }]
+true
+[{ name: "p0", age: 29 }, { name: "p0", age: 28 }, { name: "p0", age: 27 }, { name: "p0", age: 22 }]
+[9, 19, 29, 39, 49]
+["fig", "pear", "apple"]
+false true None 0
+[] Some(7) false
+noisy 1
+noisy 2
+noisy 3
+Some(3)
+noisy 1
+noisy 2
+noisy 3
+noisy 4
+1
