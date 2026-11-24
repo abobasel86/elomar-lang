@@ -175,7 +175,7 @@ pub(crate) fn from_json(schema: &Schema, json: &Json) -> Value {
         }
         (Schema::Map(t), Json::Object(obj)) => Value::Map(Rc::new(
             obj.iter()
-                .map(|(k, v)| (crate::MapKey::Str(k.as_str().into()), from_json(t, v)))
+                .map(|(k, v)| (crate::MapKey::Str(Rc::new(k.clone())), from_json(t, v)))
                 .collect(),
         )),
         (Schema::Option(_), Json::Null) => Value::none(),

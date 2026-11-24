@@ -1620,6 +1620,28 @@ impl<'p> Interpreter<'p, '_> {
                         reg!(dst) = v;
                         continue;
                     }
+                    // `s = s + t` and `s += t` append in place, so building a
+                    // string or list in a loop is not quadratic; one that
+                    // other values share is copied once first.
+                    if op == BinOp::Add && dst == a && a != b {
+                        match (&reg!(a), &reg!(b)) {
+                            (Value::Str(_), Value::Str(t)) => {
+                                let t = t.clone();
+                                if let Value::Str(s) = &mut reg!(a) {
+                                    Rc::make_mut(s).push_str(&t);
+                                }
+                                continue;
+                            }
+                            (Value::List(_), Value::List(t)) => {
+                                let t = t.clone();
+                                if let Value::List(s) = &mut reg!(a) {
+                                    Rc::make_mut(s).extend(t.iter().cloned());
+                                }
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     let (l, r) = (reg!(a).clone(), reg!(b).clone());
                     reg!(dst) = self.binary(op, l, r, span)?;
                 }
@@ -1702,7 +1724,7 @@ impl<'p> Interpreter<'p, '_> {
                         Value::List(items) => Value::Int(items.len() as i64),
                         Value::Map(entries) => Value::Int(entries.len() as i64),
                         Value::Set(items) => Value::Int(items.len() as i64),
-                        Value::Str(s) => Value::Int(builtins::graphemes(s).count() as i64),
+                        Value::Str(s) => Value::Int(builtins::str_length(s) as i64),
                         Value::Tuple(items) => {
                             let i: usize = name.parse().expect("checked tuple index");
                             items[i].clone()

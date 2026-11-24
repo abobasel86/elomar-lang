@@ -4,6 +4,19 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Changed
+
+- `s = s + t` and `s += t` append to a string or list in place when no
+  other value shares it, instead of copying it each time: building a
+  470 KB string in a loop takes 9 ms instead of 571 ms.
+- `.length` and `slice` on a long string remember where its visible
+  characters start, so a loop over a string by index is no longer
+  quadratic: going through 40,000 characters with `s.slice(i, i + 1)`
+  takes 5 ms instead of 37 s. `bench/data.elo` times text, maps, JSON and
+  SQLite.
+
 ## [1.4.0] - 2026-11-24
 
 ### Added

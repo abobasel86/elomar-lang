@@ -1,0 +1,127 @@
+// Text, maps, JSON and SQLite: the time of each part in ms.
+
+use std.time
+use std.json
+use std.db
+
+type Row = { id: Int, name: String, score: Float, tags: List<String> }
+
+type Book = { id: Int, title: String, year: Int }
+
+fn row(i: Int) -> Row {
+    return { id: i, name: "user {i}", score: i.to_float() / 7.0, tags: ["a", "b{i % 10}"] }
+}
+
+fn part(name: String, start: Int) {
+    print("{name}: {time.now() - start} ms")
+}
+
+fn main() {
+    // Text: building, splitting, searching.
+    var start = time.now()
+    var parts: List<String> = []
+    for i in 0..60000 {
+        parts.push("word{i % 97}")
+    }
+    let text = parts.join(" ")
+    part("join", start)
+    start = time.now()
+    let words = text.split(" ")
+    var hits = 0
+    for w in words {
+        if w.contains("9") && w.starts_with("word") {
+            hits += 1
+        }
+    }
+    part("split+search {hits}", start)
+    start = time.now()
+    var total = 0
+    for w in words {
+        total += w.upper().replace("WORD", "").length + w.slice(0, 2).length
+    }
+    part("upper+replace+slice {total}", start)
+    start = time.now()
+    var built = ""
+    for i in 0..20000 {
+        built = built + "{i},"
+    }
+    part("append {built.length}", start)
+    start = time.now()
+    let chars = text.chars().length
+    let lines = text.replace(" ", "\n").lines().length
+    part("chars+lines {chars} {lines}", start)
+    start = time.now()
+    let arabic = "مَرْحَبًا بِكُمْ ".repeat(2500)
+    var at = 0
+    var marks = 0
+    while at < arabic.length {
+        if arabic.slice(at, at + 1) == " " {
+            marks += 1
+        }
+        at += 1
+    }
+    part("slice loop {marks}", start)
+
+    // Maps: counting words, string and int keys.
+    start = time.now()
+    var counts: Map<String, Int> = [:]
+    for w in words {
+        counts[w] = counts.get_or(w, 0) + 1
+    }
+    part("count words {counts.length}", start)
+    start = time.now()
+    var squares: Map<Int, Int> = [:]
+    for i in 0..60000 {
+        squares[i] = i * i
+    }
+    var sum = 0
+    for i in 0..60000 {
+        sum += squares.get_or(i, 0)
+    }
+    part("int keys {sum}", start)
+    start = time.now()
+    var n = 0
+    for e in counts.entries() {
+        n += e.value
+    }
+    for k in squares.keys() {
+        n += k % 2
+    }
+    part("entries+keys {n}", start)
+
+    // JSON: records out and back.
+    start = time.now()
+    var rows: List<Row> = []
+    for i in 0..20000 {
+        rows.push(row(i))
+    }
+    let out = json.stringify(rows)
+    part("json.stringify {out.length}", start)
+    start = time.now()
+    match json.parse<List<Row>>(out) {
+        Ok(back) => part("json.parse {back.length}", start)
+        Err(e) => print(e.message())
+    }
+
+    // SQLite: inserts, then a query into records.
+    let conn = match db.open(":memory:") {
+        Ok(c) => c
+        Err(e) => {
+            print(e.message())
+            return
+        }
+    }
+    db.execute(conn, "CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, year INT)")
+    start = time.now()
+    db.execute(conn, "BEGIN")
+    for i in 0..20000 {
+        db.execute(conn, "INSERT INTO books (title, year) VALUES (:t, :y)", { t: "book {i}", y: 1900 + i % 120 })
+    }
+    db.execute(conn, "COMMIT")
+    part("db insert", start)
+    start = time.now()
+    match db.query<Book>(conn, "SELECT * FROM books WHERE year > :y", { y: 1950 }) {
+        Ok(books) => part("db query {books.length}", start)
+        Err(e) => print(e.message())
+    }
+}

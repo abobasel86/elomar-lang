@@ -286,7 +286,7 @@ fn csv(func: &str, args: &[Value]) -> Value {
                 let map = header
                     .iter()
                     .zip(row)
-                    .map(|(k, v)| (crate::MapKey::Str(Rc::from(k.as_str())), Value::str(v)))
+                    .map(|(k, v)| (crate::MapKey::Str(Rc::new(k.clone())), Value::str(v)))
                     .collect();
                 out.push(Value::Map(Rc::new(map)));
             }

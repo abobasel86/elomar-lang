@@ -1,0 +1,66 @@
+// `s = s + t` and `s += t` on strings and lists: values stay values, so a
+// copy made before the append keeps what it had.
+
+type Box = { label: String, items: List<Int> }
+
+fn grow(s: String) -> String {
+    var out = s
+    out += "!"
+    return out
+}
+
+fn main() {
+    var s = "a"
+    let t = s
+    s = s + "b"
+    s += "c"
+    print(t, s)
+
+    var words = ["x", "y"]
+    var w = words[0]
+    w += "z"
+    print(words, w)
+
+    let keep = s
+    let f = || keep + "?"
+    s += "d"
+    print(f(), s, keep)
+
+    var counts: Map<String, Int> = [:]
+    var key = "k"
+    counts[key] = 1
+    key += "2"
+    counts[key] = 2
+    print(counts)
+
+    let before = s
+    print(grow(s), s, before)
+
+    var xs = [1, 2]
+    let ys = xs
+    xs = xs + [3]
+    xs += [4, 5]
+    print(ys, xs)
+
+    let b: Box = { label: s, items: xs }
+    s += "e"
+    xs += [6]
+    print(b, s, xs)
+
+    var built = ""
+    var nums: List<Int> = []
+    for i in 0..2000 {
+        built = built + "{i % 10}"
+        nums = nums + [i]
+    }
+    print(built.length, built.slice(0, 12), nums.length, nums.sum())
+
+    // Adding a variable to itself.
+    var twice = "ab"
+    twice = twice + twice
+    twice += twice
+    var list2 = [1]
+    list2 = list2 + list2
+    list2 += list2
+    print(twice, list2)
+}

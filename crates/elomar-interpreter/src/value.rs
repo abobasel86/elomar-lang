@@ -35,7 +35,7 @@ pub enum Thunk {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MapKey {
     Int(i64),
-    Str(Rc<str>),
+    Str(Rc<String>),
 }
 
 impl MapKey {
@@ -91,7 +91,8 @@ pub enum Value {
     Int(i64),
     Float(f64),
     Bool(bool),
-    Str(Rc<str>),
+    /// Grows in place when appended to and not shared (`s = s + t`).
+    Str(Rc<String>),
     Unit,
     List(Rc<Vec<Value>>),
     /// Fields in the order they were written.
@@ -121,8 +122,8 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn str(s: impl Into<Rc<str>>) -> Value {
-        Value::Str(s.into())
+    pub fn str(s: impl Into<String>) -> Value {
+        Value::Str(Rc::new(s.into()))
     }
 
     pub fn list(items: Vec<Value>) -> Value {

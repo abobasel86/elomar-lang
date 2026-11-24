@@ -16,6 +16,106 @@ pub(crate) fn graphemes(s: &str) -> unicode_segmentation::Graphemes<'_> {
     s.graphemes(true)
 }
 
+/// Where the visible characters of a string start, so `.length` and
+/// `slice` on a long string do not count them again on every call (as in
+/// `while i < s.length { s.slice(i, i + 1) ... }`).
+enum Bounds {
+    /// Every character is one byte.
+    Ascii,
+    /// The byte where each character starts, then the length in bytes.
+    Starts(Vec<usize>),
+}
+
+impl Bounds {
+    fn of(s: &str) -> Bounds {
+        if s.is_ascii() {
+            return Bounds::Ascii;
+        }
+        let mut starts: Vec<usize> = s.grapheme_indices(true).map(|(i, _)| i).collect();
+        starts.push(s.len());
+        Bounds::Starts(starts)
+    }
+
+    fn count(&self, s: &str) -> usize {
+        match self {
+            Bounds::Ascii => s.len(),
+            Bounds::Starts(starts) => starts.len() - 1,
+        }
+    }
+
+    /// The byte where character `i` starts (`i` may be the count).
+    fn byte(&self, i: usize) -> usize {
+        match self {
+            Bounds::Ascii => i,
+            Bounds::Starts(starts) => starts[i],
+        }
+    }
+}
+
+/// Strings shorter than this are counted each time.
+const CACHED_FROM: usize = 64;
+
+/// How many strings' bounds each thread keeps.
+const CACHED: usize = 4;
+
+thread_local! {
+    /// The bounds of the last long strings used, newest first. A `Weak`
+    /// keeps the string's memory from being reused while it is here, and a
+    /// string is never changed in place while a `Weak` points to it (see
+    /// `Rc::make_mut`), so a live entry always matches its string.
+    static BOUNDS: std::cell::RefCell<Vec<(std::rc::Weak<String>, Rc<Bounds>)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn bounds(s: &Rc<String>) -> Rc<Bounds> {
+    BOUNDS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        cache.retain(|(w, _)| w.strong_count() > 0);
+        if let Some(i) = cache
+            .iter()
+            .position(|(w, _)| std::ptr::eq(w.as_ptr(), Rc::as_ptr(s)))
+        {
+            let entry = cache.remove(i);
+            let b = entry.1.clone();
+            cache.insert(0, entry);
+            return b;
+        }
+        let b = Rc::new(Bounds::of(s));
+        cache.insert(0, (Rc::downgrade(s), b.clone()));
+        cache.truncate(CACHED);
+        b
+    })
+}
+
+/// The number of visible characters in `s`.
+pub(crate) fn str_length(s: &Rc<String>) -> usize {
+    if s.len() < CACHED_FROM {
+        return graphemes(s).count();
+    }
+    bounds(s).count(s)
+}
+
+/// `s.slice(start, end)`, by visible characters.
+fn str_slice(s: &Rc<String>, args: &[Value], span: Span) -> R<Value> {
+    let (start, end) = (arg_int(&args[0]), arg_int(&args[1]));
+    let b = match s.len() < CACHED_FROM {
+        true => Rc::new(Bounds::of(s)),
+        false => bounds(s),
+    };
+    let len = b.count(s) as i64;
+    if start < 0 || end > len || start > end {
+        return Err(RuntimeError::new(
+            "R0003",
+            span,
+            Text::new(
+                format!("slice {start}..{end} is out of bounds for a string of length {len}"),
+                format!("المقطع {start}..{end} خارج حدود نص طوله {len}"),
+            ),
+        ));
+    }
+    Ok(Value::str(&s[b.byte(start as usize)..b.byte(end as usize)]))
+}
+
 pub(crate) fn overflow(span: Span) -> RuntimeError {
     RuntimeError::new(
         "R0002",
@@ -407,8 +507,9 @@ pub(crate) fn call_method(recv: Value, method: &str, args: Vec<Value>, span: Spa
                 m => unreachable!("checked map method `{m}`"),
             }
         }
-        (Value::Enum(e), "kind") => Value::Str(e.variant.clone()),
+        (Value::Enum(e), "kind") => Value::str(&*e.variant),
         (Value::Enum(e), "message") => e.fields.first().cloned().unwrap_or(Value::Unit),
+        (Value::Str(s), "slice") => str_slice(&s, &args, span)?,
         (Value::Str(s), _) => str_method(&s, method, &args, span)?,
         (Value::Int(n), "to_float") => Value::Float(n as f64),
         (Value::Int(n), "abs") => Value::Int(n.checked_abs().ok_or_else(|| overflow(span))?),
@@ -638,24 +739,6 @@ fn str_method(s: &str, method: &str, args: &[Value], span: Span) -> R<Value> {
             Some(byte) => Value::some(Value::Int(graphemes(&s[..byte]).count() as i64)),
             None => Value::none(),
         },
-        "slice" => {
-            let (start, end) = (arg_int(&args[0]), arg_int(&args[1]));
-            let parts: Vec<&str> = graphemes(s).collect();
-            let len = parts.len() as i64;
-            if start < 0 || end > len || start > end {
-                return Err(RuntimeError::new(
-                    "R0003",
-                    span,
-                    Text::new(
-                        format!(
-                            "slice {start}..{end} is out of bounds for a string of length {len}"
-                        ),
-                        format!("المقطع {start}..{end} خارج حدود نص طوله {len}"),
-                    ),
-                ));
-            }
-            Value::str(parts[start as usize..end as usize].concat())
-        }
         "pad_start" | "pad_end" => {
             let width = arg_int(&args[0]).max(0) as usize;
             let fill = args.get(1).map(arg_str).unwrap_or(" ");

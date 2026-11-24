@@ -1,0 +1,61 @@
+// `.length` and `slice` count visible characters, in short and long
+// strings, and see appends made between calls.
+
+fn scan(s: String) -> String {
+    var out = ""
+    var i = 0
+    while i < s.length {
+        out += "[{s.slice(i, i + 1)}]"
+        i += 1
+    }
+    return out
+}
+
+fn main() {
+    let short = "مَرْحَبًا"
+    print(short.length, scan(short))
+
+    let flags = "🇯🇴🇸🇦 e\u{301}"
+    print(flags.length, scan(flags))
+
+    let long = "السَّلَامُ عَلَيْكُمْ ".repeat(8)
+    print(long.length, long.slice(0, 10), long.slice(long.length - 6, long.length))
+    var count = 0
+    var i = 0
+    while i < long.length {
+        if long.slice(i, i + 1) == "ل" {
+            count += 1
+        }
+        i += 1
+    }
+    print(count)
+
+    let ascii = "abcdefghij".repeat(10)
+    print(ascii.length, ascii.slice(95, 100), ascii.slice(3, 3).length)
+
+    // Appending between calls.
+    var s = "x".repeat(70)
+    print(s.length)
+    s += "يَ"
+    print(s.length, s.slice(68, 71))
+    let copy = s
+    s += "🙂"
+    print(s.length, copy.length, s.slice(70, 72), copy.slice(69, 71))
+    var grow = ""
+    while grow.length < 100 {
+        grow += "ab"
+    }
+    print(grow.length)
+
+    // Many strings in turn.
+    let texts = ["a".repeat(80), "بَ".repeat(80), "c".repeat(90), "دُ".repeat(90), "e".repeat(100)]
+    var total = 0
+    for round in 0..3 {
+        for t in texts {
+            total += t.length + t.slice(round, round + 2).length
+        }
+    }
+    print(total)
+
+    print(long.slice(5, 300))
+}

@@ -1126,7 +1126,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     Value::List(items) => Value::Int(items.len() as i64),
                     Value::Map(entries) => Value::Int(entries.len() as i64),
                     Value::Set(items) => Value::Int(items.len() as i64),
-                    Value::Str(s) => Value::Int(builtins::graphemes(&s).count() as i64),
+                    Value::Str(s) => Value::Int(builtins::str_length(&s) as i64),
                     Value::Tuple(items) => {
                         let i: usize = name.name.parse().expect("checked tuple index");
                         items[i].clone()
