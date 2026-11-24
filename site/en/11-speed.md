@@ -70,6 +70,23 @@ and `par_all` stop the parts after the first part that finds what it looks
 for, so an item after it cannot change the result, just as `find` would
 never have reached it.
 
+## Maps and sets
+
+Maps and sets have no `par_` methods of their own: turn them into a list
+first. `entries()`, `keys()` and `values()` give the lists of a map, and
+`to_list()` the items of a set, in order:
+
+```elomar
+fn main() {
+    let prices = ["tea": 4, "coffee": 7, "juice": 5]
+    let costly = prices.entries().par_filter(|e| e.value > 4).map(|e| e.key)
+    print(costly)                                      // ["coffee", "juice"]
+    print(prices.keys().par_count(|k| k.length > 3))   // 2
+    let seen = set([12, 7, 30, 9])
+    print(seen.to_list().par_map(|n| n * 2))           // [14, 18, 24, 60]
+}
+```
+
 ## What runs on the cores
 
 The work goes to the cores only when it cannot be told apart from running

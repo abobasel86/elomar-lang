@@ -55,7 +55,7 @@ OpenAI or Claude in `elomar.toml` without changing the code.
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
 > Python, processes), packages with a public registry, editor support, a
 > bilingual tutorial and a browser playground.
-> See [`docs/grammar.md`](docs/grammar.md) and the [changelog](CHANGELOG.md).
+> See [`docs/grammar.md`](docs/grammar.md) (in Arabic; [English translation](docs/grammar.en.md)) and the [changelog](CHANGELOG.md).
 
 ## Vision
 
@@ -298,7 +298,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
 | `tests/fail/` | Programs that must fail with specific error codes |
-| `docs/grammar.md` | Authoritative grammar, semantics and error codes (version 1.0.0) |
+| `docs/grammar.md` | Authoritative grammar, semantics and error codes (version 1.0.0), in Arabic |
+| `docs/grammar.en.md` | Its English translation |
 | `docs/stability.md` | What 1.0 promises: programs written for 1.0 keep working in every 1.x |
 | `Elomar-Lang_Master_Specification_AR.md` | Vision, architecture and roadmap (Arabic) |
 

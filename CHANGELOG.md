@@ -4,6 +4,19 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **The specification in English**: `docs/grammar.en.md` translates
+  `docs/grammar.md` section by section; the English pages of the site link
+  to it. Stale passages in both were corrected: named functions are
+  values, every effect has its sources, and `async fn` runs on several
+  cores since 1.2.
+- Lesson 11 of the site has three exercises (`par_map`, `par_max_by` and
+  `par_sum_by`) and shows how to work on maps and sets on several cores
+  through `entries()`, `keys()`, `values()` and `to_list()`.
+
 ## [1.6.0] - 2026-11-24
 
 ### Added

@@ -616,5 +616,125 @@
     ]
    }
   }
+ ],
+ "11-speed": [
+  {
+   "id": "speed-squares",
+   "mode": "function",
+   "title": {
+    "en": "Squares on every core",
+    "ar": "المربعات على كل الأنوية"
+   },
+   "task": {
+    "en": "Complete `squares`: the square of each number, in the same order, computed with a `par_` method. `squares([1, 2, 3])` is `[1, 4, 9]`.",
+    "ar": "أكمل الدالة `squares`: مربع كل عدد بالترتيب نفسه، محسوبًا بدالة من دوال `par_`. `squares([1, 2, 3])` تعطي `[1, 4, 9]`."
+   },
+   "starter": "fn squares(numbers: List<Int>) -> List<Int> {\n    return numbers\n}\n",
+   "solution": "fn squares(numbers: List<Int>) -> List<Int> {\n    return numbers.par_map(|n| n * n)\n}\n",
+   "cases": [
+    {
+     "expr": "squares([1, 2, 3])",
+     "expect": "[1, 4, 9]"
+    },
+    {
+     "expr": "squares([-4, 10])",
+     "expect": "[16, 100]"
+    },
+    {
+     "expr": "squares([])",
+     "expect": "[]"
+    }
+   ],
+   "hints": {
+    "en": [
+     "`par_map(f)` gives what `map(f)` gives, on several cores.",
+     "`numbers.par_map(|n| n * n)`"
+    ],
+    "ar": [
+     "`par_map(f)` تعطي ما تعطيه `map(f)`، على عدة أنوية.",
+     "`numbers.par_map(|n| n * n)`"
+    ]
+   }
+  },
+  {
+   "id": "speed-longest",
+   "mode": "function",
+   "title": {
+    "en": "The longest word",
+    "ar": "أطول كلمة"
+   },
+   "task": {
+    "en": "Complete `longest`: the longest word, or `None` for an empty list; of words of equal length, the first. `longest([\"fig\", \"banana\", \"kiwi\"])` is `Some(\"banana\")`.",
+    "ar": "أكمل الدالة `longest`: أطول كلمة، أو `None` للقائمة الفارغة؛ ومن الكلمات المتساوية في الطول أولها. `longest([\"fig\", \"banana\", \"kiwi\"])` تعطي `Some(\"banana\")`."
+   },
+   "starter": "fn longest(words: List<String>) -> Option<String> {\n    return None\n}\n",
+   "solution": "fn longest(words: List<String>) -> Option<String> {\n    return words.par_max_by(|w| w.length)\n}\n",
+   "cases": [
+    {
+     "expr": "longest([\"fig\", \"banana\", \"kiwi\"])",
+     "expect": "Some(\"banana\")"
+    },
+    {
+     "expr": "longest([\"ab\", \"cd\"])",
+     "expect": "Some(\"ab\")"
+    },
+    {
+     "expr": "longest([\"مرحبا\", \"سلام\"])",
+     "expect": "Some(\"مرحبا\")"
+    },
+    {
+     "expr": "longest([])",
+     "expect": "None"
+    }
+   ],
+   "hints": {
+    "en": [
+     "`par_max_by(f)` gives the item with the largest key `f(item)`, the first of equal ones.",
+     "The key of a word is its `.length`."
+    ],
+    "ar": [
+     "`par_max_by(f)` تعطي العنصر ذا أكبر مفتاح `f(item)`، وأول المتساوية.",
+     "مفتاح الكلمة طولها `.length`."
+    ]
+   }
+  },
+  {
+   "id": "speed-total",
+   "mode": "function",
+   "title": {
+    "en": "Count the letters",
+    "ar": "عُدّ الحروف"
+   },
+   "task": {
+    "en": "Complete `letters`: the number of characters in all the words together. `letters([\"one\", \"three\"])` is `8`.",
+    "ar": "أكمل الدالة `letters`: عدد حروف كل الكلمات معًا. `letters([\"one\", \"three\"])` تعطي `8`."
+   },
+   "starter": "fn letters(words: List<String>) -> Int {\n    return 0\n}\n",
+   "solution": "fn letters(words: List<String>) -> Int {\n    return words.par_sum_by(|w| w.length)\n}\n",
+   "cases": [
+    {
+     "expr": "letters([\"one\", \"three\"])",
+     "expect": "8"
+    },
+    {
+     "expr": "letters([\"مرحبًا\", \"a\"])",
+     "expect": "6"
+    },
+    {
+     "expr": "letters([])",
+     "expect": "0"
+    }
+   ],
+   "hints": {
+    "en": [
+     "`par_sum_by(f)` adds up `f(item)` for every item.",
+     "`words.par_sum_by(|w| w.length)`"
+    ],
+    "ar": [
+     "`par_sum_by(f)` تجمع `f(item)` لكل العناصر.",
+     "`words.par_sum_by(|w| w.length)`"
+    ]
+   }
+  }
  ]
 }

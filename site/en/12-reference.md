@@ -9,7 +9,7 @@ slug: 12-reference
 
 Every built-in function, every method of every type, and every function of
 the standard modules, in one page. The lessons show them at work; the
-[language reference](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md)
+[language reference](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.en.md)
 gives every detail and error code. A method marked * changes the value, so
 the value must be in a `var`.
 

@@ -17,5 +17,5 @@ answer, press **Check**, and see whether it works.
 
 Every function and method is in the [reference](12-reference.html), and
 [what's new](news.html) tells what each version added. For every detail,
-the [language specification](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.md)
+the [language specification](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.en.md)
 lists all syntax, functions and error codes.
