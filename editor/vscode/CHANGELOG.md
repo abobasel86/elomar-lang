@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.6.0
+
+Works with Elomar-Lang 1.6.0 (five more `par_` list methods, faster record fields).
+
 ## 1.5.0
 
 Works with Elomar-Lang 1.5.0 (more `par_` list methods, faster string building and indexing).

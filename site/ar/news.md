@@ -63,7 +63,7 @@ other: en/news.html
 
 | الإصدار | ما جاء به |
 |---|---|
-| **1.6** (القادم) | `par_flat_map` و`par_group_by` و`par_sum_by` و`par_min_by` و`par_max_by`؛ حقول وسجلات أسرع؛ صفحتا [المرجع](12-reference.html) و[السرعة](11-speed.html) |
+| **1.6** | `par_flat_map` و`par_group_by` و`par_sum_by` و`par_min_by` و`par_max_by`؛ حقول وسجلات أسرع؛ صفحتا [المرجع](12-reference.html) و[السرعة](11-speed.html) |
 | 1.5 | `par_any` و`par_all` و`par_find` و`par_count` و`par_sort_by`؛ الإضافة في المكان نفسه؛ فهرسة سريعة للنصوص |
 | 1.4 | `par_filter` و`par_fold` |
 | 1.3 | `par_map` |
