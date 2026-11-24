@@ -1,0 +1,108 @@
+// `par_filter` gives what `filter` gives, and `par_fold` gives the same
+// result whether it runs on several cores or not.
+
+let LIMIT = 50
+
+type Pt = { x: Int, y: Int }
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn pt(i: Int) -> Pt {
+    return { x: i, y: i % 10 }
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn bigger(a: Int, b: Int) -> Int {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+fn prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    var d = 2
+    while d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d += 1
+    }
+    return true
+}
+
+fn spin(n: Int) -> Int {
+    var x = n
+    while true {
+        x += 1
+    }
+    return x
+}
+
+fn add_checked(a: Int, b: Int) -> Int {
+    if b == 300 {
+        return a div (b - 300)
+    }
+    if b > 600 {
+        return spin(b)
+    }
+    return a + b
+}
+
+fn noisy_even(n: Int) -> Bool {
+    print("noisy {n}")
+    return n % 2 == 0
+}
+
+fn noisy_add(a: Int, b: Int) -> Int {
+    print("add {a} {b}")
+    return a + b
+}
+
+fn main() {
+    let xs = upto(1000)
+
+    // par_filter, with named functions and closures.
+    print(xs.par_filter(prime).count(|p| true))
+    let k = 7
+    print(xs.par_filter(|x| x % k == 0 && x > LIMIT * 19))
+    let pts = xs.map(pt)
+    print(pts.par_filter(|p| p.y == 0 && p.x > 950))
+
+    // par_fold with associative functions gives what fold gives.
+    print(xs.par_fold(0, add), xs.fold(0, add))
+    print(xs.par_fold(5, |a, b| a + b), xs.fold(5, |a, b| a + b))
+    print(xs.par_fold(0, bigger))
+    print(upto(26).map(|i| "{i % 10}").par_fold("", |a, b| a + b))
+    print(xs.map(|i| [i]).par_fold([], |a, b| a + b).count(|i| i > 990))
+
+    // Without associativity the parts still are the same in every mode.
+    print(xs.par_fold(0, |a, b| a - b))
+    print(xs.map(|i| 1.0 / i.to_float()).par_fold(0.0, |a, b| a + b))
+
+    // Short and empty lists.
+    let none: List<Int> = []
+    print(none.par_filter(prime), none.par_fold(9, add))
+    print([4].par_filter(prime), [4].par_fold(1, add), [2, 3].par_fold(1, add))
+
+    // Inside each other.
+    print([10, 20, 30].par_map(|n| upto(n).par_filter(prime).par_fold(0, add)))
+
+    // Printing keeps its order: these run one after another.
+    print(upto(6).par_filter(noisy_even))
+    print(upto(4).par_fold(0, noisy_add))
+
+    // The first failure wins, and the endless calls after it are stopped.
+    print(upto(1000).par_fold(0, add_checked))
+}

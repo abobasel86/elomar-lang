@@ -1,0 +1,72 @@
+// `par_filter` and `par_fold`: the primes among 1..300000, then the longest
+// Collatz path among 1..300000, then a cheap sum. Prints each result and its
+// time in ms; compare with `ELOMAR_PARALLEL=0`, which runs them one part
+// after another.
+
+use std.time
+
+fn upto(n: Int) -> List<Int> {
+    var out: List<Int> = []
+    for i in 1..=n {
+        out.push(i)
+    }
+    return out
+}
+
+fn prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    var d = 2
+    while d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d += 1
+    }
+    return true
+}
+
+fn collatz(n: Int) -> Int {
+    var x = n
+    var steps = 0
+    while x != 1 {
+        if x % 2 == 0 {
+            x = x div 2
+        } else {
+            x = 3 * x + 1
+        }
+        steps += 1
+    }
+    return steps
+}
+
+// The longer path of two numbers (the smaller number on a tie): associative.
+fn longer(a: Int, b: Int) -> Int {
+    let sa = collatz(a)
+    let sb = collatz(b)
+    if sb > sa || (sb == sa && b < a) {
+        return b
+    }
+    return a
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn main() {
+    let xs = upto(300000)
+    var start = time.now()
+    let primes = xs.par_filter(prime).count(|p| true)
+    print("par_filter: {primes} primes in {time.now() - start} ms")
+    start = time.now()
+    let best = xs.par_fold(1, longer)
+    print("par_fold:   {best} in {time.now() - start} ms")
+    start = time.now()
+    let sum = xs.par_fold(0, add)
+    print("cheap sum:  {sum} in {time.now() - start} ms")
+    start = time.now()
+    let sum2 = xs.fold(0, add)
+    print("fold sum:   {sum2} in {time.now() - start} ms")
+}

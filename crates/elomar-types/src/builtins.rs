@@ -78,11 +78,13 @@ const LIST_METHODS: &[&str] = &[
     "map",
     "par_map",
     "filter",
+    "par_filter",
     "any",
     "all",
     "find",
     "count",
     "fold",
+    "par_fold",
     "sort_by",
     "take",
     "skip",
@@ -825,11 +827,11 @@ impl Checker {
                 self.typed_args(m, args, &[f], span);
                 Ty::list(out)
             }
-            "filter" | "any" | "all" | "find" | "count" => {
+            "filter" | "par_filter" | "any" | "all" | "find" | "count" => {
                 let f = Ty::Fn(vec![elem.clone()], Box::new(Ty::Bool));
                 self.typed_args(m, args, &[f], span);
                 match m {
-                    "filter" => list,
+                    "filter" | "par_filter" => list,
                     "find" => Ty::option(elem),
                     "count" => Ty::Int,
                     _ => Ty::Bool,
@@ -840,6 +842,11 @@ impl Checker {
                 let f = Ty::Fn(vec![acc.clone(), elem], Box::new(acc.clone()));
                 self.typed_args(m, args, &[acc.clone(), f], span);
                 acc
+            }
+            "par_fold" => {
+                let f = Ty::Fn(vec![elem.clone(), elem.clone()], Box::new(elem.clone()));
+                self.typed_args(m, args, &[elem.clone(), f], span);
+                elem
             }
             "sort_by" => {
                 let key = self.subst.fresh();

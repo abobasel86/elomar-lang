@@ -1563,6 +1563,21 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         }))
     }
 
+    /// `f` from the first of `items` over the others: `f(f(a, b), c)`.
+    pub(crate) fn fold_part(
+        &mut self,
+        f: &Function,
+        items: Vec<Value>,
+        span: Span,
+    ) -> Exec<Value> {
+        let mut items = items.into_iter();
+        let mut acc = items.next().expect("a part is not empty");
+        for x in items {
+            acc = self.call_value(f, vec![acc, x], span)?;
+        }
+        Ok(acc)
+    }
+
     /// `map`, `filter`, `fold` and the other list methods that take a function.
     fn list_higher_order(
         &mut self,
@@ -1572,7 +1587,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         span: Span,
     ) -> Exec<Value> {
         let mut args = args.into_iter();
-        let (init, f) = if method == "fold" {
+        let (init, f) = if method == "fold" || method == "par_fold" {
             let init = args.next().expect("checked arity");
             (Some(init), args.next())
         } else {
@@ -1600,7 +1615,17 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }
                 Value::list(out)
             }
-            "filter" => {
+            "filter" | "par_filter" => {
+                if method == "par_filter"
+                    && let Some(Value::List(keep)) = self.par_map(items, &f, span)?
+                {
+                    let kept = items.iter().zip(keep.iter());
+                    return Ok(Value::list(
+                        kept.filter(|(_, k)| matches!(k, Value::Bool(true)))
+                            .map(|(x, _)| x.clone())
+                            .collect(),
+                    ));
+                }
                 let mut out = Vec::new();
                 for x in items.iter() {
                     if test(self, x)? {
@@ -1641,6 +1666,20 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                     acc = self.call_value(&f, vec![acc, x.clone()], span)?;
                 }
                 acc
+            }
+            "par_fold" => {
+                let init = init.expect("par_fold has an initial value");
+                let partials = match self.par_fold(&init, items, &f, span)? {
+                    Some(partials) => partials,
+                    None => {
+                        let mut partials = Vec::new();
+                        for part in parallel::fold_parts(&init, items) {
+                            partials.push(self.fold_part(&f, part, span)?);
+                        }
+                        partials
+                    }
+                };
+                self.fold_part(&f, partials, span)?
             }
             "flat_map" => {
                 let mut out = Vec::new();
@@ -2250,11 +2289,13 @@ const HIGHER_ORDER: &[&str] = &[
     "map",
     "par_map",
     "filter",
+    "par_filter",
     "any",
     "all",
     "find",
     "count",
     "fold",
+    "par_fold",
     "sort_by",
     "flat_map",
     "group_by",

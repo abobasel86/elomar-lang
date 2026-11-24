@@ -1,4 +1,5 @@
-//! Running `await all([...])` and `par_map` on several processor cores.
+//! Running `await all([...])`, `par_map`, `par_filter` and `par_fold` on
+//! several processor cores.
 //!
 //! The values of the interpreter are shared through `Rc`, so they cannot
 //! move between threads. Instead, a call to an `async fn` that is isolated
@@ -581,8 +582,10 @@ struct Task {
 enum Job {
     /// A call to the `async fn` `name`.
     Call { name: String, args: Vec<Portable> },
-    /// `f` on each item of a part of a list, for `par_map`.
+    /// `f` on each item of a part of a list, for `par_map` and `par_filter`.
     Map { f: Portable, items: Vec<Portable> },
+    /// `f` from the first item of a part over the others, for `par_fold`.
+    Fold { f: Portable, items: Vec<Portable> },
 }
 
 /// The value used to stop a thread's call: never reaches the program.
@@ -650,30 +653,120 @@ impl<'p> Interpreter<'p, '_> {
     /// `items.par_map(f)` on several cores: `None` when it should run like
     /// `map` instead (parallelism is off, the list is short, `f` is not
     /// isolated, or something cannot be copied). The result and the error
-    /// are the ones `map` gives.
+    /// are the ones `map` gives. `par_filter` keeps the items whose result is
+    /// `true`.
     pub(crate) fn par_map(
         &mut self,
         items: &[Value],
         f: &Function,
         span: Span,
     ) -> Exec<Option<Value>> {
-        if !self.par.enabled || self.debugger.is_some() || items.len() < 2 {
+        if items.len() < 2 {
             return Ok(None);
         }
-        let f = match f {
+        // Several parts per thread, so a thread that finishes early takes
+        // another.
+        let size = items.len().div_ceil((threads() * 4).min(items.len()));
+        let parts = items.chunks(size).map(<[Value]>::to_vec).collect();
+        let Some(results) = self.run_parts(parts, f, false, span)? else {
+            return Ok(None);
+        };
+        let mut out = Vec::with_capacity(items.len());
+        for part in results {
+            let Value::List(values) = part else {
+                unreachable!("a part's result is a list")
+            };
+            out.extend(values.iter().cloned());
+        }
+        Ok(Some(Value::list(out)))
+    }
+
+    /// The results of the parts of `items.par_fold(init, f)` (see
+    /// [`fold_parts`]), each folded on its own core; `None` when they should
+    /// be folded here instead.
+    pub(crate) fn par_fold(
+        &mut self,
+        init: &Value,
+        items: &[Value],
+        f: &Function,
+        span: Span,
+    ) -> Exec<Option<Vec<Value>>> {
+        if items.len() < 2 {
+            return Ok(None);
+        }
+        self.run_parts(fold_parts(init, items), f, true, span)
+    }
+
+    /// Runs `f` over each part on the threads (`fold`: from its first item
+    /// over the others; otherwise on each item, giving a list). The results
+    /// are in the order of the parts, and the error is the first part's.
+    fn run_parts(
+        &mut self,
+        parts: Vec<Vec<Value>>,
+        f: &Function,
+        fold: bool,
+        span: Span,
+    ) -> Exec<Option<Vec<Value>>> {
+        if !self.par.enabled || self.debugger.is_some() {
+            return Ok(None);
+        }
+        let Some(f) = self.copy_function(f) else {
+            return Ok(None);
+        };
+        let mut tasks = Vec::with_capacity(parts.len());
+        for part in &parts {
+            let Some(items) = self.copy_out(part) else {
+                return Ok(None);
+            };
+            let f = copy_portable(&f);
+            tasks.push(Task {
+                job: match fold {
+                    true => Job::Fold { f, items },
+                    false => Job::Map { f, items },
+                },
+                span,
+            });
+        }
+        let Some(globals) = self.copy_globals() else {
+            return Ok(None);
+        };
+        let outcomes = self.run_threads(tasks, globals);
+        let lambdas = self.lambda_index();
+        let mut out = Vec::with_capacity(parts.len());
+        for outcome in outcomes {
+            match outcome {
+                Outcome::Done(value, futures) => {
+                    let mut back = In {
+                        lambdas: &lambdas,
+                        registered: &mut self.lambdas,
+                        made: Vec::new(),
+                        futures,
+                    };
+                    out.push(back.value(value));
+                }
+                Outcome::Error(err) => return Err(Flow::Error(err)),
+                Outcome::Timeout(level) => return Err(Flow::Timeout(level)),
+                Outcome::Stopped => unreachable!("only parts after a failure are stopped"),
+            }
+        }
+        Ok(Some(out))
+    }
+
+    /// A copy of `f` for the threads; `None` if it is an `async fn`, is not
+    /// isolated, or holds something that cannot be copied.
+    fn copy_function(&mut self, f: &Function) -> Option<Portable> {
+        Some(match f {
             Function::Named(name) => {
                 let async_fn = self.fns.get(name.as_str()).is_none_or(|d| d.is_async);
                 if async_fn || !self.isolated(name) {
-                    return Ok(None);
+                    return None;
                 }
                 Portable::Named(name.clone())
             }
             Function::Closure { key, captured } => {
-                let Some(&e) = self.lambdas.get(key) else {
-                    return Ok(None);
-                };
+                let &e = self.lambdas.get(key)?;
                 if !self.lambda_isolated(e) {
-                    return Ok(None);
+                    return None;
                 }
                 // A closure holds every variable visible where it was made;
                 // only the ones its body (or a closure in it) names are
@@ -688,9 +781,7 @@ impl<'p> Interpreter<'p, '_> {
                         false => Value::Unit,
                     })
                     .collect();
-                let Some(values) = self.copy_out(&values) else {
-                    return Ok(None);
-                };
+                let values = self.copy_out(&values)?;
                 Portable::Closure {
                     key: *key,
                     captured: captured
@@ -700,49 +791,7 @@ impl<'p> Interpreter<'p, '_> {
                         .collect(),
                 }
             }
-        };
-        let Some(copies) = self.copy_out(items) else {
-            return Ok(None);
-        };
-        let Some(globals) = self.copy_globals() else {
-            return Ok(None);
-        };
-        // Several parts per thread, so a thread that finishes early takes
-        // another.
-        let parts = (threads() * 4).min(copies.len());
-        let size = copies.len().div_ceil(parts);
-        let mut tasks = Vec::with_capacity(parts);
-        let mut copies = copies.into_iter().peekable();
-        while copies.peek().is_some() {
-            tasks.push(Task {
-                job: Job::Map {
-                    f: copy_portable(&f),
-                    items: copies.by_ref().take(size).collect(),
-                },
-                span,
-            });
-        }
-        let outcomes = self.run_threads(tasks, globals);
-        let lambdas = self.lambda_index();
-        let mut out = Vec::with_capacity(items.len());
-        for outcome in outcomes {
-            match outcome {
-                Outcome::Done(Portable::List(values), futures) => {
-                    let mut back = In {
-                        lambdas: &lambdas,
-                        registered: &mut self.lambdas,
-                        made: Vec::new(),
-                        futures,
-                    };
-                    out.extend(back.all(values));
-                }
-                Outcome::Done(..) => unreachable!("a part's result is a list"),
-                Outcome::Error(err) => return Err(Flow::Error(err)),
-                Outcome::Timeout(level) => return Err(Flow::Timeout(level)),
-                Outcome::Stopped => unreachable!("only parts after a failure are stopped"),
-            }
-        }
-        Ok(Some(Value::list(out)))
+        })
     }
 
     /// `await all([...])` for `items[from..]`: runs the neighbouring calls
@@ -949,6 +998,14 @@ impl<'p> Interpreter<'p, '_> {
                 let f = self.fns[name.as_str()];
                 self.call_fn(f, args, task.span)
             }
+            Job::Fold { f, items } => {
+                let Value::Function(f) = back.value(f) else {
+                    unreachable!("par_fold copies a function")
+                };
+                let items = back.all(items);
+                self.prepare_closure(&f);
+                self.fold_part(&f, items, task.span)
+            }
             Job::Map { f, items } => {
                 let f = back.value(f);
                 let items = back.all(items);
@@ -1015,6 +1072,29 @@ fn names_in(e: &Expr) -> FastMap<&str, ()> {
 }
 
 /// How many threads to use.
+/// The parts `par_fold` folds on their own, then together: at most
+/// [`FOLD_PARTS`] neighbouring runs of `items`, the first after `init`. They
+/// depend on the length alone, so the result is the same on every machine,
+/// with or without threads; it is `fold`'s when `f` is associative.
+pub(crate) fn fold_parts(init: &Value, items: &[Value]) -> Vec<Vec<Value>> {
+    let mut parts = vec![vec![init.clone()]];
+    if items.is_empty() {
+        return parts;
+    }
+    let size = items.len().div_ceil(items.len().min(FOLD_PARTS));
+    for (i, chunk) in items.chunks(size).enumerate() {
+        if i == 0 {
+            parts[0].extend(chunk.iter().cloned());
+        } else {
+            parts.push(chunk.to_vec());
+        }
+    }
+    parts
+}
+
+/// How many parts `par_fold` splits a list into, at most.
+const FOLD_PARTS: usize = 64;
+
 fn threads() -> usize {
     std::thread::available_parallelism()
         .map_or(4, |n| n.get())

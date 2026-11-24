@@ -255,6 +255,12 @@ fn main() {
 - `xs.par_map(f)` (منذ 1.3) تعطي دائمًا ما تعطيه `xs.map(f)`، لكنها تقسّم القائمة أجزاءً متتالية وتنفذها **على أنوية المعالج**
   إن كانت `f` دالة معزولة بالشروط نفسها (دالة مسماة غير `async`، أو دالة مجهولة يحقق جسمها الشروط ولا تحمل متغيراتها
   دوال غير معزولة)، وإلا نُفذت مثل `map`. إن فشل عنصر يُعاد خطأ أول عنصر يفشل وتُوقف الأجزاء التي بعده.
+- `xs.par_filter(f)` (منذ 1.4) تعطي دائمًا ما تعطيه `xs.filter(f)`، وتُنفذ `f` على الأنوية بالشروط نفسها.
+- `xs.par_fold(init, f)` (منذ 1.4) حيث `f: fn(T, T) -> T` ونوع `init` هو نوع العناصر: تقسّم القائمة إلى 64 جزءًا متتاليًا
+  على الأكثر (أو جزء لكل عنصر في القوائم الأقصر)، فتطوي أولها بدءًا من `init`، وكل جزء بعده بدءًا من أول عناصره،
+  ثم تطوي نتائج الأجزاء بالترتيب بـ `f` نفسها. يعتمد التقسيم على طول القائمة وحده، فالنتيجة واحدة على كل جهاز ومع
+  التوازي وبدونه، وتساوي `xs.fold(init, f)` إن كانت `f` تجميعية (`f(f(a, b), c) == f(a, f(b, c))`) مثل الجمع
+  و`max` ووصل النصوص. تُطوى الأجزاء على الأنوية بشروط `par_map`، والخطأ خطأ أول جزء يفشل.
 - `timeout(Future<T>, Duration) -> Future<Option<T>>`: `await timeout(f, 2s)` تعطي `Some(ناتج)`، أو `None` إن لم تنتهِ
   العملية في الوقت المحدد؛ عندها **تُوقف** عند جملتها التالية (أو تكرار الحلقة التالي)، وينتهي `time.sleep` بانتهاء الوقت.
   انتظار الشبكة أو نموذج الذكاء الاصطناعي لا يُقطع في منتصفه، لكن العملية تتوقف فور عودته (ولهما مهلتهما الخاصة).
@@ -1121,7 +1127,7 @@ fn test_greets_by_name() {
 | النوع | الأعضاء |
 |---|---|
 | كل الأنواع | `.to_string()` |
-| `List<T>` | `.length` · `push(T)`* · `pop() -> Option<T>`* · `insert(Int, T)`* · `remove(Int) -> T`* · `contains(T)` · `index_of(T) -> Option<Int>` · `is_empty()` · `first()` / `last() -> Option<T>` · `reverse()` · `sorted()` (أعداد أو نصوص) · `slice(start, end)` · `sum()` (أعداد) · `join(sep)` (`List<String>`) · `map(fn(T) -> U)` · `par_map(fn(T) -> U)` (مثل `map` على عدة أنوية، §4.5) · `filter` / `any` / `all` / `count(fn(T) -> Bool)` · `find(fn(T) -> Bool) -> Option<T>` · `fold(U, fn(U, T) -> U)` · `sort_by(fn(T) -> K)` · `take(n)` / `skip(n)` · `unique()` · `min()` / `max() -> Option<T>` (أعداد أو نصوص) · `enumerate() -> List<{ index: Int, value: T }>` · `chunks(n) -> List<List<T>>` · `flat_map(fn(T) -> List<U>)` · `group_by(fn(T) -> K) -> Map<K, List<T>>` (`K` هو `Int` أو `String`) · `zip(List<U>) -> List<(T, U)>` (بطول الأقصر) · `windows(n) -> List<List<T>>` · `sum_by(fn(T) -> N)` (`N` هو `Int` أو `Float`) · `min_by` / `max_by(fn(T) -> K) -> Option<T>` (أول الأصغر أو الأكبر) |
+| `List<T>` | `.length` · `push(T)`* · `pop() -> Option<T>`* · `insert(Int, T)`* · `remove(Int) -> T`* · `contains(T)` · `index_of(T) -> Option<Int>` · `is_empty()` · `first()` / `last() -> Option<T>` · `reverse()` · `sorted()` (أعداد أو نصوص) · `slice(start, end)` · `sum()` (أعداد) · `join(sep)` (`List<String>`) · `map(fn(T) -> U)` · `par_map(fn(T) -> U)` (مثل `map` على عدة أنوية، §4.5) · `filter` / `any` / `all` / `count(fn(T) -> Bool)` · `find(fn(T) -> Bool) -> Option<T>` · `par_filter(fn(T) -> Bool)` (مثل `filter` على عدة أنوية) · `fold(U, fn(U, T) -> U)` · `par_fold(T, fn(T, T) -> T)` (طيّ بأجزاء ثابتة على عدة أنوية، §4.5) · `sort_by(fn(T) -> K)` · `take(n)` / `skip(n)` · `unique()` · `min()` / `max() -> Option<T>` (أعداد أو نصوص) · `enumerate() -> List<{ index: Int, value: T }>` · `chunks(n) -> List<List<T>>` · `flat_map(fn(T) -> List<U>)` · `group_by(fn(T) -> K) -> Map<K, List<T>>` (`K` هو `Int` أو `String`) · `zip(List<U>) -> List<(T, U)>` (بطول الأقصر) · `windows(n) -> List<List<T>>` · `sum_by(fn(T) -> N)` (`N` هو `Int` أو `Float`) · `min_by` / `max_by(fn(T) -> K) -> Option<T>` (أول الأصغر أو الأكبر) |
 | `String` | `.length` (حروف مرئية) · `upper()` · `lower()` · `trim()` · `contains(s)` · `starts_with(s)` · `ends_with(s)` · `split(sep) -> List<String>` · `chars() -> List<String>` · `replace(a, b)` · `repeat(n)` · `parse_int()` · `parse_float()` · `is_empty()` · `index_of(s) -> Option<Int>` · `slice(start, end)` (بالحروف المرئية) · `lines()` · `words()` · `trim_start()` / `trim_end()` · `pad_start(n[, fill])` / `pad_end(n[, fill])` · `reverse()` |
 | `Int` | `to_float()` · `abs()` · `pow(n)` (n ≥ 0) · `clamp(min, max)` |
 | `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` · `pow(Float)` · `clamp(min, max)` · `round_to(digits) -> Float` · `to_fixed(digits) -> String` |

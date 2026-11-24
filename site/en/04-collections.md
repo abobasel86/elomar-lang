@@ -110,6 +110,23 @@ fn main() {
 }
 ```
 
+In the same way, `par_filter(f)` gives what `filter(f)` gives.
+`par_fold(init, f)` folds a list in parts on the cores, then folds the
+parts' results together, so `f` takes two items and returns one of the
+same type. When `f` gives the same result however the items are grouped,
+as adding, `max` or joining strings do, it is the result of `fold`:
+
+```elomar
+fn main() {
+    var numbers: List<Int> = []
+    for i in 1..=100000 {
+        numbers.push(i)
+    }
+    let sevens = numbers.par_filter(|n| n % 7 == 0)
+    print(sevens.par_fold(0, |a, b| a + b))   // 714264285
+}
+```
+
 ## Maps
 
 A map connects keys to values:

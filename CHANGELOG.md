@@ -4,6 +4,23 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [1.4.0] - 2026-11-24
+
+### Added
+
+- **`xs.par_filter(f)`**: the list `xs.filter(f)` gives, with `f` run on
+  several processor cores under the same rule as `par_map`. In
+  `bench/par_filter_fold.elo`, finding the primes up to 300,000 takes
+  70 ms instead of 434 ms.
+- **`xs.par_fold(init, f)`**, where `f` takes and returns the item type:
+  the list is split into at most 64 neighbouring parts, which depend on
+  its length alone. The first part is folded from `init` and each other
+  part from its first item, on several cores, and the parts' results are
+  then folded in order with `f`. The result is the same on every machine,
+  with or without threads, and is `fold`'s when `f` is associative (such
+  as `+`, `max` or joining strings). The longest Collatz path up to
+  300,000 takes 533 ms instead of 4669 ms.
+
 ## [1.3.0] - 2026-11-24
 
 ### Added
