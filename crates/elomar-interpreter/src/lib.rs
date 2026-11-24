@@ -1564,12 +1564,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
     }
 
     /// `f` from the first of `items` over the others: `f(f(a, b), c)`.
-    pub(crate) fn fold_part(
-        &mut self,
-        f: &Function,
-        items: Vec<Value>,
-        span: Span,
-    ) -> Exec<Value> {
+    pub(crate) fn fold_part(&mut self, f: &Function, items: Vec<Value>, span: Span) -> Exec<Value> {
         let mut items = items.into_iter();
         let mut acc = items.next().expect("a part is not empty");
         for x in items {
