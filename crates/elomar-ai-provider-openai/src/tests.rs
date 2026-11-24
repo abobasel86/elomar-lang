@@ -394,3 +394,31 @@ fn streams_pieces() {
         .unwrap_err();
     assert_eq!(err.kind, AiErrorKind::Cancelled);
 }
+
+#[test]
+fn embeds_many_texts_in_one_request() {
+    // The vectors may come back in any order; `index` says whose they are.
+    let body = json!({ "data": [
+        { "index": 1, "embedding": [2.0] },
+        { "index": 0, "embedding": [1.0] },
+    ] })
+    .to_string();
+    let (url, rx) = fake_openai(200, body, Duration::ZERO);
+    let mut p = provider(&url, Some("sk-test"));
+    let (mut a, mut b) = (
+        request(Schema::List(Box::new(Schema::Float)), 5000),
+        request(Schema::List(Box::new(Schema::Float)), 5000),
+    );
+    a.input = json!("first");
+    b.input = json!("second");
+    let out = p.embed_batch(&[&a, &b]);
+    assert_eq!(out, vec![Ok(vec![1.0]), Ok(vec![2.0])]);
+    assert!(rx.recv().unwrap().contains(r#""input":["first","second"]"#));
+
+    let (url, _rx) = fake_openai(429, "{}".into(), Duration::ZERO);
+    let out = provider(&url, Some("sk-test")).embed_batch(&[&a, &b]);
+    assert!(
+        out.iter()
+            .all(|r| r.as_ref().unwrap_err().kind == AiErrorKind::RateLimited)
+    );
+}

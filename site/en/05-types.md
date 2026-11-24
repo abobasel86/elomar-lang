@@ -300,3 +300,6 @@ fn main() {
 }
 ```
 
+A function with bounds, like `show`, can be passed as a value too:
+`[1, 2].map(show)` gives `["the number 1", "the number 2"]`.
+

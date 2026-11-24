@@ -2137,6 +2137,34 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             }
         }
         let mut results: Vec<Option<Value>> = vec![None; items.len()];
+        // `ai.embed` calls go to their models together (see
+        // `AiRuntime::embed_all`).
+        let mut embeds: Vec<(usize, elomar_ai_core::AiRequest)> = Vec::new();
+        for (i, item) in items.iter().enumerate() {
+            if let Value::Future(state) = item
+                && matches!(&*state.borrow(), FutureState::Pending(Thunk::Embed { .. }))
+            {
+                let previous = std::mem::replace(&mut *state.borrow_mut(), FutureState::Running);
+                if let FutureState::Pending(Thunk::Embed {
+                    model,
+                    text,
+                    timeout_ms,
+                }) = previous
+                {
+                    embeds.push((i, ai::embed_request(self.ai, &model, &text, timeout_ms)));
+                }
+            }
+        }
+        if !embeds.is_empty() {
+            let requests: Vec<_> = embeds.iter().map(|(_, r)| r.clone()).collect();
+            for ((i, _), answer) in embeds.iter().zip(self.ai.embed_all(&requests)) {
+                let value = ai::embed_result(answer);
+                if let Value::Future(state) = &items[*i] {
+                    *state.borrow_mut() = FutureState::Done(value.clone());
+                }
+                results[*i] = Some(value);
+            }
+        }
         if !batch.is_empty() {
             let requests: Vec<_> = batch.iter().map(|(_, c)| c.request(self.ai)).collect();
             let answers = self.ai.infer_all(&requests);

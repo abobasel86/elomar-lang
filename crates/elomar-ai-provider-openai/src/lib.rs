@@ -333,6 +333,25 @@ impl ModelProvider for OpenAiProvider {
         Ok(text)
     }
 
+    /// One `/embeddings` request for up to [`EMBED_BATCH`] texts at a
+    /// time, with the longest of their time limits.
+    fn embed_batch(&mut self, requests: &[&AiRequest]) -> Vec<Result<Vec<f64>, AiError>> {
+        let mut out = Vec::with_capacity(requests.len());
+        for chunk in requests.chunks(EMBED_BATCH) {
+            let texts: Vec<String> = chunk.iter().map(|r| r.input_text()).collect();
+            let timeout = chunk.iter().map(|r| r.timeout_ms).max().unwrap_or(0);
+            let body = json!({ "model": self.model, "input": texts });
+            match self
+                .send_to(&self.embeddings_url(), &body, timeout)
+                .and_then(|text| embeddings_of(&text, chunk.len()))
+            {
+                Ok(vectors) => out.extend(vectors.into_iter().map(Ok)),
+                Err(e) => out.extend(chunk.iter().map(|_| Err(e.clone()))),
+            }
+        }
+        out
+    }
+
     fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
         let text = self.send_to(
             &self.embeddings_url(),
@@ -362,6 +381,34 @@ impl ModelProvider for OpenAiProvider {
         }
         answer_text(&text, &request.schema).map(Turn::Final)
     }
+}
+
+/// The most texts sent in one `/embeddings` request.
+pub const EMBED_BATCH: usize = 256;
+
+/// The `n` vectors of an `/embeddings` response for several texts, in the
+/// order of the texts (by each item's `index`).
+pub fn embeddings_of(body: &str, n: usize) -> Result<Vec<Vec<f64>>, AiError> {
+    let invalid = |why: &str| AiError::new(AiErrorKind::InvalidStructuredOutput, why.to_string());
+    let json: Value =
+        serde_json::from_str(body).map_err(|_| invalid("the embeddings response is not JSON"))?;
+    let items = json["data"]
+        .as_array()
+        .ok_or_else(|| invalid("the embeddings response has no `data` list"))?;
+    let mut out: Vec<Option<Vec<f64>>> = vec![None; n];
+    for (k, item) in items.iter().enumerate() {
+        let i = item["index"].as_u64().map_or(k, |i| i as usize);
+        let v = item["embedding"]
+            .as_array()
+            .and_then(|xs| xs.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>())
+            .ok_or_else(|| invalid("an embedding is not a list of numbers"))?;
+        if let Some(slot) = out.get_mut(i) {
+            *slot = Some(v);
+        }
+    }
+    out.into_iter()
+        .map(|v| v.ok_or_else(|| invalid("the embeddings response is missing a text")))
+        .collect()
 }
 
 /// The vector in an `/embeddings` response.

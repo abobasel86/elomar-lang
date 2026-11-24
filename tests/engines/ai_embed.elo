@@ -25,4 +25,27 @@ async fn main() {
     print(scores)
     print(ai.similarity([1.0, 0.0], [0.0, 1.0]), ai.similarity([1.0, 2.0], [2.0, 4.0]), ai.similarity([], [1.0]))
     print(await ai.embed("nope", "x"))
+    await together()
+}
+
+// `await all` sends the `ai.embed` calls to each model together; the
+// results are those of one call after another, in order.
+async fn together() {
+    let texts = ["cat", "dog", "cat dog"]
+    let calls = texts.map(|t| ai.embed("mock", t))
+    let many = await all([calls[0], ai.embed("nope", "x"), calls[1], calls[2]])
+    for r in many {
+        match r {
+            Ok(v) => print(v.length, ai.similarity(v, v).round_to(3))
+            Err(e) => print(e.kind())
+        }
+    }
+    var one_by_one: List<Float> = []
+    for t in texts {
+        match await ai.embed("mock", t) {
+            Ok(v) => one_by_one.push(v.sum())
+            Err(e) => print(e.kind())
+        }
+    }
+    print(one_by_one.map(|x| x.round_to(6)))
 }

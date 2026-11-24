@@ -1,0 +1,48 @@
+// A function with trait bounds used as a value: the implementations for
+// its type go with it.
+
+trait Describe {
+    fn describe(self) -> String
+}
+
+type Box<T> = { item: T }
+
+impl Describe for Int {
+    fn describe(self) -> String {
+        return "#{self}"
+    }
+}
+
+impl<T: Describe> Describe for Box<T> {
+    fn describe(self) -> String {
+        return "[{self.item.describe()}]"
+    }
+}
+
+fn show<T: Describe>(x: T) -> String {
+    return x.describe()
+}
+
+fn pair<T: Describe, U: Describe>(a: T, b: U) -> String {
+    return "{show(a)} & {show(b)}"
+}
+
+// The bound of `T` here is passed on to `show`.
+fn all_shown<T: Describe>(xs: List<T>) -> List<String> {
+    return xs.map(show)
+}
+
+fn apply(f: fn(Int) -> String, x: Int) -> String {
+    return f(x)
+}
+
+fn main() {
+    print([1, 2, 3].map(show))
+    let boxes: List<Box<Int>> = [{ item: 4 }, { item: 5 }]
+    print(boxes.map(show), all_shown(boxes))
+    let f = show
+    print(f(9), apply(show, 10))
+    let g: fn(Box<Int>, Int) -> String = pair
+    print(g({ item: 1 }, 2))
+    print(boxes.par_map(show))
+}

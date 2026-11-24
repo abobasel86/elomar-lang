@@ -16,6 +16,7 @@ mod stdextra;
 mod stdlib;
 mod traits;
 mod ty;
+mod walk;
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -157,6 +158,21 @@ struct Checker {
     all_bounds: Vec<(String, String)>,
     /// Where each type, enum and trait is declared.
     type_spans: HashMap<String, Span>,
+    /// Functions with bounds used as values in the body being checked,
+    /// whose implementations are passed once the types are known.
+    pending_values: Vec<PendingValue>,
+}
+
+/// `show` used as a value, where `fn show<T: Describe>`: it became
+/// `|#0| show(#0, <placeholder>)`, and the placeholder becomes the
+/// implementations for `T` at the end of the body (see
+/// [`Checker::fill_pending_values`]).
+struct PendingValue {
+    placeholder: String,
+    name: String,
+    bounds: Vec<(String, String)>,
+    map: Vec<(String, Ty)>,
+    span: Span,
 }
 
 impl Checker {
@@ -868,6 +884,8 @@ impl Checker {
             }
             None => self.check_expr(&mut c.value, None),
         };
+        let pending = std::mem::take(&mut self.pending_values);
+        self.fill_pending_values(pending, &mut |visit| walk::exprs(&mut c.value, visit));
         if clash {
             self.error(
                 "E1002",
@@ -895,6 +913,37 @@ impl Checker {
         }
     }
 
+    /// Replaces each placeholder of `pending` with the implementations its
+    /// function needs, now that the types are known; `walk` visits the
+    /// expressions where the placeholders are.
+    fn fill_pending_values(&mut self, pending: Vec<PendingValue>, walk: &mut walk::Walker<'_>) {
+        if pending.is_empty() {
+            return;
+        }
+        let mut dicts: HashMap<String, Vec<Arg>> = HashMap::new();
+        for p in pending {
+            let mut args = Vec::new();
+            self.pass_dictionaries(&p.name, &p.bounds, &p.map, &mut args, p.span);
+            dicts.insert(p.placeholder, args);
+        }
+        walk(&mut |e| {
+            if let ExprKind::Call { args, .. } = &mut e.kind
+                && let Some(Arg {
+                    value:
+                        Expr {
+                            kind: ExprKind::Name(n),
+                            ..
+                        },
+                    ..
+                }) = args.last()
+                && let Some(extra) = dicts.remove(n)
+            {
+                args.pop();
+                args.extend(extra);
+            }
+        });
+    }
+
     fn check_fn(&mut self, f: &mut FnDecl) {
         let Some(sig) = self.fns.get(&f.name.name).cloned() else {
             return;
@@ -912,6 +961,10 @@ impl Checker {
         }
         self.check_block(&mut f.body);
         self.pop_scope();
+        let pending = std::mem::take(&mut self.pending_values);
+        self.fill_pending_values(pending, &mut |visit| {
+            walk::exprs_in_block(&mut f.body, visit)
+        });
         self.ret_ty = None;
         self.type_params.clear();
         self.bounds.clear();

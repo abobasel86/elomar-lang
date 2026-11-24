@@ -117,14 +117,29 @@ pub(crate) fn run_embed(
     text: String,
     timeout_ms: Option<i64>,
 ) -> Value {
-    let request = AiRequest {
-        model,
+    let request = embed_request(ai, &model, &text, timeout_ms);
+    embed_result(ai.embed(&request))
+}
+
+/// The request of an `ai.embed(model, text[, timeout])` call.
+pub(crate) fn embed_request(
+    ai: &AiRuntime,
+    model: &str,
+    text: &str,
+    timeout_ms: Option<i64>,
+) -> AiRequest {
+    AiRequest {
+        model: model.to_string(),
         instructions: String::new(),
-        input: Json::String(text),
+        input: Json::String(text.to_string()),
         schema: Schema::List(Box::new(Schema::Float)),
         timeout_ms: timeout_ms.map_or_else(|| ai.default_timeout_ms(), |ms| ms.max(0) as u64),
-    };
-    match ai.embed(&request) {
+    }
+}
+
+/// `Ok` with the vector, or `Err(AIError)`.
+pub(crate) fn embed_result(answer: Result<Vec<f64>, AiError>) -> Value {
+    match answer {
         Ok(v) => Value::Result(Ok(Rc::new(Value::list(
             v.into_iter().map(Value::Float).collect(),
         )))),

@@ -422,6 +422,10 @@ impl Checker {
             ExprKind::Bool(_) => Ty::Bool,
             ExprKind::Name(name) => {
                 let name = name.clone();
+                if let Some((kind, ty)) = self.bounded_fn_value(&name, span) {
+                    e.kind = kind;
+                    return ty;
+                }
                 self.check_name(&name, span)
             }
             ExprKind::List(items) => {
@@ -570,6 +574,73 @@ impl Checker {
         }
     }
 
+    /// `show` as a value, where `show` has trait bounds: the closure
+    /// `|#0, ...| show(#0, ..., <placeholder>)` and its type. The
+    /// placeholder becomes the implementations at the end of the body.
+    fn bounded_fn_value(&mut self, name: &str, span: Span) -> Option<(ExprKind, Ty)> {
+        if self.lookup_local(name).is_some() || self.consts.contains_key(name) {
+            return None;
+        }
+        let sig = self
+            .fns
+            .get(name)
+            .cloned()
+            .filter(|s| !s.bounds.is_empty())?;
+        self.note_fn(span, name);
+        self.note_def(span, sig.name_span);
+        self.usage.calls.push((name.to_string(), span));
+        let bounds = sig.bounds.clone();
+        let (sig, map) = self.instantiate_with_map(name, sig, &[], span);
+        let placeholder = format!("#implementations {}", self.pending_values.len());
+        let params: Vec<String> = (0..sig.params.len()).map(|i| format!("#{i}")).collect();
+        let named = |n: &str| Expr {
+            kind: ExprKind::Name(n.to_string()),
+            span,
+        };
+        let mut args: Vec<Arg> = params
+            .iter()
+            .map(|p| Arg {
+                name: None,
+                value: named(p),
+            })
+            .collect();
+        args.push(Arg {
+            name: None,
+            value: named(&placeholder),
+        });
+        self.pending_values.push(crate::PendingValue {
+            placeholder,
+            name: name.to_string(),
+            bounds,
+            map,
+            span,
+        });
+        let kind = ExprKind::Lambda {
+            params: params
+                .into_iter()
+                .map(|p| LambdaParam {
+                    name: Ident { name: p, span },
+                    ty: None,
+                })
+                .collect(),
+            body: Box::new(ArmBody::Expr(Expr {
+                kind: ExprKind::Call {
+                    callee: Box::new(named(name)),
+                    type_args: Vec::new(),
+                    args,
+                },
+                span,
+            })),
+        };
+        let types = sig.params.iter().map(|(_, t)| t.clone()).collect();
+        let ret = if sig.is_async {
+            Ty::future(sig.ret)
+        } else {
+            sig.ret
+        };
+        Some((kind, Ty::Fn(types, Box::new(ret))))
+    }
+
     fn check_name(&mut self, name: &str, span: Span) -> Ty {
         if let Some(local) = self.lookup_local(name).cloned() {
             self.note_local(name, &local, span);
@@ -628,24 +699,6 @@ impl Checker {
                     format!("`{name}` is a module, not a value; call one of its functions, e.g. `{name}.infer(...)`"),
                     format!("`{name}` وحدة وليست قيمة؛ استدعِ إحدى دوالها، مثل `{name}.infer(...)`"),
                 ),
-            );
-            return Ty::Error;
-        }
-        if let Some(sig) = self.fns.get(name).cloned().filter(|s| !s.bounds.is_empty()) {
-            let _ = sig;
-            self.push(
-                Diagnostic::error(
-                    "E0103",
-                    span,
-                    Text::new(
-                        "a function with trait bounds cannot be used as a value yet",
-                        "لا يمكن بعد استخدام دالة ذات قيود واجهات كقيمة",
-                    ),
-                )
-                .with_hint(Text::new(
-                    format!("wrap it in a closure: `|x| {name}(x)`"),
-                    format!("ضعها داخل دالة مجهولة: `|x| {name}(x)`"),
-                )),
             );
             return Ty::Error;
         }

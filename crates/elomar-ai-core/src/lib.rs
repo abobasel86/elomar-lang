@@ -217,6 +217,13 @@ pub trait ModelProvider: Send + Sync {
         ))
     }
 
+    /// The embeddings of several texts, in order (`await all` over
+    /// `ai.embed` calls to one model). By default one request each; a
+    /// provider that can embed many texts in one request does.
+    fn embed_batch(&mut self, requests: &[&AiRequest]) -> Vec<Result<Vec<f64>, AiError>> {
+        requests.iter().map(|r| self.embed(r)).collect()
+    }
+
     /// One step of a conversation with tools: the model either answers or
     /// asks for tool calls. `history` holds the earlier calls and results.
     fn step(
@@ -262,6 +269,18 @@ impl ModelProvider for UnavailableProvider {
 }
 
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
+
+/// An embedding, unless it is empty or not made of finite numbers.
+fn checked_embedding(v: Result<Vec<f64>, AiError>) -> Result<Vec<f64>, AiError> {
+    let v = v?;
+    if v.is_empty() || v.iter().any(|x| !x.is_finite()) {
+        return Err(AiError::new(
+            AiErrorKind::InvalidStructuredOutput,
+            "the provider returned an empty or invalid embedding",
+        ));
+    }
+    Ok(v)
+}
 
 /// The error of a stream the program stopped.
 pub fn cancelled() -> AiError {
@@ -468,14 +487,43 @@ impl AiRuntime {
     /// [`AiRuntime::infer`] (budget, model, network permission).
     pub fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
         let provider = self.checked_provider(request)?;
-        let v = provider.embed(request)?;
-        if v.is_empty() || v.iter().any(|x| !x.is_finite()) {
-            return Err(AiError::new(
-                AiErrorKind::InvalidStructuredOutput,
-                "the provider returned an empty or invalid embedding",
-            ));
+        checked_embedding(provider.embed(request))
+    }
+
+    /// Several embeddings, as for `await all([...])` over `ai.embed`: each
+    /// request is checked first, in order, then the requests to one model
+    /// go to it together, so a provider can answer them in one request.
+    /// Results keep the order of `requests`.
+    pub fn embed_all(&mut self, requests: &[AiRequest]) -> Vec<Result<Vec<f64>, AiError>> {
+        let mut out: Vec<Option<Result<Vec<f64>, AiError>>> =
+            (0..requests.len()).map(|_| None).collect();
+        let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+        for (i, request) in requests.iter().enumerate() {
+            if let Err(e) = self.checked_provider(request) {
+                out[i] = Some(Err(e));
+                continue;
+            }
+            match groups.iter_mut().find(|(m, _)| *m == request.model) {
+                Some((_, idx)) => idx.push(i),
+                None => groups.push((request.model.clone(), vec![i])),
+            }
         }
-        Ok(v)
+        for (model, idx) in groups {
+            let provider = self.models.get_mut(&model).expect("checked model");
+            let batch: Vec<&AiRequest> = idx.iter().map(|&i| &requests[i]).collect();
+            let mut answers = provider.embed_batch(&batch).into_iter();
+            for i in idx {
+                out[i] = Some(checked_embedding(answers.next().unwrap_or_else(|| {
+                    Err(AiError::new(
+                        AiErrorKind::InvalidStructuredOutput,
+                        "the provider returned fewer embeddings than texts",
+                    ))
+                })));
+            }
+        }
+        out.into_iter()
+            .map(|r| r.expect("every request answered"))
+            .collect()
     }
 
     /// Runs one inference: budget → model lookup → network permission →

@@ -4,6 +4,20 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Functions with trait bounds are values**: `xs.map(show)`,
+  `let f = show` and `apply(show, 3)` work when `show` is
+  `fn show<T: Describe>`. The checker passes the implementations for the
+  type once it is known in the same function; if it never is, the error
+  is `E2020`, with the type to write.
+- **`await all` embeds together**: the `ai.embed` calls in one `all` go
+  to each model at once, and an OpenAI model embeds up to 256 texts in one
+  request instead of one request per text. Results keep their order, and
+  each call keeps its own checks and `Result`.
+
 ## [1.7.0] - 2026-11-24
 
 ### Added

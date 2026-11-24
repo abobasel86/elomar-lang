@@ -854,8 +854,12 @@ fn trait_errors() {
     );
     assert_eq!(
         codes(&format!("{DESCRIBE}fn main() {{\n  let f = show\n}}")),
-        vec!["E0103"]
+        vec!["E2020"]
     );
+    // A bounded function is a value once its type is known.
+    ok(&format!(
+        "{DESCRIBE}fn main() {{\n  let f: fn(Int) -> String = show\n  print([1].map(show), f(2))\n}}"
+    ));
 }
 
 #[test]

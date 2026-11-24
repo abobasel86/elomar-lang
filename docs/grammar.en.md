@@ -488,6 +488,9 @@ async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
   words of the text (the same words give the same direction), and an `error` rule matching the text gives its error; the Anthropic provider
   makes no embeddings (`UnsupportedCapability`).
 - `ai.similarity` is pure arithmetic with no effects, so it counts as isolated and runs inside `par_` methods.
+- `await all([...])` (since 1.8) sends the `ai.embed` calls to each model together: the OpenAI provider embeds up to 256 texts in one
+  request. The results are in the order of the list, and each call has its own checks and its own `Result`, as if they ran one after
+  another.
 
 ## 4.7 Enums (`enum`)
 
@@ -1109,7 +1112,9 @@ report([1, 2])
 - `impl<T: A>` (since 1.7): a bound on the impl's type parameter becomes a bound on each of its methods, which may then call the methods of `A`
   on values of `T`. The impl can be passed where its trait is needed (`fn show<X: Describe>`), with the implementations for `T`, nested too
   (`Box<Box<Int>>`). If `T` does not implement `A`, the error is `E2019`.
-- Not supported yet: using a function with bounds as a value (`E0103`); write `|x| show(x)`.
+- A function with bounds is a value too (since 1.8): `xs.map(show)`, `let f = show` and `apply(show, 3)`. The trait implementations are
+  found once the type is known in the same function; if it never is (`let f = show` unused), the error is `E2020`: give the type,
+  `let f: fn(Int) -> String = show`.
 
 ## 5. Effects
 
@@ -1190,7 +1195,7 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 | `E0007` | Unclosed `{` inside a string, or an empty `{}` (for a literal brace write `\{`) |
 | `E0101` | Unexpected token (expected such-and-such) |
 | `E0102` | Expected an expression |
-| `E0103` | Feature not supported yet (type arguments for a non-generic function, built-in functions as values, a function with bounds as a value) |
+| `E0103` | Feature not supported yet (type arguments for a non-generic function, built-in functions as values) |
 | `E0104` | Invalid assignment target |
 | `E0105` | `var` at file level |
 | `E0107` | Expected a pattern |
@@ -1287,5 +1292,5 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 
 ## 9. Not Implemented Yet (Planned)
 
-Using a function with bounds as a value (`E0103`). (Working since 1.7: `ai.stream` and `ai.embed` (§4.6.5) and `impl<T: A>` (§4.16);
-since 1.2, running `async fn` on several cores, §4.5.)
+Built-in functions such as `print` as values (`E0103`); write `|x| print(x)`. (Working since 1.8: a function with bounds as a value
+(§4.16); since 1.7: `ai.stream` and `ai.embed` (§4.6.5) and `impl<T: A>`; since 1.2, running `async fn` on several cores, §4.5.)
