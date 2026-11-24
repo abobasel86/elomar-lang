@@ -338,3 +338,59 @@ fn tool_calling_steps() {
     assert_eq!(body["messages"][3]["role"], "tool");
     assert_eq!(body["messages"][3]["content"], "91");
 }
+
+#[test]
+fn embeddings() {
+    let body = json!({ "data": [{ "embedding": [0.5, -0.25, 1] }] }).to_string();
+    let (url, rx) = fake_openai(200, body, Duration::ZERO);
+    let mut p = provider(&url, Some("sk-test"));
+    let mut req = request(Schema::List(Box::new(Schema::Float)), 5000);
+    req.input = json!("a cat on a mat");
+    assert_eq!(p.embed(&req).unwrap(), vec![0.5, -0.25, 1.0]);
+    let sent = rx.recv().unwrap();
+    assert!(sent.starts_with("POST /v1/embeddings "), "{sent}");
+    assert!(sent.contains(r#""input":"a cat on a mat""#), "{sent}");
+
+    let (url, _rx) = fake_openai(200, json!({ "data": [] }).to_string(), Duration::ZERO);
+    let err = provider(&url, Some("sk-test")).embed(&req).unwrap_err();
+    assert_eq!(err.kind, AiErrorKind::InvalidStructuredOutput);
+    let (url, _rx) = fake_openai(401, "{}".into(), Duration::ZERO);
+    let err = provider(&url, Some("sk-test")).embed(&req).unwrap_err();
+    assert_eq!(err.kind, AiErrorKind::Authentication);
+}
+
+#[test]
+fn streams_pieces() {
+    let event = |piece: &str| {
+        format!(
+            "data: {}\n\n",
+            json!({ "choices": [{ "delta": { "content": piece } }] })
+        )
+    };
+    let body = format!(
+        "{}{}data: {}\n\n{}data: [DONE]\n\n",
+        event("Hel"),
+        event("lo, "),
+        json!({ "choices": [{ "delta": {} }] }),
+        event("world")
+    );
+    let (url, rx) = fake_openai(200, body.clone(), Duration::ZERO);
+    let mut p = provider(&url, Some("sk-test"));
+    let mut pieces = Vec::new();
+    let text = p
+        .stream(&request(Schema::String, 5000), &mut |s| {
+            pieces.push(s.to_string());
+            true
+        })
+        .unwrap();
+    assert_eq!(text, "Hello, world");
+    assert_eq!(pieces, ["Hel", "lo, ", "world"]);
+    assert!(rx.recv().unwrap().contains(r#""stream":true"#));
+
+    // Stopping after the first piece.
+    let (url, _rx) = fake_openai(200, body, Duration::ZERO);
+    let err = provider(&url, Some("sk-test"))
+        .stream(&request(Schema::String, 5000), &mut |_| false)
+        .unwrap_err();
+    assert_eq!(err.kind, AiErrorKind::Cancelled);
+}

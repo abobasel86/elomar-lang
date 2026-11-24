@@ -22,6 +22,14 @@ pub enum Thunk {
         span: Span,
     },
     Infer(InferCall),
+    /// `ai.stream(model, instructions, input, on_text[, timeout])`.
+    Stream(Box<crate::ai::StreamCall>),
+    /// `ai.embed(model, text[, timeout])`.
+    Embed {
+        model: String,
+        text: String,
+        timeout_ms: Option<i64>,
+    },
     /// `ai.run` with tools.
     Run(Box<RunCall>),
     /// `all([...])`: the futures to wait for, in order.

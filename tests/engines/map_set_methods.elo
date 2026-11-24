@@ -1,0 +1,28 @@
+// `filter`, `any`, `all` and `count` on maps and sets, `map_values` on
+// maps and `map` on sets, in the order of the keys.
+
+fn costly(name: String, price: Int) -> Bool {
+    return price > 4
+}
+
+fn main() {
+    let prices = ["tea": 4, "coffee": 7, "juice": 5, "water": 1]
+    print(prices.filter(|k, v| v > 4))
+    print(prices.filter(costly), prices.filter(|k, v| k.starts_with("w")))
+    print(prices.map_values(|v| v * 2), prices.map_values(|v| "{v} JD"))
+    print(prices.any(|k, v| v == 1), prices.all(|k, v| v > 1), prices.count(|k, v| k.length > 3))
+    let empty: Map<String, Int> = [:]
+    print(empty.filter(costly), empty.any(costly), empty.all(costly), empty.count(costly))
+
+    let numbers = set([12, 7, 30, 9, 4])
+    print(numbers.filter(|n| n % 2 == 0), numbers.map(|n| n % 5), numbers.map(|n| "n{n}"))
+    print(numbers.any(|n| n > 20), numbers.all(|n| n > 3), numbers.count(|n| n < 10))
+
+    // The order is the order of the keys; printing shows it.
+    print(prices.count(|k, v| {
+        print("checking {k}")
+        return v > 2
+    }))
+    // An error stops at the first key that fails.
+    print(set([3, 0, 5]).map(|n| 10 div n))
+}

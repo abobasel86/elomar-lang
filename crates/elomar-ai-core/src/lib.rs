@@ -185,6 +185,38 @@ pub trait ModelProvider: Send + Sync {
         None
     }
 
+    /// The answer as text, given piece by piece to `on_text` as it arrives
+    /// (`ai.stream`); returns the whole text. `on_text` returns `false` to
+    /// stop, and the call then fails with `Cancelled`. By default the
+    /// answer comes in one piece.
+    fn stream(
+        &mut self,
+        request: &AiRequest,
+        on_text: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<String, AiError> {
+        let text = self.infer(request)?;
+        let text = match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(serde_json::Value::String(s)) => s,
+            _ => text,
+        };
+        if !on_text(&text) {
+            return Err(cancelled());
+        }
+        Ok(text)
+    }
+
+    /// The embedding of `request.input_text()`: a vector of numbers whose
+    /// direction stands for the text's meaning (`ai.embed`).
+    fn embed(&mut self, _request: &AiRequest) -> Result<Vec<f64>, AiError> {
+        Err(AiError::new(
+            AiErrorKind::UnsupportedCapability,
+            format!(
+                "provider `{}` does not make embeddings; use an `openai` or `mock` model for `ai.embed`",
+                self.provider_name()
+            ),
+        ))
+    }
+
     /// One step of a conversation with tools: the model either answers or
     /// asks for tool calls. `history` holds the earlier calls and results.
     fn step(
@@ -230,6 +262,28 @@ impl ModelProvider for UnavailableProvider {
 }
 
 pub const DEFAULT_TIMEOUT_MS: u64 = 30_000;
+
+/// The error of a stream the program stopped.
+pub fn cancelled() -> AiError {
+    AiError::new(AiErrorKind::Cancelled, "the stream was stopped")
+}
+
+/// Reads server-sent events, calling `on_data` with each `data:` field
+/// until it returns `Ok(false)`, an error, or the stream ends.
+pub fn read_sse(
+    reader: impl std::io::BufRead,
+    mut on_data: impl FnMut(&str) -> Result<bool, AiError>,
+) -> Result<(), AiError> {
+    for line in reader.lines() {
+        let line = line.map_err(|e| AiError::new(AiErrorKind::Network, e.to_string()))?;
+        if let Some(data) = line.strip_prefix("data:")
+            && !on_data(data.trim_start())?
+        {
+            break;
+        }
+    }
+    Ok(())
+}
 
 /// Registered models plus the run's policy and counters.
 #[derive(Default)]
@@ -393,6 +447,35 @@ impl AiRuntime {
                 parse_response(&text?, &request.schema)
             })
             .collect()
+    }
+
+    /// Takes out the provider of `request.model` after the checks of
+    /// [`AiRuntime::infer`], so it can stream on another thread while the
+    /// program handles the pieces; give it back with [`AiRuntime::put_back`].
+    pub fn take_checked(&mut self, request: &AiRequest) -> Result<Box<dyn ModelProvider>, AiError> {
+        self.checked_provider(request)?;
+        Ok(self
+            .models
+            .remove(&request.model)
+            .expect("checked_provider found it"))
+    }
+
+    pub fn put_back(&mut self, model: String, provider: Box<dyn ModelProvider>) {
+        self.models.insert(model, provider);
+    }
+
+    /// The embedding of `request.input_text()`, after the same checks as
+    /// [`AiRuntime::infer`] (budget, model, network permission).
+    pub fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
+        let provider = self.checked_provider(request)?;
+        let v = provider.embed(request)?;
+        if v.is_empty() || v.iter().any(|x| !x.is_finite()) {
+            return Err(AiError::new(
+                AiErrorKind::InvalidStructuredOutput,
+                "the provider returned an empty or invalid embedding",
+            ));
+        }
+        Ok(v)
     }
 
     /// Runs one inference: budget → model lookup → network permission →

@@ -1,0 +1,68 @@
+// `impl<T: Describe>`: methods of a generic impl may use the trait's
+// methods on `T`, directly, through bounded functions, and nested.
+
+trait Describe {
+    fn describe(self) -> String
+}
+
+trait Size {
+    fn size(self) -> Int
+}
+
+type Box<T> = { item: T, label: String }
+
+impl Describe for Int {
+    fn describe(self) -> String {
+        return "the number {self}"
+    }
+}
+
+impl Size for Int {
+    fn size(self) -> Int {
+        return 1
+    }
+}
+
+impl Describe for String {
+    fn describe(self) -> String {
+        return "the text \"{self}\""
+    }
+}
+
+impl<T: Describe> Describe for Box<T> {
+    fn describe(self) -> String {
+        return "{self.label} holding {self.item.describe()}"
+    }
+}
+
+impl<T: Describe + Size> Size for Box<T> {
+    fn size(self) -> Int {
+        return 1 + self.item.size()
+    }
+}
+
+fn show<T: Describe>(x: T) -> String {
+    return x.describe()
+}
+
+fn both<T: Describe + Size>(x: T) -> String {
+    return "{x.describe()} (size {x.size()})"
+}
+
+// The bound on `T` passes on to `Box<T>`.
+fn boxed<T: Describe>(x: T) -> String {
+    let b: Box<T> = { item: x, label: "a box" }
+    return show(b)
+}
+
+fn main() {
+    let b: Box<Int> = { item: 7, label: "box" }
+    print(b.describe(), show(b))
+    let nested: Box<Box<Int>> = { item: b, label: "crate" }
+    print(nested.describe())
+    print(show(nested))
+    print(both(nested), both(3))
+    let t: Box<String> = { item: "hi", label: "tin" }
+    print(show(t), boxed(5), boxed("x"))
+    print([b, b].map(|x| show(x)))
+}

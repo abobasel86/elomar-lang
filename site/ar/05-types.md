@@ -260,3 +260,37 @@ fn main() {
 }
 ```
 
+ويمكن لـ`impl` عام أن يشترط على معامل نوعه واجهةً، بالصيغة `impl<T: Describe>`. عندها تستطيع دواله استخدام دوال
+الواجهة على `T`، ويصلح النوع حيثما احتيج إلى الواجهة:
+
+```elomar
+trait Describe {
+    fn describe(self) -> String
+}
+
+type Box<T> = { item: T }
+
+impl Describe for Int {
+    fn describe(self) -> String {
+        return "العدد {self}"
+    }
+}
+
+impl<T: Describe> Describe for Box<T> {
+    fn describe(self) -> String {
+        return "صندوق فيه {self.item.describe()}"
+    }
+}
+
+fn show<T: Describe>(x: T) -> String {
+    return x.describe()
+}
+
+fn main() {
+    let b: Box<Int> = { item: 7 }
+    print(b.describe())     // صندوق فيه العدد 7
+    let bb: Box<Box<Int>> = { item: b }
+    print(show(bb))         // صندوق فيه صندوق فيه العدد 7
+}
+```
+

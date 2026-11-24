@@ -1,0 +1,17 @@
+# `ai.stream` and `ai.embed` with an offline mock model. Swap in
+# `provider = "openai"` or `provider = "anthropic"` (see examples/ai-openai
+# and examples/ai-claude) for a real model; `ai.embed` needs an `openai`
+# or `mock` model.
+[package]
+name = "ai-stream"
+version = "0.1.0"
+entry = "main.elo"
+
+[ai.models.writer]
+provider = "mock"
+
+[[ai.models.writer.mock]]
+response = "Once upon a time, a small cat found the sea."
+
+[ai.models.search]
+provider = "mock"

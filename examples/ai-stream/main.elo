@@ -1,0 +1,33 @@
+// Streaming an answer as it is written, and searching notes by meaning.
+
+use std.ai
+
+type Note = { title: String, vector: List<Float> }
+
+async fn main() {
+    // Each piece is printed as soon as it arrives.
+    match await ai.stream("writer", "Write one sentence.", "a cat", |piece| print("> {piece}")) {
+        Ok(story) => print("whole story: {story}")
+        Err(e) => print("failed: {e.message()}")
+    }
+
+    // Embeddings: texts with the same meaning point the same way.
+    let titles = ["feeding the cat", "paying the electricity bill", "the cat sleeps on the mat"]
+    var notes: List<Note> = []
+    for t in titles {
+        match await ai.embed("search", t) {
+            Ok(v) => notes.push({ title: t, vector: v })
+            Err(e) => print(e.message())
+        }
+    }
+    match await ai.embed("search", "where the cat sleeps") {
+        Ok(query) => {
+            let best = notes.par_max_by(|n| ai.similarity(query, n.vector))
+            match best {
+                Some(n) => print("closest note: {n.title}")
+                None => print("no notes")
+            }
+        }
+        Err(e) => print(e.message())
+    }
+}

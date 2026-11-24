@@ -1,0 +1,28 @@
+// `ai.embed` with the offline mock model, and `ai.similarity`, which
+// may run inside `par_map`.
+
+use std.ai
+
+fn closeness(a: List<Float>, b: List<Float>) -> Float {
+    return ai.similarity(a, b).round_to(3)
+}
+
+async fn main() {
+    let docs = ["the cat sat on the mat", "a dog in the park", "cats like mats", "القطة على الحصيرة"]
+    var vectors: List<List<Float>> = []
+    for d in docs {
+        match await ai.embed("mock", d) {
+            Ok(v) => vectors.push(v)
+            Err(e) => print(e.kind(), e.message())
+        }
+    }
+    let query = match await ai.embed("mock", "the cat on a mat") {
+        Ok(v) => v
+        Err(e) => []
+    }
+    print(vectors.length, query.length)
+    let scores = vectors.par_map(|v| closeness(query, v))
+    print(scores)
+    print(ai.similarity([1.0, 0.0], [0.0, 1.0]), ai.similarity([1.0, 2.0], [2.0, 4.0]), ai.similarity([], [1.0]))
+    print(await ai.embed("nope", "x"))
+}

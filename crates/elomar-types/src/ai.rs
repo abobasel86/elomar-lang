@@ -244,8 +244,67 @@ impl Checker {
                 let what = format!("ai.{}", func.name);
                 self.check_ai_call(&what, func.span, type_args, args, span)
             }
-            _ => self.unknown_module_function("ai", func, &["infer", "run"], args),
+            _ if func.name == "embed" => self.check_embed_call(func.span, args, span),
+            _ if func.name == "stream" => self.check_stream_call(func.span, args, span),
+            _ if func.name == "similarity" => {
+                let vector = Ty::list(Ty::Float);
+                self.typed_args("ai.similarity", args, &[vector.clone(), vector], span);
+                Ty::Float
+            }
+            _ => self.unknown_module_function("ai", func, crate::module_functions("ai"), args),
         })
+    }
+
+    /// `ai.embed(model, text[, timeout]) -> Future<Result<List<Float>, AIError>>`.
+    fn check_embed_call(&mut self, callee_span: Span, args: &mut [Arg], span: Span) -> Ty {
+        self.usage.direct.push(("ai".into(), callee_span));
+        if self.arity("ai.embed", args, 2, 3, span) {
+            let uses_network = match &args[0].value.kind {
+                ExprKind::Str(name) => self.cloud_models.contains(name),
+                _ => !self.cloud_models.is_empty(),
+            };
+            if uses_network {
+                self.usage.direct.push(("net".into(), args[0].value.span));
+            }
+            let types = [Ty::Str, Ty::Str, Ty::Duration];
+            for (arg, ty) in args.iter_mut().zip(types.iter()) {
+                self.check_expr_against(&mut arg.value, ty);
+            }
+        }
+        Ty::future(Ty::result(Ty::list(Ty::Float), ai_error_ty()))
+    }
+
+    /// `ai.stream(model, instructions, input, on_text[, timeout])
+    /// -> Future<Result<String, AIError>>`, where `on_text: fn(String)`.
+    fn check_stream_call(&mut self, callee_span: Span, args: &mut [Arg], span: Span) -> Ty {
+        self.usage.direct.push(("ai".into(), callee_span));
+        if self.arity("ai.stream", args, 4, 5, span) {
+            let uses_network = match &args[0].value.kind {
+                ExprKind::Str(name) => self.cloud_models.contains(name),
+                _ => !self.cloud_models.is_empty(),
+            };
+            if uses_network {
+                self.usage.direct.push(("net".into(), args[0].value.span));
+            }
+            for (i, arg) in args.iter_mut().enumerate() {
+                match i {
+                    0 | 1 => self.check_expr_against(&mut arg.value, &Ty::Str),
+                    2 => {
+                        let t = self.check_expr(&mut arg.value, None);
+                        let resolved = self.subst.resolve(&t);
+                        if let Some(bad) = self.non_json_part(&resolved, false) {
+                            self.not_json_data(&resolved, &bad, arg.value.span, DataRole::AiInput);
+                        }
+                    }
+                    3 => self.check_expr_against(
+                        &mut arg.value,
+                        &Ty::Fn(vec![Ty::Str], Box::new(Ty::Unit)),
+                    ),
+                    _ => self.check_expr_against(&mut arg.value, &Ty::Duration),
+                }
+            }
+        }
+        Ty::future(Ty::result(Ty::Str, ai_error_ty()))
     }
 
     /// `ai.infer<T>(model, instructions, input[, timeout])`,

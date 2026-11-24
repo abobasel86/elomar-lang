@@ -352,8 +352,11 @@ fn type_brackets(tokens: &[&Token]) -> Vec<bool> {
     use TokenKind::*;
     let mut marks = vec![false; tokens.len()];
     for i in 1..tokens.len() {
-        let Ident(name) = &tokens[i - 1].kind else {
-            continue;
+        // `impl<T: Describe>`: the brackets after `impl` are always a type's.
+        let name = match &tokens[i - 1].kind {
+            Ident(name) => name.as_str(),
+            Impl => "Impl",
+            _ => continue,
         };
         if tokens[i].kind != Lt || marks[i] {
             continue;
@@ -473,6 +476,22 @@ mod tests {
                 "pub async fn f(q:String)->Result<T,AIError>!{ ai , net }{\nreturn await ai.infer<T>(\"m\",\"i\",q,timeout:10s)\n}\nfn g() -> Option<Int> {\nlet v=xs.first()?\nreturn Some(v)\n}\n"
             ),
             "pub async fn f(q: String) -> Result<T, AIError> !{ai, net} {\n    return await ai.infer<T>(\"m\", \"i\", q, timeout: 10s)\n}\nfn g() -> Option<Int> {\n    let v = xs.first()?\n    return Some(v)\n}\n"
+        );
+    }
+
+    #[test]
+    fn impl_with_bounds() {
+        assert_eq!(
+            fmt("impl < T : Describe + Size > Size for Box < T > {
+}
+impl<T> Stack<T> {
+}
+"),
+            "impl<T: Describe + Size> Size for Box<T> {
+}
+impl<T> Stack<T> {
+}
+"
         );
     }
 

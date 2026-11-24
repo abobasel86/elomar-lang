@@ -403,7 +403,7 @@ The same rules as for OpenAI apply (permissions, `net`, key masking, error mappi
 - When the model refuses (`stop_reason: "refusal"`), `PolicyDenied` is returned. For the models `claude-opus-5-5`, `claude-opus-5`, `claude-sonnet-5-5`, `claude-fable-5-1` and `claude-fable-5-2`, automatic switching to a fallback model on refusal is turned on (`fallbacks: "default"`).
 - HTTP 402 → `BudgetExceeded` · 529 (overloaded) → `ProviderUnavailable` · 400 with "prompt is too long" → `ContextLimitExceeded`.
 
-### 4.6.1 Tools: `ai.run`
+### 4.6.3 Tools: `ai.run`
 
 ```elomar
 fn find_student(name: String) -> Option<Student> { ... }
@@ -428,7 +428,7 @@ async fn ask(q: String) -> Result<Answer, AIError> !{ai} {
 - The `mock` model follows a written script: rules that match `input` are used in order, one step per rule. A rule with `tool = "find_student"` and `arguments = { name = "Lina" }` requests a tool, a rule with `response` answers, and `{{last_tool_result}}` in it is replaced with the last result. The OpenAI provider uses Tool Calling in strict mode.
 - Tool errors are `E2022`: not a list of names, a lambda, a generic or `async` function, a non-Latin name, or a duplicate tool. A parameter type without JSON is `E2015`.
 
-### 4.6.3 Agents and MCP: `agent.run` and `std.mcp`
+### 4.6.4 Agents and MCP: `agent.run` and `std.mcp`
 
 ```toml
 # elomar.toml: MCP servers allowed to run; listing a server here is the permission
@@ -463,13 +463,31 @@ async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
 }
 ```
 
-- `agent.run` is like `ai.run` (4.6.1), plus: the tools of the MCP servers listed in `mcp`, approval, and a step log. The model sees an MCP tool as `server__tool`, and the program sees it as `server.tool`.
+- `agent.run` is like `ai.run` (4.6.3), plus: the tools of the MCP servers listed in `mcp`, approval, and a step log. The model sees an MCP tool as `server__tool`, and the program sees it as `server.tool`.
 - **Approval:** before running a tool listed in `require_approval` (or every tool if the list is not given), `approve` is called with `{ tool, arguments }` (`arguments` is JSON text). If it returns `false`, the tool is not run and the model is told that the user refused it. The decision is in the code, not in the instruction text (specification §15.2). Literal names in `require_approval` must be tools of the call (`E2022`).
 - **Log:** `on_step` is called after every tool call with `{ tool, arguments, result, approved }`, for auditing.
 - **Permissions:** only a server listed under `[mcp.servers]` is started. The server program runs with the user's full permissions (like `std.py`). The server starts on first use in the project folder and stays until the end of the run.
 - **Effects:** `mcp.*` and a non-empty `mcp` list mean `mcp`. The effects of the tools and of the `approve`/`on_step` functions are counted on the caller, in addition to `ai` (and `net` for cloud models).
 - **Protocol:** a stdio client for MCP version 2026-07-28 (no handshake, and `_meta` in every request). It falls back automatically to `initialize` with older servers (2025-11-25 and earlier). It supports `tools/list` and `tools/call`. The result is the content text. Tools that ask the user for extra input (elicitation) are not supported yet.
 - `McpError`: `NotConfigured` (server not listed), `Unavailable` (could not start, the server stopped, or the timeout ran out), `Protocol` (a JSON-RPC error such as a tool that does not exist) and `ToolFailed` (the tool reported `isError`). In `agent.run`, an unlisted server becomes `AIError.PolicyDenied` and a failure to start it becomes `AIError.ProviderUnavailable`. Tool errors are sent back to the model to act on.
+
+### 4.6.5 Streaming and Embeddings: `ai.stream` and `ai.embed` (since 1.7)
+
+| Function | Type |
+|---|---|
+| `ai.stream(model, instructions, input, on_text[, timeout])` | `Future<Result<String, AIError>>`; `on_text: fn(String)` is called with each piece of the answer as soon as it arrives |
+| `ai.embed(model, text[, timeout])` | `Future<Result<List<Float>, AIError>>`: a vector whose direction stands for the text's meaning |
+| `ai.similarity(a, b)` | `List<Float>`, `List<Float>` → `Float`: the cosine of the angle between the vectors, from -1 to 1, and 0 if either is all zeros |
+
+- `ai.stream` and `ai.embed` go through the same checks as `ai.infer` (budget, model, network permission); their effect is `ai` (and `net`
+  for cloud models).
+- `ai.stream`: the OpenAI and Anthropic providers really stream the answer (`"stream": true`); the mock provider streams its answer one word at
+  a time. `on_text` runs in the program, in order, while the rest arrives; if it fails, the stream is stopped and its error is the program's.
+  In the browser playground the pieces are collected first, then given to `on_text`.
+- `ai.embed`: the OpenAI provider uses `/embeddings` with the model named in `model`; the mock provider gives a vector of 64 numbers from the
+  words of the text (the same words give the same direction), and an `error` rule matching the text gives its error; the Anthropic provider
+  makes no embeddings (`UnsupportedCapability`).
+- `ai.similarity` is pure arithmetic with no effects, so it counts as isolated and runs inside `par_` methods.
 
 ## 4.7 Enums (`enum`)
 
@@ -901,6 +919,78 @@ fn main() {
 - A module that does not exist is `E1011`, with the expected path.
 - `let` constants in modules are evaluated before the constants of the main file.
 
+### 4.12.1 Packages (Dependencies)
+
+```toml
+# elomar.toml
+[dependencies]
+geometry = { path = "vendor/geometry" }                              # local folder
+textkit = { git = "https://github.com/user/textkit", tag = "v1.0" }  # or branch / rev
+```
+
+```elomar
+use geometry.shapes               // src/shapes.elo in the geometry package
+use geometry.shapes.{Rect, area}
+```
+
+- A package is a folder with an `elomar.toml` and its modules in `src/` (or next to `elomar.toml`). It is used with `use <package>.<module>` under the same `pub` rules. Inside the package, `use app.x` means its own module `x`.
+- Dependencies of packages are resolved too, and one name must always point to the same source. A package name is lowercase Latin letters, digits and `_`, and is not `app` or `std`.
+- git packages are downloaded with the `git` command into `~/.elomar/git` (or `$ELOMAR_HOME/git`), and `elomar.lock` pins the exact commit of each one until `elomar update`. The check in the editor does not connect to the network. `elomar run` and `elomar test` download what is missing.
+- Commands: `elomar add <name> --path <folder>` or `--git <url> [--tag|--branch|--rev]`, `elomar remove <name>`, and `elomar update`.
+- An error in the dependencies (a folder that does not exist, conflicting sources, a package that was not downloaded) is `E1015`. A module that does not exist in a package is `E1011`.
+
+#### Package Registry
+
+```toml
+# elomar.toml of the application
+[registry]                       # optional: the default is the public registry https://github.com/abobasel86/elomar-registry
+index = "../my-registry"         # a git repository or a local folder (or the ELOMAR_REGISTRY environment variable)
+
+[dependencies]
+strings = "1.2"                 # the newest version that satisfies ^1.2 from the registry
+other = { version = ">=1, <3" }
+```
+
+- The registry is an **index**, not a server: a git repository (or folder) with one file per package, `packages/<name>.toml`, which lists `description`, `git` and a list of `[[versions]]`. Each version has `version` and a full `commit` (40 characters), so the code of a version cannot change after it is published. `yanked = true` hides a version from new resolutions without breaking existing lock files.
+- Version requirements use Cargo/semver syntax: `"1.2"` means `^1.2`, plus `"=1.0.0"` and `">=1, <3"`. The newest matching version that is not yanked is chosen, and the version and commit are recorded in `elomar.lock`. Resolution runs again only if the lock no longer satisfies the requirement, or on `elomar update`.
+- Each package has one version in the project: if two packages require incompatible versions, it is error `E1015`, which names who required what.
+- Commands: `elomar add strings` (writes `"^<newest version>"`) or `elomar add strings@1.2`, and `elomar search [text]`.
+- Publishing: in the package folder (a clean git repository, with `version` under `[package]`), run `elomar publish --index <local copy of the registry repository> [--git <URL>]`. It adds the version to the package file in the index. Then you commit and push the index (or open a pull request). The command sends nothing to the network itself, and it warns if the commit has not been pushed to a remote branch.
+
+## 4.13 Projects and Tests
+
+`elomar new myapp` creates a project that runs and whose tests pass:
+
+```text
+myapp/
+├── elomar.toml               ← [package] and [permissions] (all closed by default)
+├── src/main.elo              ← elomar run src/main.elo
+├── src/greeting.elo          ← module: use app.greeting
+└── tests/greeting_test.elo   ← elomar test
+```
+
+```elomar
+// tests/greeting_test.elo
+use app.greeting
+
+fn test_greets_by_name() {
+    assert_eq(greeting.greet("Lina"), "Hello, Lina!")
+}
+```
+
+- **Discovery:** every `.elo` file inside `tests/` (and its subfolders) is a test file. Every function in it whose name starts with `test_` and that has no parameters is a test.
+- **Pass and fail:** a test fails if a runtime error occurs (such as a failed `assert` or `assert_eq`) or if it returns `Err(...)`. It may be `async`.
+- **Isolation:** each test runs in a new interpreter with a new AI budget, and its output is shown only if it fails.
+- **Access to the code:** test files use the project items marked `pub` through `use app.<module>`. The permissions and models of `elomar.toml` apply to them.
+- `elomar test [PATH] [--filter TEXT]`: the path is the project folder (default: the current folder) or a single test file. The exit code is 1 on any failure.
+- `elomar new` does not write over an existing folder that is not empty.
+- `elomar build FILE [-o OUT]` checks the program, then writes a single executable file: a copy of `elomar` itself with the program files at its end
+  (the main file, its modules and the modules of its packages) and `elomar.toml`. When run, it runs the program directly, all arguments reach `os.args()`,
+  and it does not need Elomar-Lang to be installed. A program with errors is not built (exit code 1). The file is only for the system it was built on.
+  In a built program, relative paths and the `[permissions]` lists start from the **current working folder**, not from the project folder,
+  and what the program reads at run time (data files, Python scripts, MCP servers) is not included in it.
+- `elomar fmt [PATHS] [--check]` formats files in one style: 4 spaces per level, spaces around binary operators, `f(x, y)`, `{ a: 1 }`, `0..10` and `!{ai, net}`, removal of `;` at the end of a line, and merging of consecutive blank lines. It keeps comments and the line breaks the author wrote, and it checks that the output produces the same tokens before writing.
+
 ## 4.14 Generic Functions (Generics)
 
 ```elomar
@@ -1016,79 +1106,10 @@ report([1, 2])
 - Implementing a trait twice on the same type, or two methods with the same name on the same type, is `E1002`.
 - Methods are available wherever the type is available, and have effects like any function. The effects of an implementation used through a bound are counted on the caller of the generic function.
 - `impl` for a generic type: `impl<T> Stack<T> { fn push(self, x: T) -> Stack<T> { ... } }` and `impl<T> Describe for Box<T>`. `T` takes the type of the value at each call.
-- Not supported yet: bounds on `impl` parameters (`impl<T: A>`), and using a function with bounds as a value (`E0103`).
-
-### 4.12.1 Packages (Dependencies)
-
-```toml
-# elomar.toml
-[dependencies]
-geometry = { path = "vendor/geometry" }                              # local folder
-textkit = { git = "https://github.com/user/textkit", tag = "v1.0" }  # or branch / rev
-```
-
-```elomar
-use geometry.shapes               // src/shapes.elo in the geometry package
-use geometry.shapes.{Rect, area}
-```
-
-- A package is a folder with an `elomar.toml` and its modules in `src/` (or next to `elomar.toml`). It is used with `use <package>.<module>` under the same `pub` rules. Inside the package, `use app.x` means its own module `x`.
-- Dependencies of packages are resolved too, and one name must always point to the same source. A package name is lowercase Latin letters, digits and `_`, and is not `app` or `std`.
-- git packages are downloaded with the `git` command into `~/.elomar/git` (or `$ELOMAR_HOME/git`), and `elomar.lock` pins the exact commit of each one until `elomar update`. The check in the editor does not connect to the network. `elomar run` and `elomar test` download what is missing.
-- Commands: `elomar add <name> --path <folder>` or `--git <url> [--tag|--branch|--rev]`, `elomar remove <name>`, and `elomar update`.
-- An error in the dependencies (a folder that does not exist, conflicting sources, a package that was not downloaded) is `E1015`. A module that does not exist in a package is `E1011`.
-
-#### Package Registry
-
-```toml
-# elomar.toml of the application
-[registry]                       # optional: the default is the public registry https://github.com/abobasel86/elomar-registry
-index = "../my-registry"         # a git repository or a local folder (or the ELOMAR_REGISTRY environment variable)
-
-[dependencies]
-strings = "1.2"                 # the newest version that satisfies ^1.2 from the registry
-other = { version = ">=1, <3" }
-```
-
-- The registry is an **index**, not a server: a git repository (or folder) with one file per package, `packages/<name>.toml`, which lists `description`, `git` and a list of `[[versions]]`. Each version has `version` and a full `commit` (40 characters), so the code of a version cannot change after it is published. `yanked = true` hides a version from new resolutions without breaking existing lock files.
-- Version requirements use Cargo/semver syntax: `"1.2"` means `^1.2`, plus `"=1.0.0"` and `">=1, <3"`. The newest matching version that is not yanked is chosen, and the version and commit are recorded in `elomar.lock`. Resolution runs again only if the lock no longer satisfies the requirement, or on `elomar update`.
-- Each package has one version in the project: if two packages require incompatible versions, it is error `E1015`, which names who required what.
-- Commands: `elomar add strings` (writes `"^<newest version>"`) or `elomar add strings@1.2`, and `elomar search [text]`.
-- Publishing: in the package folder (a clean git repository, with `version` under `[package]`), run `elomar publish --index <local copy of the registry repository> [--git <URL>]`. It adds the version to the package file in the index. Then you commit and push the index (or open a pull request). The command sends nothing to the network itself, and it warns if the commit has not been pushed to a remote branch.
-
-## 4.13 Projects and Tests
-
-`elomar new myapp` creates a project that runs and whose tests pass:
-
-```text
-myapp/
-├── elomar.toml               ← [package] and [permissions] (all closed by default)
-├── src/main.elo              ← elomar run src/main.elo
-├── src/greeting.elo          ← module: use app.greeting
-└── tests/greeting_test.elo   ← elomar test
-```
-
-```elomar
-// tests/greeting_test.elo
-use app.greeting
-
-fn test_greets_by_name() {
-    assert_eq(greeting.greet("Lina"), "Hello, Lina!")
-}
-```
-
-- **Discovery:** every `.elo` file inside `tests/` (and its subfolders) is a test file. Every function in it whose name starts with `test_` and that has no parameters is a test.
-- **Pass and fail:** a test fails if a runtime error occurs (such as a failed `assert` or `assert_eq`) or if it returns `Err(...)`. It may be `async`.
-- **Isolation:** each test runs in a new interpreter with a new AI budget, and its output is shown only if it fails.
-- **Access to the code:** test files use the project items marked `pub` through `use app.<module>`. The permissions and models of `elomar.toml` apply to them.
-- `elomar test [PATH] [--filter TEXT]`: the path is the project folder (default: the current folder) or a single test file. The exit code is 1 on any failure.
-- `elomar new` does not write over an existing folder that is not empty.
-- `elomar build FILE [-o OUT]` checks the program, then writes a single executable file: a copy of `elomar` itself with the program files at its end
-  (the main file, its modules and the modules of its packages) and `elomar.toml`. When run, it runs the program directly, all arguments reach `os.args()`,
-  and it does not need Elomar-Lang to be installed. A program with errors is not built (exit code 1). The file is only for the system it was built on.
-  In a built program, relative paths and the `[permissions]` lists start from the **current working folder**, not from the project folder,
-  and what the program reads at run time (data files, Python scripts, MCP servers) is not included in it.
-- `elomar fmt [PATHS] [--check]` formats files in one style: 4 spaces per level, spaces around binary operators, `f(x, y)`, `{ a: 1 }`, `0..10` and `!{ai, net}`, removal of `;` at the end of a line, and merging of consecutive blank lines. It keeps comments and the line breaks the author wrote, and it checks that the output produces the same tokens before writing.
+- `impl<T: A>` (since 1.7): a bound on the impl's type parameter becomes a bound on each of its methods, which may then call the methods of `A`
+  on values of `T`. The impl can be passed where its trait is needed (`fn show<X: Describe>`), with the implementations for `T`, nested too
+  (`Box<Box<Int>>`). If `T` does not implement `A`, the error is `E2019`.
+- Not supported yet: using a function with bounds as a value (`E0103`); write `|x| show(x)`.
 
 ## 5. Effects
 
@@ -1144,8 +1165,8 @@ and `std.os`), `ai` (`ai.infer`, `ai.run` and `agent.run`), `net` (`std.http`, `
 | `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` · `pow(Float)` · `clamp(min, max)` · `round_to(digits) -> Float` · `to_fixed(digits) -> String` |
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn() -> T)` · `map(fn(T) -> U) -> Option<U>` · `and_then(fn(T) -> Option<U>)` · `filter(fn(T) -> Bool)` · `is_some_and(fn(T) -> Bool)` · `or(Option<T>)` · `ok_or(E) -> Result<T, E>` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn(E) -> T)` · `map(fn(T) -> U) -> Result<U, E>` · `map_err(fn(E) -> F) -> Result<T, F>` · `and_then(fn(T) -> Result<U, E>)` · `ok() -> Option<T>` · `err() -> Option<E>` |
-| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` |
-| `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` |
+| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` · `filter(fn(K, V) -> Bool) -> Map<K, V>` · `any` / `all` / `count(fn(K, V) -> Bool)` · `map_values(fn(V) -> U) -> Map<K, U>` (since 1.7, in key order) |
+| `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` · `filter(fn(T) -> Bool) -> Set<T>` · `any` / `all` / `count(fn(T) -> Bool)` · `map(fn(T) -> U) -> Set<U>` (`U` is `Int` or `String`; since 1.7) |
 | `AIError` · `FsError` · `JsonError` | `kind() -> String` (the variant name) · `message() -> String` |
 
 \* Modifies the collection, and requires it to be in a `var` variable.
@@ -1266,5 +1287,5 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 
 ## 9. Not Implemented Yet (Planned)
 
-`ai.stream` and `ai.embed` · bounds on `impl` parameters (`impl<T: A>`). (Running `async fn` on several cores works since 1.2,
-see §4.5.)
+Using a function with bounds as a value (`E0103`). (Working since 1.7: `ai.stream` and `ai.embed` (§4.6.5) and `impl<T: A>` (§4.16);
+since 1.2, running `async fn` on several cores, §4.5.)

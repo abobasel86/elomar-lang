@@ -21,6 +21,14 @@ pub struct InferCall {
     pub timeout_ms: Option<i64>,
 }
 
+/// A pending `ai.stream` call: the request (for a `String` answer) and
+/// the function that gets each piece.
+#[derive(Debug, Clone)]
+pub struct StreamCall {
+    pub infer: InferCall,
+    pub on_text: Rc<crate::value::Function>,
+}
+
 /// One tool of an `ai.run` call.
 #[derive(Debug, Clone)]
 pub struct RunTool {
@@ -100,6 +108,50 @@ pub(crate) fn schema_of(t: &TypeExpr, unit_enums: &HashMap<String, Vec<String>>)
 pub(crate) fn run_infer(ai: &mut AiRuntime, call: &InferCall) -> Value {
     let request = call.request(ai);
     infer_result(call, ai.infer(&request))
+}
+
+/// `ai.embed`: `Ok` with the vector, or `Err(AIError)`.
+pub(crate) fn run_embed(
+    ai: &mut AiRuntime,
+    model: String,
+    text: String,
+    timeout_ms: Option<i64>,
+) -> Value {
+    let request = AiRequest {
+        model,
+        instructions: String::new(),
+        input: Json::String(text),
+        schema: Schema::List(Box::new(Schema::Float)),
+        timeout_ms: timeout_ms.map_or_else(|| ai.default_timeout_ms(), |ms| ms.max(0) as u64),
+    };
+    match ai.embed(&request) {
+        Ok(v) => Value::Result(Ok(Rc::new(Value::list(
+            v.into_iter().map(Value::Float).collect(),
+        )))),
+        Err(e) => Value::Result(Err(Rc::new(ai_error_value(&e)))),
+    }
+}
+
+/// `ai.similarity(a, b)`: the cosine of the angle between two vectors,
+/// from -1 (opposite) to 1 (the same direction); 0 when either is all
+/// zeros. Lists of different lengths are compared on the shorter length.
+pub(crate) fn similarity(args: &[Value]) -> f64 {
+    let floats = |v: Option<&Value>| -> Vec<f64> {
+        match v {
+            Some(Value::List(xs)) => xs.iter().filter_map(Value::as_f64).collect(),
+            _ => Vec::new(),
+        }
+    };
+    let (a, b) = (floats(args.first()), floats(args.get(1)));
+    let dot: f64 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+    let n = a.len().min(b.len());
+    let na = a[..n].iter().map(|x| x * x).sum::<f64>().sqrt();
+    let nb = b[..n].iter().map(|x| x * x).sum::<f64>().sqrt();
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        (dot / (na * nb)).clamp(-1.0, 1.0)
+    }
 }
 
 /// `Result<T, AIError>` from a model's checked answer.

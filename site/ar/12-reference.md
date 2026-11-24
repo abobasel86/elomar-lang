@@ -111,6 +111,9 @@ slug: 12-reference
 | `contains(x)` · `add(x)`* · `remove(x)`* | (`Set`) هل فيها `x`؛ تضيف؛ تحذف: `Bool` |
 | `union(s)` · `intersection(s)` · `difference(s)` · `is_subset(s)` | (`Set`) عمليات المجموعات |
 | `to_list()` | (`Set`) العناصر قائمة `List` مرتبة |
+| `filter(f)` · `any(f)` · `all(f)` · `count(f)` | (للنوعين) بالدالة `f(key, value)` للقاموس و`f(item)` للمجموعة؛ و`filter` تعطي النوع نفسه |
+| `map_values(f)` | (`Map`) كل قيمة بعد تغييرها بـ`f` |
+| `map(f)` | (`Set`) كل عنصر عبر `f`، مجموعةً (عناصرها `Int` أو `String`) |
 
 ## الأخطاء
 
@@ -143,7 +146,7 @@ slug: 12-reference
 | `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` |
 | `std.process` | `process.run(command, args[, timeout])` |
 | `std.py` | `py.call<T>(module, function, args[, timeout])` |
-| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` |
+| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` · `ai.stream(model, instructions, input, on_text[, timeout])` · `ai.embed(model, text[, timeout])` · `ai.similarity(a, b)` |
 | `std.agent` | `agent.run<T>(model, instructions, input, tools, mcp, approve, ...)` |
 | `std.mcp` | `mcp.tools(server)` · `mcp.call(server, tool, args)` |
 

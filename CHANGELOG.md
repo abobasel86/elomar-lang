@@ -8,6 +8,29 @@ change the language.
 
 ### Added
 
+- **`ai.stream(model, instructions, input, on_text)`**: the answer piece
+  by piece as the model writes it. `on_text` gets each piece as it
+  arrives, while the provider goes on reading on its own thread; the
+  result is the whole text. OpenAI and Claude stream for real
+  (`"stream": true`); the mock model streams one word at a time. If
+  `on_text` fails, the stream stops and its error is the program's.
+- **`ai.embed(model, text)`** gives a text's embedding, a
+  `List<Float>` whose direction stands for its meaning, and
+  **`ai.similarity(a, b)`** compares two (the cosine, from -1 to 1).
+  OpenAI models use `/embeddings`; the mock model makes a deterministic
+  64-number vector from the words, so semantic search works offline in
+  tests; Claude has no embeddings and gives `UnsupportedCapability`.
+  `ai.similarity` is plain arithmetic, so it runs inside `par_` methods.
+  `examples/ai-stream` shows both.
+- **`impl<T: A>`**: a generic impl can require a trait of its type
+  parameter, and its methods may call that trait's methods on `T`. Such
+  an impl can be passed wherever its trait is needed, nested too
+  (`Box<Box<Int>>`): the implementations for `T` go with it. A `T`
+  without the trait is error `E2019`.
+- **Maps and sets** have `filter`, `any`, `all` and `count` (with
+  `f(key, value)` for a map), `map_values` on maps and `map` on sets, in
+  key order.
+
 - **The specification in English**: `docs/grammar.en.md` translates
   `docs/grammar.md` section by section; the English pages of the site link
   to it. Stale passages in both were corrected: named functions are
@@ -16,6 +39,13 @@ change the language.
 - Lesson 11 of the site has three exercises (`par_map`, `par_max_by` and
   `par_sum_by`) and shows how to work on maps and sets on several cores
   through `entries()`, `keys()`, `values()` and `to_list()`.
+
+### Fixed
+
+- `elomar fmt` wrote `impl < T > Stack<T>` with spaces once the impl had
+  a bound; the brackets after `impl` are now always kept tight.
+- The specification numbered two sections 4.6.1 and put 4.12.1 and 4.13
+  after 4.16; the sections are now in order, in both languages.
 
 ## [1.6.0] - 2026-11-24
 

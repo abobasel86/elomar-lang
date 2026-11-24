@@ -949,7 +949,7 @@ impl Checker {
     }
 
     /// Like `instantiate`, also returning what each type parameter became.
-    fn instantiate_with_map(
+    pub(crate) fn instantiate_with_map(
         &mut self,
         name: &str,
         sig: FnSig,

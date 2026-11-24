@@ -384,3 +384,35 @@ fn tool_loop_sends_assistant_content_back_unchanged() {
         ] })
     );
 }
+
+#[test]
+fn streams_pieces() {
+    let event = |v: Value| format!("event: x\ndata: {v}\n\n");
+    let body = [
+        event(json!({ "type": "message_start", "message": {} })),
+        event(json!({ "type": "content_block_delta", "delta": { "type": "text_delta", "text": "مرحبا " } })),
+        event(json!({ "type": "content_block_delta", "delta": { "type": "text_delta", "text": "بكم" } })),
+        event(json!({ "type": "message_stop" })),
+    ]
+    .concat();
+    let (url, rx) = fake_one(200, body);
+    let mut p = provider(&url, "claude-test", Some("sk-test"));
+    let mut pieces = Vec::new();
+    let text = p
+        .stream(&request(Schema::String, 5000), &mut |s| {
+            pieces.push(s.to_string());
+            true
+        })
+        .unwrap();
+    assert_eq!(text, "مرحبا بكم");
+    assert_eq!(pieces, ["مرحبا ", "بكم"]);
+    assert_eq!(body_of(&rx.recv().unwrap())["stream"], json!(true));
+
+    let failing = event(json!({ "type": "error", "error": { "message": "overloaded" } }));
+    let (url, _rx) = fake_one(200, failing);
+    let err = provider(&url, "claude-test", Some("sk-test"))
+        .stream(&request(Schema::String, 5000), &mut |_| true)
+        .unwrap_err();
+    assert_eq!(err.kind, AiErrorKind::ProviderUnavailable);
+    assert!(err.message.contains("overloaded"));
+}

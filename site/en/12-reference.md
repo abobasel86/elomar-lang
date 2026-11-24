@@ -113,6 +113,9 @@ Written `500ms`, `10s`, `2m`, `1h`.
 | `contains(x)` · `add(x)`* · `remove(x)`* | (`Set`) Whether it holds `x`; adds; removes: `Bool` |
 | `union(s)` · `intersection(s)` · `difference(s)` · `is_subset(s)` | (`Set`) Set operations |
 | `to_list()` | (`Set`) The items as a sorted `List` |
+| `filter(f)` · `any(f)` · `all(f)` · `count(f)` | (Both) With `f(key, value)` for a map, `f(item)` for a set; `filter` keeps the type |
+| `map_values(f)` | (`Map`) Every value changed by `f` |
+| `map(f)` | (`Set`) Every item through `f`, as a set (`Int` or `String` items) |
 
 ## Errors
 
@@ -145,7 +148,7 @@ permission in `elomar.toml` ([lesson 7](07-data.html)).
 | `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` |
 | `std.process` | `process.run(command, args[, timeout])` |
 | `std.py` | `py.call<T>(module, function, args[, timeout])` |
-| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` |
+| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` · `ai.stream(model, instructions, input, on_text[, timeout])` · `ai.embed(model, text[, timeout])` · `ai.similarity(a, b)` |
 | `std.agent` | `agent.run<T>(model, instructions, input, tools, mcp, approve, ...)` |
 | `std.mcp` | `mcp.tools(server)` · `mcp.call(server, tool, args)` |
 

@@ -265,3 +265,38 @@ fn main() {
 }
 ```
 
+A generic `impl` can ask its type parameter for a trait, with `impl<T:
+Describe>`. Its methods may then use the trait's methods on `T`, and the
+type works wherever the trait is needed:
+
+```elomar
+trait Describe {
+    fn describe(self) -> String
+}
+
+type Box<T> = { item: T }
+
+impl Describe for Int {
+    fn describe(self) -> String {
+        return "the number {self}"
+    }
+}
+
+impl<T: Describe> Describe for Box<T> {
+    fn describe(self) -> String {
+        return "a box holding {self.item.describe()}"
+    }
+}
+
+fn show<T: Describe>(x: T) -> String {
+    return x.describe()
+}
+
+fn main() {
+    let b: Box<Int> = { item: 7 }
+    print(b.describe())     // a box holding the number 7
+    let bb: Box<Box<Int>> = { item: b }
+    print(show(bb))         // a box holding a box holding the number 7
+}
+```
+

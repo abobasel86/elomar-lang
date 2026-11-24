@@ -278,8 +278,8 @@ impl Parser {
                 "E0101",
                 p.span,
                 Text::new(
-                    "trait bounds are allowed only on functions: `fn f<T: Describe>(...)`",
-                    "قيود الواجهات مسموحة على الدوال فقط: `fn f<T: Describe>(...)`",
+                    "trait bounds are allowed only on functions and `impl`: `fn f<T: Describe>(...)`",
+                    "قيود الواجهات مسموحة على الدوال و`impl` فقط: `fn f<T: Describe>(...)`",
                 ),
             ));
         }
@@ -375,16 +375,7 @@ impl Parser {
     /// `impl Type { ... }` or `impl Trait for Type { ... }`.
     fn impl_decl(&mut self) -> PResult<ImplDecl> {
         let start = self.expect(TokenKind::Impl)?;
-        let mut type_params = Vec::new();
-        if self.eat(&TokenKind::Lt) {
-            loop {
-                type_params.push(self.ident()?);
-                if !self.eat(&TokenKind::Comma) {
-                    break;
-                }
-            }
-            self.expect(TokenKind::Gt)?;
-        }
+        let (type_params, bounds) = self.type_params_with_bounds()?;
         let first = self.type_expr()?;
         let (trait_name, target) = if self.eat(&TokenKind::For) {
             let trait_name = match first.kind {
@@ -424,6 +415,7 @@ impl Parser {
         let end = self.expect(TokenKind::RBrace)?;
         Ok(ImplDecl {
             type_params,
+            bounds,
             trait_name,
             target,
             methods,

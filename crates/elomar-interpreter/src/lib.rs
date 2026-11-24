@@ -1367,6 +1367,50 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             | "std.crypto" | "std.csv" => {
                 stdextra::call(module, name, &values, &mut *self.host, span).map_err(Flow::from)
             }
+            "std.ai" if name == "embed" => {
+                let mut values = values.into_iter();
+                let mut text = || match values.next() {
+                    Some(Value::Str(s)) => s.to_string(),
+                    _ => String::new(),
+                };
+                let (model, text) = (text(), text());
+                let timeout_ms = match values.next() {
+                    Some(Value::Duration(ms)) => Some(ms),
+                    _ => None,
+                };
+                Ok(Value::future(Thunk::Embed {
+                    model,
+                    text,
+                    timeout_ms,
+                }))
+            }
+            "std.ai" if name == "similarity" => Ok(Value::Float(ai::similarity(&values))),
+            "std.ai" if name == "stream" => {
+                let mut values = values.into_iter();
+                let mut text = || match values.next() {
+                    Some(Value::Str(s)) => s.to_string(),
+                    _ => String::new(),
+                };
+                let (model, instructions) = (text(), text());
+                let input = values.next().unwrap_or(Value::Unit);
+                let Some(Value::Function(on_text)) = values.next() else {
+                    unreachable!("checked function argument");
+                };
+                let timeout_ms = match values.next() {
+                    Some(Value::Duration(ms)) => Some(ms),
+                    _ => None,
+                };
+                Ok(Value::future(Thunk::Stream(Box::new(ai::StreamCall {
+                    infer: ai::InferCall {
+                        schema: elomar_ai_core::Schema::String,
+                        model,
+                        instructions,
+                        input,
+                        timeout_ms,
+                    },
+                    on_text,
+                }))))
+            }
             "std.ai" => Ok(infer_future(type_args, values, &self.unit_enums)),
             "std.fs" => Ok(stdlib::fs_call(&self.fs, name, &values)),
             "std.db" => Ok(db::call(
@@ -1413,12 +1457,98 @@ impl<'p, 'h> Interpreter<'p, 'h> {
         {
             return self.list_higher_order(items, method, values, span);
         }
+        if matches!(
+            method,
+            "filter" | "any" | "all" | "count" | "map_values" | "map"
+        ) && matches!(recv, Value::Map(_) | Value::Set(_))
+        {
+            return self.map_set_higher_order(&recv, method, values, span);
+        }
         if matches!(recv, Value::Option(_) | Value::Result(_))
             && let Some(v) = self.option_result_method(&recv, method, &values, span)?
         {
             return Ok(v);
         }
         builtins::call_method(recv, method, values, span).map_err(Flow::from)
+    }
+
+    /// `filter`, `any`, `all` and `count` on a map (`f(key, value)`) or a
+    /// set, `map_values` on a map and `map` on a set: in the order of the
+    /// keys, as `entries()` and `to_list()` give them.
+    fn map_set_higher_order(
+        &mut self,
+        recv: &Value,
+        method: &str,
+        args: Vec<Value>,
+        span: Span,
+    ) -> Exec<Value> {
+        let Some(Value::Function(f)) = args.into_iter().next() else {
+            unreachable!("checked function argument");
+        };
+        match recv {
+            Value::Map(entries) => {
+                if method == "map_values" {
+                    let mut out = std::collections::BTreeMap::new();
+                    for (k, v) in entries.iter() {
+                        out.insert(k.clone(), self.call_value(&f, vec![v.clone()], span)?);
+                    }
+                    return Ok(Value::Map(Rc::new(out)));
+                }
+                let mut kept = std::collections::BTreeMap::new();
+                let mut n = 0;
+                for (k, v) in entries.iter() {
+                    let yes = matches!(
+                        self.call_value(&f, vec![k.to_value(), v.clone()], span)?,
+                        Value::Bool(true)
+                    );
+                    match method {
+                        "any" if yes => return Ok(Value::Bool(true)),
+                        "all" if !yes => return Ok(Value::Bool(false)),
+                        _ if yes => {
+                            n += 1;
+                            if method == "filter" {
+                                kept.insert(k.clone(), v.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(match method {
+                    "filter" => Value::Map(Rc::new(kept)),
+                    "count" => Value::Int(n),
+                    m => Value::Bool(m == "all"),
+                })
+            }
+            Value::Set(items) => {
+                let mut out = std::collections::BTreeSet::new();
+                let mut n = 0;
+                for k in items.iter() {
+                    let r = self.call_value(&f, vec![k.to_value()], span)?;
+                    if method == "map" {
+                        out.insert(MapKey::from_value(&r));
+                        continue;
+                    }
+                    let yes = matches!(r, Value::Bool(true));
+                    match method {
+                        "any" if yes => return Ok(Value::Bool(true)),
+                        "all" if !yes => return Ok(Value::Bool(false)),
+                        _ if yes => {
+                            n += 1;
+                            if method == "filter" {
+                                out.insert(k.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(match method {
+                    "filter" | "map" => Value::Set(Rc::new(out)),
+                    "count" => Value::Int(n),
+                    m => Value::Bool(m == "all"),
+                })
+            }
+            _ => unreachable!("checked map or set"),
+        }
     }
 
     fn eval_args(&mut self, args: &'p [Arg]) -> Exec<Vec<Value>> {
@@ -1855,12 +1985,80 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 self.call_fn(f, args, span)?
             }
             Thunk::Infer(call) => ai::run_infer(self.ai, &call),
+            Thunk::Embed {
+                model,
+                text,
+                timeout_ms,
+            } => ai::run_embed(self.ai, model, text, timeout_ms),
+            Thunk::Stream(call) => self.run_stream(&call, span)?,
             Thunk::Run(call) => self.run_agent(&call, span)?,
             Thunk::All(items) => self.await_all(&items, span)?,
             Thunk::Timeout(future, limit) => self.await_timeout(&future, limit, span)?,
         };
         *state.borrow_mut() = FutureState::Done(result.clone());
         Ok(result)
+    }
+
+    /// `ai.stream`: the provider streams on its own thread and sends each
+    /// piece here, where `on_text` runs as the pieces arrive. If `on_text`
+    /// fails, the stream is stopped and its error is the program's.
+    fn run_stream(&mut self, call: &ai::StreamCall, span: Span) -> Exec<Value> {
+        let request = call.infer.request(self.ai);
+        let mut provider = match self.ai.take_checked(&request) {
+            Ok(p) => p,
+            Err(e) => return Ok(Value::Result(Err(Rc::new(ai::ai_error_value(&e))))),
+        };
+        let mut failed: Option<Flow> = None;
+        #[cfg(not(target_family = "wasm"))]
+        let answer = {
+            let (tx, rx) = std::sync::mpsc::channel::<String>();
+            let provider = &mut provider;
+            let req = &request;
+            std::thread::scope(|scope| {
+                let handle = scope.spawn(move || {
+                    provider.stream(req, &mut |piece| tx.send(piece.to_string()).is_ok())
+                });
+                for piece in rx.iter() {
+                    if let Err(e) = self.call_value(&call.on_text, vec![Value::str(piece)], span) {
+                        failed = Some(e);
+                        break;
+                    }
+                }
+                // Further pieces fail to send, which stops the stream.
+                drop(rx);
+                handle.join().unwrap_or_else(|_| {
+                    Err(elomar_ai_core::AiError::new(
+                        elomar_ai_core::AiErrorKind::ProviderUnavailable,
+                        "the stream stopped unexpectedly",
+                    ))
+                })
+            })
+        };
+        // WebAssembly (the browser playground) has no threads: the pieces
+        // are collected first, then given to `on_text` in order.
+        #[cfg(target_family = "wasm")]
+        let answer = {
+            let mut pieces = Vec::new();
+            let answer = provider.stream(&request, &mut |piece| {
+                pieces.push(piece.to_string());
+                true
+            });
+            for piece in pieces {
+                if let Err(e) = self.call_value(&call.on_text, vec![Value::str(piece)], span) {
+                    failed = Some(e);
+                    break;
+                }
+            }
+            answer
+        };
+        self.ai.put_back(request.model.clone(), provider);
+        if let Some(e) = failed {
+            return Err(e);
+        }
+        Ok(match answer {
+            Ok(text) => Value::Result(Ok(Rc::new(Value::str(text)))),
+            Err(e) => Value::Result(Err(Rc::new(ai::ai_error_value(&e)))),
+        })
     }
 
     /// Whether statements and loop steps must check the time limits (or

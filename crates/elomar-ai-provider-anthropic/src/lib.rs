@@ -220,6 +220,12 @@ impl AnthropicProvider {
 
     /// Sends a request body and returns the response text.
     fn send(&self, body: &Value, timeout_ms: u64) -> Result<String, AiError> {
+        self.post(body, timeout_ms)?
+            .into_string()
+            .map_err(|e| transport_error(&e, timeout_ms))
+    }
+
+    fn post(&self, body: &Value, timeout_ms: u64) -> Result<ureq::Response, AiError> {
         let Some(key) = (self.key)() else {
             return Err(AiError::new(
                 AiErrorKind::Authentication,
@@ -240,9 +246,7 @@ impl AnthropicProvider {
             req = req.set("anthropic-beta", FALLBACK_BETA);
         }
         match req.send_string(&body.to_string()) {
-            Ok(resp) => resp
-                .into_string()
-                .map_err(|e| transport_error(&e, timeout_ms)),
+            Ok(resp) => Ok(resp),
             Err(ureq::Error::Status(code, resp)) => {
                 let text = resp.into_string().unwrap_or_default();
                 Err(status_error(code, &text))
@@ -294,6 +298,50 @@ impl ModelProvider for AnthropicProvider {
     }
 
     /// Requests are independent HTTP calls, so several can run at once.
+    /// The Messages API with `"stream": true`: each `content_block_delta`
+    /// event with text is a piece of the answer.
+    fn stream(
+        &mut self,
+        request: &AiRequest,
+        on_text: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<String, AiError> {
+        let mut body = self.request_body(request);
+        body["stream"] = json!(true);
+        let resp = self.post(&body, request.timeout_ms)?;
+        let mut text = String::new();
+        elomar_ai_core::read_sse(std::io::BufReader::new(resp.into_reader()), |data| {
+            let event: Value = serde_json::from_str(data).map_err(|_| {
+                AiError::new(
+                    AiErrorKind::InvalidStructuredOutput,
+                    "a stream event is not JSON",
+                )
+            })?;
+            match event["type"].as_str() {
+                Some("content_block_delta") => {
+                    if let Some(piece) = event["delta"]["text"].as_str()
+                        && !piece.is_empty()
+                    {
+                        text.push_str(piece);
+                        if !on_text(piece) {
+                            return Err(elomar_ai_core::cancelled());
+                        }
+                    }
+                    Ok(true)
+                }
+                Some("message_stop") => Ok(false),
+                Some("error") => Err(AiError::new(
+                    AiErrorKind::ProviderUnavailable,
+                    event["error"]["message"]
+                        .as_str()
+                        .unwrap_or("the stream failed")
+                        .to_string(),
+                )),
+                _ => Ok(true),
+            }
+        })?;
+        Ok(text)
+    }
+
     fn infer_shared(&self, request: &AiRequest) -> Option<Result<String, AiError>> {
         Some(
             self.send(&self.request_body(request), request.timeout_ms)

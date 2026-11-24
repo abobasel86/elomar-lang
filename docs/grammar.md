@@ -401,7 +401,7 @@ network_hosts = ["api.anthropic.com"]
 - عند رفض النموذج (`stop_reason: "refusal"`) يُرجع `PolicyDenied`. للنماذج `claude-opus-5-5` و`claude-opus-5` و`claude-sonnet-5-5` و`claude-fable-5-1` و`claude-fable-5-2` يُفعَّل التحويل التلقائي إلى نموذج بديل عند الرفض (`fallbacks: "default"`).
 - HTTP 402 → `BudgetExceeded` · 529 (ضغط) → `ProviderUnavailable` · 400 مع «prompt is too long» → `ContextLimitExceeded`.
 
-### 4.6.1 الأدوات: `ai.run`
+### 4.6.3 الأدوات: `ai.run`
 
 ```elomar
 fn find_student(name: String) -> Option<Student> { ... }
@@ -426,7 +426,7 @@ async fn ask(q: String) -> Result<Answer, AIError> !{ai} {
 - النموذج الوهمي `mock` يتبع نصًا مكتوبًا: القواعد المطابقة لـ `input` تُستخدم بالترتيب، خطوة لكل قاعدة؛ القاعدة `tool = "find_student"` و`arguments = { name = "Lina" }` تطلب أداة، والقاعدة `response` تجيب، و`{{last_tool_result}}` فيها يُستبدل بآخر ناتج. مزود OpenAI يستخدم Tool Calling بالوضع الصارم.
 - أخطاء الأدوات `E2022`: ليست قائمة أسماء، أو دالة مجهولة أو عامة أو `async`، أو اسم غير لاتيني، أو أداة مكررة؛ ونوع معامل بلا JSON `E2015`.
 
-### 4.6.3 الوكلاء وMCP: `agent.run` و`std.mcp`
+### 4.6.4 الوكلاء وMCP: `agent.run` و`std.mcp`
 
 ```toml
 # elomar.toml: خوادم MCP المسموح بتشغيلها؛ ذكر الخادم هنا هو الإذن
@@ -461,13 +461,30 @@ async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
 }
 ```
 
-- `agent.run` مثل `ai.run` (4.6.1) مع: أدوات خوادم MCP المذكورة في `mcp`، والموافقة، وسجل الخطوات. يرى النموذج أداة MCP باسم `server__tool`، ويراها البرنامج `server.tool`.
+- `agent.run` مثل `ai.run` (4.6.3) مع: أدوات خوادم MCP المذكورة في `mcp`، والموافقة، وسجل الخطوات. يرى النموذج أداة MCP باسم `server__tool`، ويراها البرنامج `server.tool`.
 - **الموافقة:** قبل تنفيذ أداة مذكورة في `require_approval` (أو كل أداة إن لم تُذكر القائمة) تُستدعى `approve` بـ `{ tool, arguments }` (`arguments` نص JSON)؛ إن أرجعت `false` لا تُنفَّذ الأداة ويُبلَّغ النموذج أن المستخدم رفضها. القرار في الشيفرة وليس في نص التعليمات (المواصفة §15.2). أسماء `require_approval` الحرفية يجب أن تكون أدوات الاستدعاء (`E2022`).
 - **السجل:** `on_step` تُستدعى بعد كل استدعاء أداة بـ `{ tool, arguments, result, approved }` للتدقيق.
 - **الصلاحيات:** لا يُشغَّل إلا خادم مذكور تحت `[mcp.servers]`؛ برنامج الخادم يعمل بصلاحيات المستخدم كاملة (مثل `std.py`). يبدأ الخادم عند أول استخدام في مجلد المشروع ويبقى حتى نهاية التشغيل.
 - **التأثيرات:** `mcp.*` وقائمة `mcp` غير الفارغة تعني `mcp`؛ وتأثيرات الأدوات والدوال `approve`/`on_step` تُحسب على المستدعي، إضافة إلى `ai` (و`net` للنماذج السحابية).
 - **البروتوكول:** عميل stdio لـ MCP بإصدار 2026-07-28 (بلا مصافحة، و`_meta` في كل طلب)، ويتراجع تلقائيًا إلى `initialize` مع الخوادم الأقدم (2025-11-25 وما قبلها). يدعم `tools/list` و`tools/call`؛ النتيجة نص المحتوى. الأدوات التي تطلب إدخالًا إضافيًا من المستخدم (elicitation) غير مدعومة بعد.
 - `McpError`: `NotConfigured` (خادم غير مذكور) و`Unavailable` (تعذّر التشغيل أو توقف الخادم أو انتهت المهلة) و`Protocol` (خطأ JSON-RPC مثل أداة غير موجودة) و`ToolFailed` (الأداة أبلغت `isError`). في `agent.run` يصبح خادم غير مذكور `AIError.PolicyDenied` وتعذّر تشغيله `AIError.ProviderUnavailable`، وأخطاء الأدوات تُعاد إلى النموذج ليتصرف.
+
+### 4.6.5 البث والتضمين: `ai.stream` و`ai.embed` (منذ 1.7)
+
+| الدالة | النوع |
+|---|---|
+| `ai.stream(model, instructions, input, on_text[, timeout])` | `Future<Result<String, AIError>>`؛ و`on_text: fn(String)` تُستدعى بكل قطعة من الإجابة فور وصولها |
+| `ai.embed(model, text[, timeout])` | `Future<Result<List<Float>, AIError>>`: متجه يدل اتجاهه على معنى النص |
+| `ai.similarity(a, b)` | `List<Float>`, `List<Float>` → `Float`: جيب تمام الزاوية بين المتجهين، من -1 إلى 1، و0 إن كان أحدهما أصفارًا |
+
+- يمر `ai.stream` و`ai.embed` بفحوص `ai.infer` نفسها (الحد، والنموذج، وإذن الشبكة)، وتأثيرهما `ai` (و`net` للنماذج السحابية).
+- `ai.stream`: يبث مزودا OpenAI وAnthropic الإجابة فعلًا (`"stream": true`)، ويبث المزود الوهمي إجابته كلمةً كلمة. تُنفذ
+  `on_text` في البرنامج بالترتيب بينما يصل الباقي؛ وإن فشلت أُوقف البث وكان خطؤها خطأ البرنامج. في ساحة التجربة بالمتصفح
+  تُجمع القطع أولًا ثم تُعطى لـ`on_text`.
+- `ai.embed`: مزود OpenAI يستخدم `/embeddings` بالنموذج المذكور في `model`؛ والمزود الوهمي يعطي متجهًا من 64 رقمًا من
+  كلمات النص (الكلمات نفسها تعطي الاتجاه نفسه)، وقاعدة `error` تطابق النص تعطي خطأها؛ ومزود Anthropic لا يصنع تضمينات
+  (`UnsupportedCapability`).
+- `ai.similarity` حساب خالص بلا تأثيرات، فتُعدّ معزولة وتعمل داخل دوال `par_`.
 
 ## 4.7 الأنواع المعدودة (`enum`)
 
@@ -899,6 +916,78 @@ fn main() {
 - الوحدة غير الموجودة `E1011` مع المسار المتوقع.
 - ثوابت `let` في الوحدات تُقيَّم قبل ثوابت الملف الرئيسي.
 
+### 4.12.1 الحزم (الاعتماديات)
+
+```toml
+# elomar.toml
+[dependencies]
+geometry = { path = "vendor/geometry" }                              # مجلد محلي
+textkit = { git = "https://github.com/user/textkit", tag = "v1.0" }  # أو branch / rev
+```
+
+```elomar
+use geometry.shapes               // src/shapes.elo في الحزمة geometry
+use geometry.shapes.{Rect, area}
+```
+
+- الحزمة مجلد فيه `elomar.toml` ووحداته في `src/` (أو بجوار `elomar.toml`). تُستخدم بـ `use <package>.<module>` بقواعد `pub` نفسها، وداخل الحزمة يعني `use app.x` وحدتها هي `x`.
+- اعتماديات الحزم تُحل أيضًا، والاسم الواحد يجب أن يشير دائمًا إلى المصدر نفسه. اسم الحزمة حروف لاتينية صغيرة وأرقام و`_`، وليس `app` ولا `std`.
+- حزم git تُنزَّل بالأمر `git` إلى `~/.elomar/git` (أو `$ELOMAR_HOME/git`)، ويثبّت `elomar.lock` الـ commit الدقيق لكل منها حتى `elomar update`. الفحص في المحرر لا يتصل بالشبكة؛ أما `elomar run` و`elomar test` فينزّلان الناقص.
+- الأوامر: `elomar add <name> --path <folder>` أو `--git <url> [--tag|--branch|--rev]`، و`elomar remove <name>`، و`elomar update`.
+- خطأ في الاعتماديات (مجلد غير موجود، تعارض مصادر، حزمة لم تُنزَّل) `E1015`؛ ووحدة غير موجودة في حزمة `E1011`.
+
+#### سجل الحزم (Registry)
+
+```toml
+# elomar.toml للتطبيق
+[registry]                       # اختياري: الافتراضي السجل العام https://github.com/abobasel86/elomar-registry
+index = "../my-registry"         # مستودع git أو مجلد محلي (أو متغير البيئة ELOMAR_REGISTRY)
+
+[dependencies]
+strings = "1.2"                 # أحدث إصدار يحقق ^1.2 من السجل
+other = { version = ">=1, <3" }
+```
+
+- السجل **فهرس** وليس خادمًا: مستودع git (أو مجلد) فيه ملف لكل حزمة `packages/<name>.toml` يذكر `description` و`git` وقائمة `[[versions]]`، لكل إصدار `version` و`commit` كامل (40 خانة)، فلا تتغير شيفرة إصدار بعد نشره. `yanked = true` يخفي إصدارًا عن الحلول الجديدة دون كسر ملفات القفل الموجودة.
+- متطلبات الإصدار بصيغة Cargo/semver: `"1.2"` تعني `^1.2`، و`"=1.0.0"`، و`">=1, <3"`. يُختار أحدث إصدار مطابق غير مسحوب، ويُسجَّل الإصدار والـ commit في `elomar.lock`؛ ولا يُعاد الحل إلا إذا لم يعد القفل يحقق المتطلب أو عند `elomar update`.
+- لكل حزمة إصدار واحد في المشروع: إن طلبت حزمتان إصدارين غير متوافقين فهو خطأ `E1015` يذكر من طلب ماذا.
+- الأوامر: `elomar add strings` (يكتب `"^<أحدث إصدار>"`) أو `elomar add strings@1.2`، و`elomar search [text]`.
+- النشر: في مجلد الحزمة (مستودع git نظيف، و`version` تحت `[package]`) شغّل `elomar publish --index <نسخة محلية من مستودع السجل> [--git <URL>]`؛ يضيف الإصدار إلى ملف الحزمة في الفهرس، ثم تعمل commit وpush للفهرس (أو pull request). لا يرسل الأمر شيئًا إلى الشبكة بنفسه، ويحذّر إن لم يكن الـ commit مدفوعًا إلى فرع بعيد.
+
+## 4.13 المشاريع والاختبارات
+
+`elomar new myapp` ينشئ مشروعًا يعمل وتنجح اختباراته:
+
+```text
+myapp/
+├── elomar.toml               ← [package] و[permissions] (كلها مغلقة افتراضيًا)
+├── src/main.elo              ← elomar run src/main.elo
+├── src/greeting.elo          ← وحدة: use app.greeting
+└── tests/greeting_test.elo   ← elomar test
+```
+
+```elomar
+// tests/greeting_test.elo
+use app.greeting
+
+fn test_greets_by_name() {
+    assert_eq(greeting.greet("Lina"), "Hello, Lina!")
+}
+```
+
+- **الاكتشاف:** كل ملف `.elo` داخل `tests/` (ومجلداته الفرعية) ملف اختبار؛ وكل دالة فيه اسمها يبدأ بـ `test_` وبلا معاملات اختبار.
+- **النجاح والفشل:** يفشل الاختبار إن وقع خطأ تنفيذ (مثل فشل `assert` أو `assert_eq`) أو أرجع `Err(...)`؛ ويجوز أن يكون `async`.
+- **العزل:** كل اختبار يعمل في مفسّر جديد بميزانية AI جديدة، ولا تُعرض مخرجاته إلا إن فشل.
+- **الوصول للكود:** ملفات الاختبار تستخدم عناصر المشروع المعلّمة بـ `pub` عبر `use app.<module>`، وتنطبق عليها صلاحيات `elomar.toml` ونماذجه.
+- `elomar test [PATH] [--filter TEXT]`: المسار مجلد المشروع (الافتراضي المجلد الحالي) أو ملف اختبار واحد؛ ورمز الخروج 1 عند أي فشل.
+- `elomar new` لا يكتب فوق مجلد موجود غير فارغ.
+- `elomar build FILE [-o OUT]` يفحص البرنامج ثم يكتب ملفًا تنفيذيًا واحدًا: نسخة من `elomar` نفسه وبآخرها ملفات البرنامج
+  (الملف الرئيسي ووحداته ووحدات حزمه) و`elomar.toml`. عند تشغيله ينفّذ البرنامج مباشرة، وكل المعاملات تصل إلى `os.args()`،
+  ولا يحتاج تثبيت Elomar-Lang. البرنامج الذي فيه أخطاء لا يُبنى (رمز الخروج 1). الملف للنظام الذي بُني عليه فقط.
+  في البرنامج المبني تبدأ المسارات النسبية وقوائم `[permissions]` من **مجلد التشغيل الحالي**، لا من مجلد المشروع،
+  وما يقرؤه البرنامج وقت التشغيل (ملفات البيانات، سكربتات Python، خوادم MCP) لا يُضمَّن فيه.
+- `elomar fmt [PATHS] [--check]` ينسّق الملفات بأسلوب واحد: 4 مسافات لكل مستوى، ومسافات حول العوامل الثنائية، و`f(x, y)` و`{ a: 1 }` و`0..10` و`!{ai, net}`، وحذف `;` في نهاية السطر، ودمج الأسطر الفارغة المتتالية. يحتفظ بالتعليقات وبفواصل الأسطر التي كتبها المؤلف، ويتحقق أن الناتج يُنتج الرموز نفسها قبل الكتابة.
+
 ## 4.14 الدوال العامة (Generics)
 
 ```elomar
@@ -1014,79 +1103,10 @@ report([1, 2])
 - التنفيذ المكرر لواجهة على النوع نفسه، أو دالتان تابعتان بالاسم نفسه للنوع نفسه، `E1002`.
 - الدوال التابعة متاحة حيثما كان النوع متاحًا، ولها تأثيرات كأي دالة؛ وتأثيرات التنفيذ المستخدم عبر قيد تُحسب على من يستدعي الدالة العامة.
 - `impl` لنوع عام: `impl<T> Stack<T> { fn push(self, x: T) -> Stack<T> { ... } }` و`impl<T> Describe for Box<T>`؛ و`T` يأخذ نوع القيمة عند كل استدعاء.
-- غير مدعوم بعد: قيود على معاملات `impl` (`impl<T: A>`)، واستخدام دالة ذات قيود كقيمة (`E0103`).
-
-### 4.12.1 الحزم (الاعتماديات)
-
-```toml
-# elomar.toml
-[dependencies]
-geometry = { path = "vendor/geometry" }                              # مجلد محلي
-textkit = { git = "https://github.com/user/textkit", tag = "v1.0" }  # أو branch / rev
-```
-
-```elomar
-use geometry.shapes               // src/shapes.elo في الحزمة geometry
-use geometry.shapes.{Rect, area}
-```
-
-- الحزمة مجلد فيه `elomar.toml` ووحداته في `src/` (أو بجوار `elomar.toml`). تُستخدم بـ `use <package>.<module>` بقواعد `pub` نفسها، وداخل الحزمة يعني `use app.x` وحدتها هي `x`.
-- اعتماديات الحزم تُحل أيضًا، والاسم الواحد يجب أن يشير دائمًا إلى المصدر نفسه. اسم الحزمة حروف لاتينية صغيرة وأرقام و`_`، وليس `app` ولا `std`.
-- حزم git تُنزَّل بالأمر `git` إلى `~/.elomar/git` (أو `$ELOMAR_HOME/git`)، ويثبّت `elomar.lock` الـ commit الدقيق لكل منها حتى `elomar update`. الفحص في المحرر لا يتصل بالشبكة؛ أما `elomar run` و`elomar test` فينزّلان الناقص.
-- الأوامر: `elomar add <name> --path <folder>` أو `--git <url> [--tag|--branch|--rev]`، و`elomar remove <name>`، و`elomar update`.
-- خطأ في الاعتماديات (مجلد غير موجود، تعارض مصادر، حزمة لم تُنزَّل) `E1015`؛ ووحدة غير موجودة في حزمة `E1011`.
-
-#### سجل الحزم (Registry)
-
-```toml
-# elomar.toml للتطبيق
-[registry]                       # اختياري: الافتراضي السجل العام https://github.com/abobasel86/elomar-registry
-index = "../my-registry"         # مستودع git أو مجلد محلي (أو متغير البيئة ELOMAR_REGISTRY)
-
-[dependencies]
-strings = "1.2"                 # أحدث إصدار يحقق ^1.2 من السجل
-other = { version = ">=1, <3" }
-```
-
-- السجل **فهرس** وليس خادمًا: مستودع git (أو مجلد) فيه ملف لكل حزمة `packages/<name>.toml` يذكر `description` و`git` وقائمة `[[versions]]`، لكل إصدار `version` و`commit` كامل (40 خانة)، فلا تتغير شيفرة إصدار بعد نشره. `yanked = true` يخفي إصدارًا عن الحلول الجديدة دون كسر ملفات القفل الموجودة.
-- متطلبات الإصدار بصيغة Cargo/semver: `"1.2"` تعني `^1.2`، و`"=1.0.0"`، و`">=1, <3"`. يُختار أحدث إصدار مطابق غير مسحوب، ويُسجَّل الإصدار والـ commit في `elomar.lock`؛ ولا يُعاد الحل إلا إذا لم يعد القفل يحقق المتطلب أو عند `elomar update`.
-- لكل حزمة إصدار واحد في المشروع: إن طلبت حزمتان إصدارين غير متوافقين فهو خطأ `E1015` يذكر من طلب ماذا.
-- الأوامر: `elomar add strings` (يكتب `"^<أحدث إصدار>"`) أو `elomar add strings@1.2`، و`elomar search [text]`.
-- النشر: في مجلد الحزمة (مستودع git نظيف، و`version` تحت `[package]`) شغّل `elomar publish --index <نسخة محلية من مستودع السجل> [--git <URL>]`؛ يضيف الإصدار إلى ملف الحزمة في الفهرس، ثم تعمل commit وpush للفهرس (أو pull request). لا يرسل الأمر شيئًا إلى الشبكة بنفسه، ويحذّر إن لم يكن الـ commit مدفوعًا إلى فرع بعيد.
-
-## 4.13 المشاريع والاختبارات
-
-`elomar new myapp` ينشئ مشروعًا يعمل وتنجح اختباراته:
-
-```text
-myapp/
-├── elomar.toml               ← [package] و[permissions] (كلها مغلقة افتراضيًا)
-├── src/main.elo              ← elomar run src/main.elo
-├── src/greeting.elo          ← وحدة: use app.greeting
-└── tests/greeting_test.elo   ← elomar test
-```
-
-```elomar
-// tests/greeting_test.elo
-use app.greeting
-
-fn test_greets_by_name() {
-    assert_eq(greeting.greet("Lina"), "Hello, Lina!")
-}
-```
-
-- **الاكتشاف:** كل ملف `.elo` داخل `tests/` (ومجلداته الفرعية) ملف اختبار؛ وكل دالة فيه اسمها يبدأ بـ `test_` وبلا معاملات اختبار.
-- **النجاح والفشل:** يفشل الاختبار إن وقع خطأ تنفيذ (مثل فشل `assert` أو `assert_eq`) أو أرجع `Err(...)`؛ ويجوز أن يكون `async`.
-- **العزل:** كل اختبار يعمل في مفسّر جديد بميزانية AI جديدة، ولا تُعرض مخرجاته إلا إن فشل.
-- **الوصول للكود:** ملفات الاختبار تستخدم عناصر المشروع المعلّمة بـ `pub` عبر `use app.<module>`، وتنطبق عليها صلاحيات `elomar.toml` ونماذجه.
-- `elomar test [PATH] [--filter TEXT]`: المسار مجلد المشروع (الافتراضي المجلد الحالي) أو ملف اختبار واحد؛ ورمز الخروج 1 عند أي فشل.
-- `elomar new` لا يكتب فوق مجلد موجود غير فارغ.
-- `elomar build FILE [-o OUT]` يفحص البرنامج ثم يكتب ملفًا تنفيذيًا واحدًا: نسخة من `elomar` نفسه وبآخرها ملفات البرنامج
-  (الملف الرئيسي ووحداته ووحدات حزمه) و`elomar.toml`. عند تشغيله ينفّذ البرنامج مباشرة، وكل المعاملات تصل إلى `os.args()`،
-  ولا يحتاج تثبيت Elomar-Lang. البرنامج الذي فيه أخطاء لا يُبنى (رمز الخروج 1). الملف للنظام الذي بُني عليه فقط.
-  في البرنامج المبني تبدأ المسارات النسبية وقوائم `[permissions]` من **مجلد التشغيل الحالي**، لا من مجلد المشروع،
-  وما يقرؤه البرنامج وقت التشغيل (ملفات البيانات، سكربتات Python، خوادم MCP) لا يُضمَّن فيه.
-- `elomar fmt [PATHS] [--check]` ينسّق الملفات بأسلوب واحد: 4 مسافات لكل مستوى، ومسافات حول العوامل الثنائية، و`f(x, y)` و`{ a: 1 }` و`0..10` و`!{ai, net}`، وحذف `;` في نهاية السطر، ودمج الأسطر الفارغة المتتالية. يحتفظ بالتعليقات وبفواصل الأسطر التي كتبها المؤلف، ويتحقق أن الناتج يُنتج الرموز نفسها قبل الكتابة.
+- `impl<T: A>` (منذ 1.7): قيد على معامل نوع الـ`impl`، يصير قيدًا على كل دوالها، فتستطيع استدعاء دوال `A` على قيم `T`.
+  ويُمرَّر الـ`impl` حيث تُطلب واجهته (`fn show<X: Describe>`) ومعه تنفيذات `T`، متداخلًا أيضًا (`Box<Box<Int>>`). إن لم
+  ينفذ `T` الواجهة `A` فالخطأ `E2019`.
+- غير مدعوم بعد: استخدام دالة ذات قيود كقيمة (`E0103`)؛ اكتب `|x| show(x)`.
 
 ## 5. التأثيرات (Effects)
 
@@ -1142,8 +1162,8 @@ fn test_greets_by_name() {
 | `Float` | `to_int()` · `round()` · `floor()` · `ceil()` (→ `Int`) · `abs()` · `sqrt()` · `pow(Float)` · `clamp(min, max)` · `round_to(digits) -> Float` · `to_fixed(digits) -> String` |
 | `Option<T>` | `is_some()` · `is_none()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn() -> T)` · `map(fn(T) -> U) -> Option<U>` · `and_then(fn(T) -> Option<U>)` · `filter(fn(T) -> Bool)` · `is_some_and(fn(T) -> Bool)` · `or(Option<T>)` · `ok_or(E) -> Result<T, E>` |
 | `Result<T,E>` | `is_ok()` · `is_err()` · `unwrap_or(T) -> T` · `unwrap_or_else(fn(E) -> T)` · `map(fn(T) -> U) -> Result<U, E>` · `map_err(fn(E) -> F) -> Result<T, F>` · `and_then(fn(T) -> Result<U, E>)` · `ok() -> Option<T>` · `err() -> Option<E>` |
-| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` |
-| `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` |
+| `Map<K,V>` | `.length` · `get(K) -> Option<V>` · `contains_key(K)` · `remove(K) -> Option<V>`* · `keys() -> List<K>` · `values() -> List<V>` · `is_empty()` · `get_or(K, V) -> V` · `entries() -> List<{ key: K, value: V }>` · `filter(fn(K, V) -> Bool) -> Map<K, V>` · `any` / `all` / `count(fn(K, V) -> Bool)` · `map_values(fn(V) -> U) -> Map<K, U>` (منذ 1.7، بترتيب المفاتيح) |
+| `Set<T>` | `.length` · `contains(T)` · `add(T)`* · `remove(T) -> Bool`* · `is_empty()` · `to_list()` · `union(Set<T>)` · `intersection(Set<T>)` · `difference(Set<T>)` · `is_subset(Set<T>) -> Bool` · `filter(fn(T) -> Bool) -> Set<T>` · `any` / `all` / `count(fn(T) -> Bool)` · `map(fn(T) -> U) -> Set<U>` (`U` هو `Int` أو `String`؛ منذ 1.7) |
 | `AIError` · `FsError` · `JsonError` | `kind() -> String` (اسم الحالة) · `message() -> String` |
 
 \* يعدّل القائمة، ويتطلب أن تكون في متغير `var`.
@@ -1264,4 +1284,5 @@ fn test_greets_by_name() {
 
 ## 9. غير المنفذ بعد (مخطط)
 
-`ai.stream` و`ai.embed` · قيود على معاملات `impl` (`impl<T: A>`). (تنفيذ `async fn` على عدة أنوية يعمل منذ 1.2، انظر §4.5.)
+استخدام دالة ذات قيود كقيمة (`E0103`). (يعمل منذ 1.7: `ai.stream` و`ai.embed` (§4.6.5) و`impl<T: A>` (§4.16)؛ ومنذ 1.2 تنفيذ
+`async fn` على عدة أنوية، §4.5.)

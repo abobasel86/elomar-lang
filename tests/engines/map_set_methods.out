@@ -1,0 +1,12 @@
+["coffee": 7, "juice": 5]
+["coffee": 7, "juice": 5] ["water": 1]
+["coffee": 14, "juice": 10, "tea": 8, "water": 2] ["coffee": "7 JD", "juice": "5 JD", "tea": "4 JD", "water": "1 JD"]
+true false 3
+[:] false true 0
+set([4, 12, 30]) set([0, 2, 4]) set(["n12", "n30", "n4", "n7", "n9"])
+true true 3
+checking coffee
+checking juice
+checking tea
+checking water
+3

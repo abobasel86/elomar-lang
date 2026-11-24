@@ -187,6 +187,11 @@ const MAP_METHODS: &[&str] = &[
     "values",
     "is_empty",
     "to_string",
+    "filter",
+    "map_values",
+    "any",
+    "all",
+    "count",
 ];
 const ERROR_METHODS: &[&str] = &["kind", "message", "to_string"];
 const SET_METHODS: &[&str] = &[
@@ -200,6 +205,11 @@ const SET_METHODS: &[&str] = &[
     "difference",
     "is_subset",
     "to_string",
+    "filter",
+    "map",
+    "any",
+    "all",
+    "count",
 ];
 const OTHER_METHODS: &[&str] = &["to_string"];
 
@@ -952,6 +962,21 @@ impl Checker {
                 self.arity(m, args, 0, 0, span);
                 Ty::Bool
             }
+            "filter" | "any" | "all" | "count" => {
+                let f = Ty::Fn(vec![k.clone(), v.clone()], Box::new(Ty::Bool));
+                self.typed_args(m, args, &[f], span);
+                match m {
+                    "filter" => Ty::Map(Box::new(k), Box::new(v)),
+                    "count" => Ty::Int,
+                    _ => Ty::Bool,
+                }
+            }
+            "map_values" => {
+                let out = self.subst.fresh();
+                let f = Ty::Fn(vec![v], Box::new(out.clone()));
+                self.typed_args(m, args, &[f], span);
+                Ty::Map(Box::new(k), Box::new(out))
+            }
             _ => return None,
         })
     }
@@ -996,6 +1021,34 @@ impl Checker {
             "is_subset" => {
                 self.typed_args(m, args, std::slice::from_ref(&set), span);
                 Ty::Bool
+            }
+            "filter" | "any" | "all" | "count" => {
+                let f = Ty::Fn(vec![elem], Box::new(Ty::Bool));
+                self.typed_args(m, args, &[f], span);
+                match m {
+                    "filter" => set,
+                    "count" => Ty::Int,
+                    _ => Ty::Bool,
+                }
+            }
+            "map" => {
+                let out = self.subst.fresh();
+                let f = Ty::Fn(vec![elem], Box::new(out.clone()));
+                self.typed_args(m, args, &[f], span);
+                let o = self.subst.shallow(&out);
+                // A set holds `String`s or `Int`s.
+                if !matches!(o, Ty::Int | Ty::Str | Ty::Error | Ty::Var(_)) {
+                    let shown = self.subst.show(&o);
+                    self.error(
+                        "E2005",
+                        span,
+                        Text::new(
+                            format!("`Set.map` needs a function that returns `Int` or `String`, not `{shown}`"),
+                            format!("`Set.map` تحتاج دالة تعيد `Int` أو `String`، لا `{shown}`"),
+                        ),
+                    );
+                }
+                Ty::set(out)
             }
             _ => return None,
         })

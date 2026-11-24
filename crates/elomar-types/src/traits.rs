@@ -198,10 +198,13 @@ impl Checker {
                     n += 1;
                 }
                 taken.insert(full.clone());
-                // The impl's type parameters belong to each method.
+                // The impl's type parameters and bounds belong to each method.
                 let mut params = imp.type_params.clone();
                 params.append(&mut f.type_params);
                 f.type_params = params;
+                let mut bounds = imp.bounds.clone();
+                bounds.append(&mut f.bounds);
+                f.bounds = bounds;
                 for p in &mut f.params {
                     replace_self(&mut p.ty, &imp.target);
                 }
@@ -609,12 +612,17 @@ impl Checker {
                 self.note_fn(method.span, &entry.fn_name);
                 self.note_def(method.span, entry.span);
                 let sig = self.fns.get(&entry.fn_name)?.clone();
+                let bounds = sig.bounds.clone();
                 // A method of a generic impl is a generic function: give its
                 // type parameters fresh types, then match `self`.
-                let mut sig = self.instantiate(&entry.fn_name, sig, &[], span);
+                let (mut sig, map) = self.instantiate_with_map(&entry.fn_name, sig, &[], span);
                 let (_, self_ty) = sig.params.remove(0);
                 self.subst.unify(&recv, &self_ty);
                 let ty = self.check_user_call(&entry.fn_name, &sig, args, span, method.span);
+                // `impl<T: Describe>`: the implementations for `T`.
+                if !bounds.is_empty() {
+                    self.pass_dictionaries(&entry.fn_name, &bounds, &map, args, method.span);
+                }
                 (entry.fn_name, ty)
             }
         };
@@ -631,6 +639,70 @@ impl Checker {
             },
         );
         Some(ty)
+    }
+
+    /// The value passed for method `method` of trait `tr` implemented by
+    /// `fn_name` for the type `target`: the function itself, or, for an
+    /// `impl<T: A>`, `|#0, #1, ...| fn_name(#0, #1, ..., <implementations
+    /// for T>)`.
+    fn bound_method_value(
+        &mut self,
+        tr: &str,
+        method: &str,
+        fn_name: &str,
+        target: &Ty,
+        span: Span,
+    ) -> Expr {
+        let name = |n: &str| Expr {
+            kind: ExprKind::Name(n.to_string()),
+            span,
+        };
+        let Some(sig) = self.fns.get(fn_name).cloned() else {
+            return name(fn_name);
+        };
+        if sig.bounds.is_empty() {
+            return name(fn_name);
+        }
+        let bounds = sig.bounds.clone();
+        let (sig, map) = self.instantiate_with_map(fn_name, sig, &[], span);
+        if let Some((_, self_ty)) = sig.params.first() {
+            self.subst.unify(self_ty, target);
+        }
+        let count = self.traits[tr]
+            .methods
+            .iter()
+            .find(|s| s.name == method)
+            .map_or(0, |s| s.params.len())
+            + 1;
+        let params: Vec<String> = (0..count).map(|i| format!("#{i}")).collect();
+        let mut args: Vec<Arg> = params
+            .iter()
+            .map(|p| Arg {
+                name: None,
+                value: name(p),
+            })
+            .collect();
+        self.pass_dictionaries(fn_name, &bounds, &map, &mut args, span);
+        Expr {
+            kind: ExprKind::Lambda {
+                params: params
+                    .into_iter()
+                    .map(|p| LambdaParam {
+                        name: Ident { name: p, span },
+                        ty: None,
+                    })
+                    .collect(),
+                body: Box::new(ArmBody::Expr(Expr {
+                    kind: ExprKind::Call {
+                        callee: Box::new(name(fn_name)),
+                        type_args: Vec::new(),
+                        args,
+                    },
+                    span,
+                })),
+            },
+            span,
+        }
     }
 
     /// After a call to a bounded generic function: appends, for each bound,
@@ -734,7 +806,16 @@ impl Checker {
                     for n in &names {
                         self.usage.calls.push((n.clone(), span));
                     }
-                    names
+                    // A method of an `impl<T: A>` needs the implementations
+                    // for `T` too: pass a closure that calls it with them.
+                    let mut exprs = Vec::new();
+                    for (m, n) in methods.iter().zip(&names) {
+                        exprs.push(self.bound_method_value(tr, m, n, &resolved, span));
+                    }
+                    for value in exprs {
+                        args.push(Arg { name: None, value });
+                    }
+                    continue;
                 }
             };
             for n in names {

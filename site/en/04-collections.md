@@ -154,6 +154,18 @@ fn main() {
 `stock["kiwis"]` on a missing key stops the program; use `get` or `get_or`
 when a key may be missing. An empty map is written `[:]`.
 
+Maps have `filter`, `any`, `all` and `count` with a function of the key
+and the value, and `map_values` changes every value:
+
+```elomar
+fn main() {
+    let prices = ["tea": 4, "coffee": 7, "juice": 5]
+    print(prices.filter(|name, price| price > 4))   // ["coffee": 7, "juice": 5]
+    print(prices.map_values(|price| price * 2))     // ["coffee": 14, "juice": 10, "tea": 8]
+    print(prices.any(|name, price| price > 6), prices.count(|name, price| name.length > 3))   // true 2
+}
+```
+
 ## Sets
 
 A set holds each value once:
@@ -166,5 +178,16 @@ fn main() {
     print(seen, seen.contains("b"))
     let other = set(["c", "d"])
     print(seen.union(other), seen.intersection(other))
+}
+```
+
+Sets have `filter`, `map`, `any`, `all` and `count` too; `map` gives a
+set, so equal results are kept once:
+
+```elomar
+fn main() {
+    let numbers = set([12, 7, 30, 9])
+    print(numbers.filter(|n| n % 2 == 0))   // set([12, 30])
+    print(numbers.map(|n| n % 3))           // set([0, 1])
 }
 ```

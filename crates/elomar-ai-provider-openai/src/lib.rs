@@ -180,7 +180,30 @@ impl OpenAiProvider {
     }
 
     /// Sends a request body and returns the response text.
+    /// The request body sent to `/embeddings`.
+    pub fn embed_body(&self, request: &AiRequest) -> Value {
+        json!({ "model": self.model, "input": request.input_text() })
+    }
+
     fn send(&self, body: &Value, timeout_ms: u64) -> Result<String, AiError> {
+        self.send_to(self.completions_url.as_str(), body, timeout_ms)
+    }
+
+    /// `/embeddings` next to `/chat/completions`.
+    fn embeddings_url(&self) -> String {
+        let mut url = self.completions_url.clone();
+        let path = url.path().trim_end_matches("/chat/completions").to_string();
+        url.set_path(&format!("{path}/embeddings"));
+        url.to_string()
+    }
+
+    fn send_to(&self, url: &str, body: &Value, timeout_ms: u64) -> Result<String, AiError> {
+        self.post(url, body, timeout_ms)?
+            .into_string()
+            .map_err(|e| transport_error(&e, timeout_ms))
+    }
+
+    fn post(&self, url: &str, body: &Value, timeout_ms: u64) -> Result<ureq::Response, AiError> {
         let Some(key) = (self.key)() else {
             return Err(AiError::new(
                 AiErrorKind::Authentication,
@@ -192,15 +215,13 @@ impl OpenAiProvider {
         };
         let response = self
             .agent
-            .post(self.completions_url.as_str())
+            .post(url)
             .timeout(Duration::from_millis(timeout_ms.max(1)))
             .set("Authorization", &format!("Bearer {key}"))
             .set("Content-Type", "application/json")
             .send_string(&body.to_string());
         match response {
-            Ok(resp) => resp
-                .into_string()
-                .map_err(|e| transport_error(&e, timeout_ms)),
+            Ok(resp) => Ok(resp),
             Err(ureq::Error::Status(code, resp)) => {
                 let text = resp.into_string().unwrap_or_default();
                 Err(status_error(code, &text))
@@ -278,6 +299,49 @@ impl ModelProvider for OpenAiProvider {
         answer_text(&text, &request.schema)
     }
 
+    /// Chat Completions with `"stream": true`: each event's
+    /// `choices[0].delta.content` is a piece of the answer.
+    fn stream(
+        &mut self,
+        request: &AiRequest,
+        on_text: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<String, AiError> {
+        let mut body = self.request_body(request);
+        body["stream"] = json!(true);
+        let resp = self.post(self.completions_url.as_str(), &body, request.timeout_ms)?;
+        let mut text = String::new();
+        elomar_ai_core::read_sse(std::io::BufReader::new(resp.into_reader()), |data| {
+            if data == "[DONE]" {
+                return Ok(false);
+            }
+            let event: Value = serde_json::from_str(data).map_err(|_| {
+                AiError::new(
+                    AiErrorKind::InvalidStructuredOutput,
+                    "a stream event is not JSON",
+                )
+            })?;
+            if let Some(piece) = event["choices"][0]["delta"]["content"].as_str()
+                && !piece.is_empty()
+            {
+                text.push_str(piece);
+                if !on_text(piece) {
+                    return Err(elomar_ai_core::cancelled());
+                }
+            }
+            Ok(true)
+        })?;
+        Ok(text)
+    }
+
+    fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
+        let text = self.send_to(
+            &self.embeddings_url(),
+            &self.embed_body(request),
+            request.timeout_ms,
+        )?;
+        embedding_of(&text)
+    }
+
     /// Requests are independent HTTP calls, so several can run at once.
     fn infer_shared(&self, request: &AiRequest) -> Option<Result<String, AiError>> {
         Some(
@@ -298,6 +362,25 @@ impl ModelProvider for OpenAiProvider {
         }
         answer_text(&text, &request.schema).map(Turn::Final)
     }
+}
+
+/// The vector in an `/embeddings` response.
+pub fn embedding_of(body: &str) -> Result<Vec<f64>, AiError> {
+    let json: Value = serde_json::from_str(body).map_err(|_| {
+        AiError::new(
+            AiErrorKind::InvalidStructuredOutput,
+            "the embeddings response is not JSON",
+        )
+    })?;
+    json["data"][0]["embedding"]
+        .as_array()
+        .and_then(|xs| xs.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>())
+        .ok_or_else(|| {
+            AiError::new(
+                AiErrorKind::InvalidStructuredOutput,
+                "the embeddings response has no `data[0].embedding` list of numbers",
+            )
+        })
 }
 
 /// Extracts the model's answer from a Chat Completions response.

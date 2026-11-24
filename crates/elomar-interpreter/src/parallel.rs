@@ -228,10 +228,12 @@ impl<'p> Interpreter<'p, '_> {
             }
             ExprKind::Call { callee, .. } => match &callee.kind {
                 ExprKind::Name(n) if n == "print" || n == "input" => ok = false,
-                ExprKind::Field { target, .. } => {
+                ExprKind::Field { target, name } => {
                     if let ExprKind::Name(m) = &target.kind
                         && MODULES.contains(&m.as_str())
                         && !ISOLATED_MODULES.contains(&m.as_str())
+                        // Comparing two vectors is plain arithmetic.
+                        && !(m == "std.ai" && name.name == "similarity")
                     {
                         ok = false;
                     }

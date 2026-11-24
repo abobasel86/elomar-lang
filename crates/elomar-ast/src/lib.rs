@@ -58,6 +58,9 @@ pub struct TraitMethod {
 pub struct ImplDecl {
     /// `impl<T> Stack<T>`: type parameters, shared by all its methods.
     pub type_params: Vec<Ident>,
+    /// `impl<T: Describe>`: (type parameter, trait) pairs, shared by all
+    /// its methods.
+    pub bounds: Vec<(Ident, Ident)>,
     pub trait_name: Option<Ident>,
     pub target: TypeExpr,
     pub methods: Vec<FnDecl>,

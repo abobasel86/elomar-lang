@@ -61,6 +61,46 @@ impl ModelProvider for MockProvider {
         }
     }
 
+    /// The answer of [`MockProvider::infer`] as text, one word (with the
+    /// spaces after it) at a time.
+    fn stream(
+        &mut self,
+        request: &AiRequest,
+        on_text: &mut dyn FnMut(&str) -> bool,
+    ) -> Result<String, AiError> {
+        let text = self.infer(request)?;
+        let text = match serde_json::from_str::<Value>(&text) {
+            Ok(Value::String(s)) => s,
+            _ => text,
+        };
+        for piece in words_with_spaces(&text) {
+            if !on_text(piece) {
+                return Err(elomar_ai_core::cancelled());
+            }
+        }
+        Ok(text)
+    }
+
+    /// A rule with `error` whose `input_contains` matches gives that error;
+    /// otherwise the words of the text, each counted in one of
+    /// [`EMBED_DIMENSIONS`] places chosen by its hash, scaled to length 1.
+    /// Texts that share words point the same way, so `ai.similarity`
+    /// behaves sensibly offline; the numbers are the same on every machine.
+    fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
+        let input = request.input_text();
+        let failing = self.rules.iter().find(|r| {
+            r.tool.is_none()
+                && r.error.is_some()
+                && r.input_contains
+                    .as_ref()
+                    .is_none_or(|needle| input.contains(needle.as_str()))
+        });
+        if let Some(rule) = failing {
+            return answer(rule, request).map(|_| Vec::new());
+        }
+        Ok(embedding(&input))
+    }
+
     fn infer(&mut self, request: &AiRequest) -> Result<String, AiError> {
         let input = request.input_text();
         let rule = self.rules.iter().find(|r| {
@@ -319,5 +359,82 @@ mod tool_tests {
             }])
             .is_err()
         );
+    }
+}
+
+/// The length of the mock's embeddings.
+pub const EMBED_DIMENSIONS: usize = 64;
+
+/// See [`MockProvider::embed`]. Words are runs of letters and digits, in
+/// lower case; a text without any is the zero vector.
+pub fn embedding(text: &str) -> Vec<f64> {
+    let mut v = vec![0.0; EMBED_DIMENSIONS];
+    for word in text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+    {
+        // FNV-1a, so the places never change between versions or machines.
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for b in word.to_lowercase().bytes() {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+        v[(h % EMBED_DIMENSIONS as u64) as usize] += 1.0;
+    }
+    let norm = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if norm > 0.0 {
+        for x in &mut v {
+            *x /= norm;
+        }
+    }
+    v
+}
+
+#[cfg(test)]
+mod embed_tests {
+    use super::*;
+
+    #[test]
+    fn embeddings_are_unit_length_and_stable() {
+        let a = embedding("The cat sat on the mat");
+        assert_eq!(a.len(), EMBED_DIMENSIONS);
+        let norm: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-12);
+        // Case and punctuation do not matter; the zero vector has no words.
+        assert_eq!(a, embedding("the CAT, sat on the mat!"));
+        assert!(embedding(" ,.! ").iter().all(|x| *x == 0.0));
+        assert_ne!(embedding("قطة"), embedding("كلب"));
+    }
+}
+
+/// `text` in pieces of one word and the spaces after it.
+fn words_with_spaces(text: &str) -> Vec<&str> {
+    let mut pieces = Vec::new();
+    let mut start = 0;
+    let mut in_space = false;
+    for (i, c) in text.char_indices() {
+        if c.is_whitespace() {
+            in_space = true;
+        } else if in_space {
+            pieces.push(&text[start..i]);
+            start = i;
+            in_space = false;
+        }
+    }
+    if start < text.len() {
+        pieces.push(&text[start..]);
+    }
+    pieces
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+
+    #[test]
+    fn pieces_join_back() {
+        assert_eq!(words_with_spaces("a  bc d "), vec!["a  ", "bc ", "d "]);
+        assert_eq!(words_with_spaces(" x"), vec![" ", "x"]);
+        assert!(words_with_spaces("").is_empty());
     }
 }
