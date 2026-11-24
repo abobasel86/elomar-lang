@@ -7,6 +7,24 @@ other: ar/news.html
 
 # What's new
 
+## 1.7: streaming, meaning, and generic traits
+
+- **`ai.stream`** shows an answer while the model writes it: your function
+  gets each piece as it arrives, and the result is the whole text. OpenAI
+  and Claude stream for real; the mock model streams word by word.
+- **`ai.embed`** turns a text into numbers that stand for its meaning, and
+  **`ai.similarity`** compares two, so a program can search notes by
+  meaning. The mock model does it offline, from the words.
+- **`impl<T: Describe>`**: a generic type can implement a trait when its
+  contents do, as `Box<T>` describing itself with its item's description,
+  nested as deep as you like.
+- **Maps and sets** have `filter`, `any`, `all` and `count`, maps
+  `map_values` and sets `map`.
+- The specification is now also [in English](https://github.com/abobasel86/elomar-lang/blob/main/docs/grammar.en.md),
+  and lesson 11 has exercises.
+
+[The AI lesson](09-ai.html) shows streaming and embeddings.
+
 ## Every core, the same answers
 
 *Elomar-Lang 1.1 to 1.6: how the language became many times faster without
@@ -79,7 +97,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.6** | `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by`, `par_max_by`; faster fields and records; the [reference](12-reference.html) and [speed](11-speed.html) pages |
+| **1.7** | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
+| 1.6 | `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by`, `par_max_by`; faster fields and records; the [reference](12-reference.html) and [speed](11-speed.html) pages |
 | 1.5 | `par_any`, `par_all`, `par_find`, `par_count`, `par_sort_by`; appending in place; fast indexing into text |
 | 1.4 | `par_filter` and `par_fold` |
 | 1.3 | `par_map` |
