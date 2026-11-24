@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.3.0
+
+Works with Elomar-Lang 1.3.0 (`list.par_map` on several processor cores).
+
 ## 1.2.0
 
 Works with Elomar-Lang 1.2.0 (`await all` on several processor cores).
