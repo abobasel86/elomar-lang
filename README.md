@@ -48,7 +48,7 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v1.4.0, stable.** Programs written for 1.0 keep working in
+> **Project status: v1.5.0, stable.** Programs written for 1.0 keep working in
 > every 1.x version: see [`docs/stability.md`](docs/stability.md).
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
@@ -353,8 +353,9 @@ cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 10. ✅ v1.1: a bytecode engine, about twice as fast overall and up to five times on loops.
 11. ✅ v1.1.1: fixes in the formatter and the checker.
 12. ✅ v1.2: `await all([...])` runs isolated `async fn` calls on several processor cores, with the same results.
-14. ✅ v1.4: `par_filter` and `par_fold` on several processor cores.
 13. ✅ v1.3: `list.par_map(f)` computes `map` on several processor cores when `f` is isolated.
+14. ✅ v1.4: `par_filter` and `par_fold` on several processor cores.
+15. ✅ v1.5: `par_any`, `par_all`, `par_find`, `par_count` and `par_sort_by`; appending in place and fast string indexing.
 
 ## Editors
 
