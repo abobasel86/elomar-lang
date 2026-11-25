@@ -1,6 +1,8 @@
 title: Elomar-Lang
 description: A simple, typed programming language with AI built in — in Arabic and English.
+url: https://abobasel86.github.io
 baseurl: /elomar-lang
+description_ar: لغة برمجة بسيطة بأنواع ثابتة، والذكاء الاصطناعي جزء منها، تتعلمها بالعربية والإنجليزية.
 markdown: kramdown
 kramdown:
   input: GFM

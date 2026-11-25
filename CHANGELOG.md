@@ -4,6 +4,14 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- Links to the website show a preview when shared (X, LinkedIn, WhatsApp
+  and others): every page has Open Graph and Twitter card tags with its
+  title, a description in its language, and the project's image.
+
 ## [1.12.1] - 2026-11-25
 
 ### Added
