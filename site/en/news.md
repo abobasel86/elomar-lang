@@ -7,6 +7,21 @@ other: ar/news.html
 
 # What's new
 
+## 1.12: install in one line, upgrade in one word
+
+- **Install with one line.** On Windows (PowerShell):
+  `irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex`. On Linux or macOS:
+  `curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh`. The installer checks the download against the release's
+  checksums and adds `elomar` to your `PATH`.
+- **`elomar upgrade`** moves you to the newest version
+  (`elomar upgrade --check` only tells you whether there is one).
+- **`elomar doctor` checks the whole project**: besides the AI setup,
+  packages, Python, the programs MCP servers need, and the folders a
+  program may use.
+- **Contributing**: a [guide](https://github.com/abobasel86/elomar-lang/blob/main/CONTRIBUTING.md),
+  a [security policy](https://github.com/abobasel86/elomar-lang/blob/main/SECURITY.md)
+  and issue forms, in English and Arabic.
+
 ## 1.11: from nothing to a working AI project
 
 - **`elomar new helpdesk --ai ollama`** (or `mock`, `openai`,
@@ -161,7 +176,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.11** | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |
+| **1.12** | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project |
+| 1.11 | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |
 | 1.10 | Local models (Ollama) without a key; an embedding cache |
 | 1.9 | Built-in functions as values; `ai.search` |
 | 1.8 | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |

@@ -7,6 +7,17 @@ other: en/news.html
 
 # الجديد
 
+## 1.12: التثبيت بسطر، والترقية بكلمة
+
+- **التثبيت بسطر واحد.** على Windows (في PowerShell):
+  `irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex`. وعلى Linux أو macOS:
+  `curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh`. يتحقق المثبّت من التنزيل ببصمات الإصدار، ويضيف `elomar` إلى `PATH`.
+- **`elomar upgrade`** ينقلك إلى أحدث إصدار (و`elomar upgrade --check` يخبرك فقط إن كان هناك أحدث).
+- **`elomar doctor` يفحص المشروع كله**: إضافة إلى إعداد الذكاء الاصطناعي، يفحص الحزم وPython والبرامج التي تحتاجها خوادم MCP
+  والمجلدات التي يستخدمها البرنامج.
+- **المساهمة**: [دليل](https://github.com/abobasel86/elomar-lang/blob/main/CONTRIBUTING.md) و[سياسة أمنية](https://github.com/abobasel86/elomar-lang/blob/main/SECURITY.md)
+  ونماذج للمسائل، بالعربية والإنجليزية.
+
 ## 1.11: من لا شيء إلى مشروع ذكاء اصطناعي يعمل
 
 - **`elomar new helpdesk --ai ollama`** (أو `mock` أو `openai` أو `anthropic`) ينشئ مشروعًا يستدعي نموذجًا: `elomar.toml`
@@ -120,7 +131,8 @@ other: en/news.html
 
 | الإصدار | ما جاء به |
 |---|---|
-| **1.11** | `elomar new --ai`؛ `elomar doctor`؛ تمارين لدرس الذكاء الاصطناعي |
+| **1.12** | التثبيت بسطر واحد؛ `elomar upgrade`؛ `elomar doctor` للمشروع كله |
+| 1.11 | `elomar new --ai`؛ `elomar doctor`؛ تمارين لدرس الذكاء الاصطناعي |
 | 1.10 | نماذج محلية (Ollama) دون مفتاح؛ ذاكرة للتضمينات |
 | 1.9 | الدوال المدمجة كقيم؛ `ai.search` |
 | 1.8 | الدوال ذات القيود كقيم؛ `ai.embed` دفعة واحدة؛ HTTPS خلف برامج الحماية والخوادم الوسيطة |
