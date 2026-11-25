@@ -305,10 +305,13 @@ dependencies = [
  "elomar-loader",
  "elomar-parser",
  "elomar-pkg",
+ "elomar-tls",
  "elomar-types",
  "mimalloc",
  "rustyline",
  "serde_json",
+ "ureq",
+ "url",
 ]
 
 [[package]]

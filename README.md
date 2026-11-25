@@ -267,6 +267,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `--no-color` | Plain output (also honors `NO_COLOR`) |
 | `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |
 | `elomar new NAME` | Create a project with a program, a module and a passing test |
+| `elomar new NAME --ai PROVIDER` | The same, calling a model, with `elomar.toml` set for `mock`, `ollama`, `openai` or `anthropic` |
+| `elomar doctor` | Check the project's AI setup: the configuration, each model's key, network permission, its server and its model id |
 | `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
 | `elomar fmt [PATHS] [--check] [--stdin]` | Format `.elo` files (comments kept; never changes meaning) |
 | `elomar add NAME[@VERSION]` | Add a package from the registry |

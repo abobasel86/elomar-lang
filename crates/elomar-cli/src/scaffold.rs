@@ -67,7 +67,17 @@ fn valid_name(name: &str) -> bool {
         && !name.starts_with('.')
 }
 
-pub(crate) fn new_project(name: &str, reporter: &Reporter) -> ExitCode {
+pub(crate) fn new_project(name: &str, ai: Option<&str>, reporter: &Reporter) -> ExitCode {
+    if let Some(provider) = ai
+        && !crate::scaffold_ai::PROVIDERS.contains(&provider)
+    {
+        let list = crate::scaffold_ai::PROVIDERS.join(", ");
+        reporter.say(
+            &format!("error: `--ai {provider}` is not known; use one of: {list}"),
+            &format!("خطأ: `--ai {provider}` غير معروف؛ استخدم أحد: {list}"),
+        );
+        return ExitCode::from(2);
+    }
     if !valid_name(name) {
         reporter.say(
             &format!(
@@ -86,12 +96,15 @@ pub(crate) fn new_project(name: &str, reporter: &Reporter) -> ExitCode {
         );
         return ExitCode::from(2);
     }
-    let files = [
-        ("elomar.toml", config(name)),
-        ("src/main.elo", MAIN.to_string()),
-        ("src/greeting.elo", GREETING.to_string()),
-        ("tests/greeting_test.elo", TEST.to_string()),
-    ];
+    let files = match ai {
+        Some(provider) => crate::scaffold_ai::files(name, provider),
+        None => vec![
+            ("elomar.toml", config(name)),
+            ("src/main.elo", MAIN.to_string()),
+            ("src/greeting.elo", GREETING.to_string()),
+            ("tests/greeting_test.elo", TEST.to_string()),
+        ],
+    };
     for (path, text) in &files {
         let p = dir.join(path);
         let written = p
@@ -110,12 +123,18 @@ pub(crate) fn new_project(name: &str, reporter: &Reporter) -> ExitCode {
         .iter()
         .map(|(p, _)| format!("  {name}/{p}\n"))
         .collect();
+    let (setup_en, setup_ar) = ai.map_or(("", ""), crate::scaffold_ai::before_running);
+    let doctor = if ai.is_some() {
+        "  elomar doctor\n"
+    } else {
+        ""
+    };
     reporter.out(
         &format!(
-            "Created project `{name}`:\n{list}\nNext:\n  cd {name}\n  elomar run src/main.elo\n  elomar test"
+            "Created project `{name}`:\n{list}\nNext:\n  cd {name}\n{setup_en}{doctor}  elomar run src/main.elo\n  elomar test"
         ),
         &format!(
-            "أُنشئ المشروع `{name}`:\n{list}\nالخطوات التالية:\n  cd {name}\n  elomar run src/main.elo\n  elomar test"
+            "أُنشئ المشروع `{name}`:\n{list}\nالخطوات التالية:\n  cd {name}\n{setup_ar}{doctor}  elomar run src/main.elo\n  elomar test"
         ),
     );
     ExitCode::SUCCESS

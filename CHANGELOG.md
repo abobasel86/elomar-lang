@@ -4,6 +4,19 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **`elomar new NAME --ai PROVIDER`** (`mock`, `ollama`, `openai`,
+  `anthropic`): a project that calls a model, with `elomar.toml` set for
+  that provider, and tests that pass offline.
+- **`elomar doctor`**: checks the AI setup and says what to fix: the
+  configuration, each model's key, network permission, whether its server
+  answers, and whether the model id exists there (by listing the models,
+  which costs nothing). Keys are never printed.
+- Exercises for lesson 9: `ai.search`, scores, and handling a failed call.
+
 ## [1.10.0] - 2026-11-25
 
 ### Added

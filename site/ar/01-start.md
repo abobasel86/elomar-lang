@@ -116,4 +116,6 @@ elomar --lang ar run hello.elo
 | `elomar build file.elo` | صنع ملف تنفيذي لمشاركته |
 | `elomar fmt file.elo` | تنسيق الكود بالأسلوب الموحد |
 | `elomar new myapp` | إنشاء مشروع مع اختبارات |
+| `elomar new myapp --ai ollama` | إنشاء مشروع يستدعي نموذجًا (`mock` أو `ollama` أو `openai` أو `anthropic`) |
+| `elomar doctor` | فحص إعداد الذكاء الاصطناعي في المشروع: المفاتيح والصلاحيات والخوادم ومعرّفات النماذج |
 | `elomar test` | تشغيل اختبارات المشروع |

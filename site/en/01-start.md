@@ -122,4 +122,6 @@ so you can see why.
 | `elomar build file.elo` | Make an executable to share |
 | `elomar fmt file.elo` | Format the code in the standard style |
 | `elomar new myapp` | Create a project with tests |
+| `elomar new myapp --ai ollama` | Create a project that calls a model (`mock`, `ollama`, `openai` or `anthropic`) |
+| `elomar doctor` | Check a project's AI setup: keys, permissions, servers and model ids |
 | `elomar test` | Run a project's tests |

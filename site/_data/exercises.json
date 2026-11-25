@@ -581,6 +581,98 @@
    }
   }
  ],
+ "09-ai": [
+  {
+   "id": "ai-closest",
+   "mode": "program",
+   "title": {
+    "en": "The closest note",
+    "ar": "أقرب ملاحظة"
+   },
+   "task": {
+    "en": "Use `ai.search` with the model `\"mock\"` to print the note closest in meaning to `\"where the cat sleeps\"`: only its text.",
+    "ar": "استخدم `ai.search` مع النموذج `\"mock\"` لتطبع الملاحظة الأقرب في المعنى إلى `\"where the cat sleeps\"`: نصها فقط."
+   },
+   "starter": "use std.ai\n\nasync fn main() {\n    let notes = [\"paying the electricity bill\", \"the cat sleeps on the mat\", \"feeding the cat\"]\n    // ...\n}\n",
+   "solution": "use std.ai\n\nasync fn main() {\n    let notes = [\"paying the electricity bill\", \"the cat sleeps on the mat\", \"feeding the cat\"]\n    match await ai.search(\"mock\", \"where the cat sleeps\", notes) {\n        Ok(hits) => print(hits[0].text)\n        Err(e) => print(e.message())\n    }\n}\n",
+   "cases": [
+    {
+     "inputs": [],
+     "expect": "the cat sleeps on the mat"
+    }
+   ],
+   "hints": {
+    "en": [
+     "`await ai.search(model, query, texts)` gives a `Result`: `match` on it.",
+     "The hits come closest first, so the answer is `hits[0].text`."
+    ],
+    "ar": [
+     "`await ai.search(model, query, texts)` تعطي `Result`: استخدم `match` عليها.",
+     "النتائج مرتبة من الأقرب، فالجواب `hits[0].text`."
+    ]
+   }
+  },
+  {
+   "id": "ai-related",
+   "mode": "program",
+   "title": {
+    "en": "How many are related?",
+    "ar": "كم منها له علاقة؟"
+   },
+   "task": {
+    "en": "Search the notes for `\"the cat\"` with the model `\"mock\"`, and print how many have a `score` above `0.5`.",
+    "ar": "ابحث في الملاحظات عن `\"the cat\"` بالنموذج `\"mock\"`، واطبع عدد التي `score` فيها أكبر من `0.5`."
+   },
+   "starter": "use std.ai\n\nasync fn main() {\n    let notes = [\"the cat sleeps on the mat\", \"feeding the cat\", \"paying the bill\", \"a dog in the park\"]\n    // ...\n}\n",
+   "solution": "use std.ai\n\nasync fn main() {\n    let notes = [\"the cat sleeps on the mat\", \"feeding the cat\", \"paying the bill\", \"a dog in the park\"]\n    match await ai.search(\"mock\", \"the cat\", notes) {\n        Ok(hits) => print(hits.count(|h| h.score > 0.5))\n        Err(e) => print(e.message())\n    }\n}\n",
+   "cases": [
+    {
+     "inputs": [],
+     "expect": "2"
+    }
+   ],
+   "hints": {
+    "en": [
+     "Each hit is a record with `text` and `score`.",
+     "`hits.count(|h| h.score > 0.5)`"
+    ],
+    "ar": [
+     "كل نتيجة سجل فيه `text` و`score`.",
+     "`hits.count(|h| h.score > 0.5)`"
+    ]
+   }
+  },
+  {
+   "id": "ai-failure",
+   "mode": "program",
+   "title": {
+    "en": "When the model fails",
+    "ar": "حين يفشل النموذج"
+   },
+   "task": {
+    "en": "No model named `\"weather\"` is set up. Ask it anyway with `ai.infer<String>(\"weather\", \"Say hi\", \"x\")`, and when it fails print `failed: ` followed by the kind of the error.",
+    "ar": "لا يوجد نموذج اسمه `\"weather\"`. اسأله مع ذلك بـ`ai.infer<String>(\"weather\", \"Say hi\", \"x\")`، وحين يفشل اطبع `failed: ` ثم نوع الخطأ."
+   },
+   "starter": "use std.ai\n\nasync fn main() {\n    // ...\n}\n",
+   "solution": "use std.ai\n\nasync fn main() {\n    match await ai.infer<String>(\"weather\", \"Say hi\", \"x\") {\n        Ok(text) => print(text)\n        Err(e) => print(\"failed: {e.kind()}\")\n    }\n}\n",
+   "cases": [
+    {
+     "inputs": [],
+     "expect": "failed: ProviderUnavailable"
+    }
+   ],
+   "hints": {
+    "en": [
+     "An AI call never stops the program: a failure is an `Err` value.",
+     "`Err(e) => print(\"failed: {e.kind()}\")`"
+    ],
+    "ar": [
+     "استدعاء الذكاء الاصطناعي لا يوقف البرنامج: الفشل قيمة `Err`.",
+     "`Err(e) => print(\"failed: {e.kind()}\")`"
+    ]
+   }
+  }
+ ],
  "10-toolbox": [
   {
    "id": "toolbox-numbers",

@@ -87,7 +87,13 @@ enum Command {
     New {
         /// Name of the project (and its folder)
         name: String,
+        /// Make a project that calls a model, set up for this provider:
+        /// mock (offline), ollama (on this computer), openai or anthropic
+        #[arg(long, value_name = "PROVIDER")]
+        ai: Option<String>,
     },
+    /// Check the project's AI setup: keys, permissions, servers and model ids
+    Doctor,
     /// Type code and see the result at once (an interactive prompt)
     Repl,
     /// Run the language server (LSP) on standard input/output, for editors
@@ -253,10 +259,11 @@ fn main() -> ExitCode {
         Command::Test { path, filter } => {
             return testing::run_tests(path, filter.as_deref(), &reporter);
         }
-        Command::New { name } => return scaffold::new_project(name, &reporter),
+        Command::New { name, ai } => return scaffold::new_project(name, ai.as_deref(), &reporter),
         Command::Build { file, output } => return build::build(file, output.as_deref(), &reporter),
         Command::Lsp => return lsp::serve(lang),
         Command::Repl => return repl::run(&reporter),
+        Command::Doctor => return doctor::run(&reporter),
         Command::Dap => return dap::serve(lang),
         Command::Add {
             name,
@@ -409,12 +416,14 @@ pub(crate) fn check_and_run(
 
 mod build;
 mod dap;
+mod doctor;
 mod editor;
 mod fmt;
 mod lsp;
 mod packages;
 mod repl;
 mod scaffold;
+mod scaffold_ai;
 mod testing;
 
 /// The project folder: where `elomar.toml` is, else the program's folder.
@@ -429,7 +438,7 @@ pub(crate) fn project_root(source: &Path) -> PathBuf {
 }
 
 /// The nearest `elomar.toml` in the source file's directory or above it.
-fn find_config(source: &Path) -> Option<PathBuf> {
+pub(crate) fn find_config(source: &Path) -> Option<PathBuf> {
     let absolute = std::path::absolute(source).ok()?;
     absolute
         .ancestors()

@@ -1018,6 +1018,13 @@ fn test_greets_by_name() {
 - **Access to the code:** test files use the project items marked `pub` through `use app.<module>`. The permissions and models of `elomar.toml` apply to them.
 - `elomar test [PATH] [--filter TEXT]`: the path is the project folder (default: the current folder) or a single test file. The exit code is 1 on any failure.
 - `elomar new` does not write over an existing folder that is not empty.
+- `elomar new NAME --ai PROVIDER` (since 1.11), with `mock`, `ollama`, `openai` or `anthropic`: a project whose `src/tickets.elo` calls
+  `ai.infer<Ticket>` and whose `main` also searches with `ai.search` (except for `anthropic`, which makes no embeddings), with
+  `elomar.toml` set for that provider (models, `[ai.cache]`, `max_calls_per_run`, `network_hosts`). Its tests pass offline.
+- `elomar doctor` (since 1.11) checks the project's AI setup and says what to fix: `elomar.toml` is valid; for each model, the key's
+  environment variable is set (not needed for a server on `localhost`), its host is in `network_hosts`, its server answers, and the
+  model id is among those listed by `GET .../models` (which costs nothing). Keys are never printed, and only allowed hosts are asked.
+  The exit code is 1 if there is a problem.
 - `elomar build FILE [-o OUT]` checks the program, then writes a single executable file: a copy of `elomar` itself with the program files at its end
   (the main file, its modules and the modules of its packages) and `elomar.toml`. When run, it runs the program directly, all arguments reach `os.args()`,
   and it does not need Elomar-Lang to be installed. A program with errors is not built (exit code 1). The file is only for the system it was built on.

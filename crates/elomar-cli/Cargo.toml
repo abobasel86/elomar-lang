@@ -29,6 +29,9 @@ elomar-ai-core.workspace = true
 elomar-ai-provider-mock.workspace = true
 elomar-ai-provider-openai.workspace = true
 elomar-ai-provider-anthropic.workspace = true
+elomar-tls.workspace = true
+ureq.workspace = true
+url.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

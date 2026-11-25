@@ -604,6 +604,62 @@ fn new_project_runs_and_passes_its_tests() {
 }
 
 #[test]
+fn new_ai_projects_check_and_pass_their_tests() {
+    let base = Path::new(env!("CARGO_TARGET_TMPDIR")).join("new-ai-projects");
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).unwrap();
+    for provider in ["mock", "ollama", "openai", "anthropic"] {
+        let name = format!("app-{provider}");
+        let out = elomar_in(&base, &["new", &name, "--ai", provider]);
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let app = base.join(&name);
+        let check = elomar_in(&app, &["check", "src/main.elo"]);
+        assert!(
+            check.status.success(),
+            "{provider}: {}",
+            String::from_utf8_lossy(&check.stderr)
+        );
+        let test = elomar_in(&app, &["test"]);
+        assert!(
+            String::from_utf8_lossy(&test.stdout).contains("test result: ok. 2 passed"),
+            "{provider}: {}",
+            String::from_utf8_lossy(&test.stdout)
+        );
+    }
+    // The mock project runs offline.
+    let run = elomar_in(&base.join("app-mock"), &["run", "src/main.elo"]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&run.stdout)),
+        "[URGENT] billing\nclosest note: refund for a double charge\n"
+    );
+    let bad = elomar_in(&base, &["new", "x", "--ai", "nope"]);
+    assert_eq!(bad.status.code(), Some(2));
+
+    // `elomar doctor`: ready offline; a missing key and a placeholder model
+    // id are problems, found before any request.
+    let doctor = |dir: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_elomar"))
+            .args(["--no-color", "--lang", "en", "doctor"])
+            .env_remove("OPENAI_API_KEY")
+            .current_dir(dir)
+            .output()
+            .unwrap()
+    };
+    let ok = doctor(&base.join("app-mock"));
+    assert!(ok.status.success());
+    assert!(String::from_utf8_lossy(&ok.stdout).contains("Everything looks ready."));
+    let missing = doctor(&base.join("app-openai"));
+    let text = String::from_utf8_lossy(&missing.stdout);
+    assert_eq!(missing.status.code(), Some(1), "{text}");
+    assert!(text.contains("write the vendor's model id"), "{text}");
+    assert!(text.contains("`OPENAI_API_KEY` is not set"), "{text}");
+}
+
+#[test]
 fn test_command_reports_failures() {
     let main = module_project(
         "test-failures",
