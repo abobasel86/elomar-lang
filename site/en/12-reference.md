@@ -148,7 +148,7 @@ permission in `elomar.toml` ([lesson 7](07-data.html)).
 | `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` |
 | `std.process` | `process.run(command, args[, timeout])` |
 | `std.py` | `py.call<T>(module, function, args[, timeout])` |
-| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` · `ai.stream(model, instructions, input, on_text[, timeout])` · `ai.embed(model, text[, timeout])` · `ai.similarity(a, b)` |
+| `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` · `ai.stream(model, instructions, input, on_text[, timeout])` · `ai.embed(model, text[, timeout])` · `ai.similarity(a, b)` · `ai.search(model, query, texts[, timeout])` |
 | `std.agent` | `agent.run<T>(model, instructions, input, tools, mcp, approve, ...)` |
 | `std.mcp` | `mcp.tools(server)` · `mcp.call(server, tool, args)` |
 

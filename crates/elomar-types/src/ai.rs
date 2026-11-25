@@ -75,6 +75,11 @@ const AGENT_PARAMS: [(&str, bool); 10] = [
     ("timeout", false),
 ];
 
+/// One result of `ai.search`.
+pub(crate) fn search_hit_ty() -> Ty {
+    Ty::record(vec![("text".into(), Ty::Str), ("score".into(), Ty::Float)])
+}
+
 /// What `approve` receives in `agent.run`.
 pub(crate) fn tool_request_ty() -> Ty {
     Ty::record(vec![
@@ -245,6 +250,7 @@ impl Checker {
                 self.check_ai_call(&what, func.span, type_args, args, span)
             }
             _ if func.name == "embed" => self.check_embed_call(func.span, args, span),
+            _ if func.name == "search" => self.check_search_call(func.span, args, span),
             _ if func.name == "stream" => self.check_stream_call(func.span, args, span),
             _ if func.name == "similarity" => {
                 let vector = Ty::list(Ty::Float);
@@ -272,6 +278,26 @@ impl Checker {
             }
         }
         Ty::future(Ty::result(Ty::list(Ty::Float), ai_error_ty()))
+    }
+
+    /// `ai.search(model, query, texts[, timeout])
+    /// -> Future<Result<List<{ text: String, score: Float }>, AIError>>`.
+    fn check_search_call(&mut self, callee_span: Span, args: &mut [Arg], span: Span) -> Ty {
+        self.usage.direct.push(("ai".into(), callee_span));
+        if self.arity("ai.search", args, 3, 4, span) {
+            let uses_network = match &args[0].value.kind {
+                ExprKind::Str(name) => self.cloud_models.contains(name),
+                _ => !self.cloud_models.is_empty(),
+            };
+            if uses_network {
+                self.usage.direct.push(("net".into(), args[0].value.span));
+            }
+            let types = [Ty::Str, Ty::Str, Ty::list(Ty::Str), Ty::Duration];
+            for (arg, ty) in args.iter_mut().zip(types.iter()) {
+                self.check_expr_against(&mut arg.value, ty);
+            }
+        }
+        Ty::future(Ty::result(Ty::list(search_hit_ty()), ai_error_ty()))
     }
 
     /// `ai.stream(model, instructions, input, on_text[, timeout])

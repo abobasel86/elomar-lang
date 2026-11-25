@@ -1,0 +1,26 @@
+// Built-in functions used as values.
+fn apply(f: fn(Int) -> String, x: Int) -> String {
+    return f(x)
+}
+
+fn main() {
+    let say = print
+    say("hello")
+    print([1, 2, 3].map(to_string))
+    print(apply(to_string, 42))
+    print([-3, 4, -5].map(abs))
+    print([-1.5, 2.5].map(abs))
+    print(["7", "x", "9"].map(parse_int))
+    print(["1.5", "y"].map(parse_float))
+    print([1, 2].map(to_float))
+    print([1.9, -2.7].map(to_int))
+    let bigger: fn(Int, Int) -> Int = max
+    let smaller: fn(Float, Float) -> Float = min
+    print(bigger(3, 8), smaller(1.5, 0.5))
+    print([4, 9, 2].fold(0, max))
+    let check: fn(Bool) = assert
+    check(true)
+    let make = set
+    print(make([3, 1, 3]).to_list())
+    print(["a", "b"].map(to_string).join("+"))
+}

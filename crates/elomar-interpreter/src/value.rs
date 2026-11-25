@@ -30,6 +30,13 @@ pub enum Thunk {
         text: String,
         timeout_ms: Option<i64>,
     },
+    /// `ai.search(model, query, texts[, timeout])`.
+    Search {
+        model: String,
+        query: String,
+        texts: Vec<String>,
+        timeout_ms: Option<i64>,
+    },
     /// `ai.run` with tools.
     Run(Box<RunCall>),
     /// `all([...])`: the futures to wait for, in order.

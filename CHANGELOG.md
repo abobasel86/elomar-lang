@@ -4,6 +4,22 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Built-in functions are values**: `xs.map(to_string)`,
+  `xs.fold(0, max)`, `["1", "x"].map(parse_int)` and `let say = print`.
+  `all` and `timeout` work on futures and stay calls only. This was the
+  last item in the specification's "not implemented yet" section.
+- **`ai.search(model, query, texts[, timeout])`**: the texts with their
+  similarity to the query, closest first, as
+  `List<{ text: String, score: Float }>`. The query and the texts are
+  embedded together, so an OpenAI model needs one request for up to 256.
+- The fuzzer also builds programs with `impl<T: A>`, functions with bounds
+  used as values, and built-in functions used as values, and compares the
+  two engines on them.
+
 ## [1.8.0] - 2026-11-25
 
 ### Added

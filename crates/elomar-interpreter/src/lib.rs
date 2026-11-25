@@ -1385,6 +1385,34 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 }))
             }
             "std.ai" if name == "similarity" => Ok(Value::Float(ai::similarity(&values))),
+            "std.ai" if name == "search" => {
+                let mut values = values.into_iter();
+                let mut text = || match values.next() {
+                    Some(Value::Str(s)) => s.to_string(),
+                    _ => String::new(),
+                };
+                let (model, query) = (text(), text());
+                let texts = match values.next() {
+                    Some(Value::List(xs)) => xs
+                        .iter()
+                        .map(|x| match x {
+                            Value::Str(s) => s.to_string(),
+                            _ => String::new(),
+                        })
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                let timeout_ms = match values.next() {
+                    Some(Value::Duration(ms)) => Some(ms),
+                    _ => None,
+                };
+                Ok(Value::future(Thunk::Search {
+                    model,
+                    query,
+                    texts,
+                    timeout_ms,
+                }))
+            }
             "std.ai" if name == "stream" => {
                 let mut values = values.into_iter();
                 let mut text = || match values.next() {
@@ -1990,6 +2018,12 @@ impl<'p, 'h> Interpreter<'p, 'h> {
                 text,
                 timeout_ms,
             } => ai::run_embed(self.ai, model, text, timeout_ms),
+            Thunk::Search {
+                model,
+                query,
+                texts,
+                timeout_ms,
+            } => ai::run_search(self.ai, &model, &query, &texts, timeout_ms),
             Thunk::Stream(call) => self.run_stream(&call, span)?,
             Thunk::Run(call) => self.run_agent(&call, span)?,
             Thunk::All(items) => self.await_all(&items, span)?,

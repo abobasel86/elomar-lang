@@ -45,6 +45,17 @@ fn main() {
 }
 ```
 
+ويمكن تمرير الدوال المدمجة بالطريقة نفسها:
+
+```elomar
+fn main() {
+    print(["3", "x", "12"].map(parse_int))               // [Some(3), None, Some(12)]
+    print([-2, 5, -7].map(abs), [4, 9, 2].fold(0, max))  // [2, 5, 7] 9
+    let قل = print
+    قل("تم")
+}
+```
+
 ودوال مفيدة أخرى: `take(n)` و`skip(n)` و`unique()` و`reverse()` و`enumerate()`
 و`chunks(n)` و`flat_map(f)` و`group_by(f)`:
 

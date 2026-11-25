@@ -197,7 +197,7 @@ the root of the path is a local `var` variable. Parameters, `let` bindings and c
 - Lookup order: local variables → file constants → functions → the Prelude.
 - File constants (`let` at file level) are evaluated in order before `main`, and see only what comes before them.
 - Functions see all functions and all constants regardless of order.
-- Named functions are values that can be passed around (§4.15); built-in functions such as `print` are not values yet (`E0103`).
+- Named functions are values that can be passed around (§4.15), and so are built-in functions such as `print` and `to_string` (since 1.9).
 
 ### 4.3 `match`
 
@@ -478,6 +478,7 @@ async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
 | `ai.stream(model, instructions, input, on_text[, timeout])` | `Future<Result<String, AIError>>`; `on_text: fn(String)` is called with each piece of the answer as soon as it arrives |
 | `ai.embed(model, text[, timeout])` | `Future<Result<List<Float>, AIError>>`: a vector whose direction stands for the text's meaning |
 | `ai.similarity(a, b)` | `List<Float>`, `List<Float>` → `Float`: the cosine of the angle between the vectors, from -1 to 1, and 0 if either is all zeros |
+| `ai.search(model, query, texts[, timeout])` (since 1.9) | `Future<Result<List<{ text: String, score: Float }>, AIError>>`: the texts with their similarity to `query`, most similar first |
 
 - `ai.stream` and `ai.embed` go through the same checks as `ai.infer` (budget, model, network permission); their effect is `ai` (and `net`
   for cloud models).
@@ -491,6 +492,9 @@ async fn assist(q: String) -> Result<Answer, AIError> !{ai, io, mcp} {
 - `await all([...])` (since 1.8) sends the `ai.embed` calls to each model together: the OpenAI provider embeds up to 256 texts in one
   request. The results are in the order of the list, and each call has its own checks and its own `Result`, as if they ran one after
   another.
+- `ai.search` embeds the query and the texts together, as `await all` does (each text counts toward `max_calls_per_run`), and sorts
+  by `ai.similarity`; equal scores keep the order of `texts`. An empty `texts` gives `Ok([])` without any call. If any embedding
+  fails, the result is the first error.
 
 ## 4.7 Enums (`enum`)
 
@@ -1062,7 +1066,9 @@ let f = |a: Int, b: Int| {
 - **Capture by value:** a lambda takes a copy of the variables visible when it is created. Changing the variable later does not affect it, and modifying a captured variable inside it is `E1013` (return the new value or use `fold`).
 - **Effects:** the effects of a lambda body (or of a named function used as a value) are counted on the function that creates it, as if the body ran there. Calling a function value adds no effect.
 - List functions: `map`, `filter`, `any`, `all`, `find`, `count`, `fold(init, f)` and `sort_by(f)` (the key is `Int`, `Float` or `String`, and the sort is stable).
-- Built-in functions such as `print` are not values yet (`E0103`). Write `|x| print(x)`. Function equality `==` is by identity, not by behavior.
+- Built-in functions are values too (since 1.9): `xs.map(to_string)`, `xs.fold(0, max)`, `let say = print`. A built-in becomes the closure
+  `|a, ...| print(a, ...)` with as many parameters as the expected function type has, or its usual number (two for `min`, `max` and
+  `assert_eq`, one for the rest). `all` and `timeout` work on futures and stay calls only (`E0103`). Function equality `==` is by identity, not by behavior.
 - Calling a value that is not a function is `E2004`, and a wrong number of arguments is `E2002`.
 
 ## 4.16 Traits (`trait`) and Methods (`impl`)
@@ -1196,7 +1202,7 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 | `E0007` | Unclosed `{` inside a string, or an empty `{}` (for a literal brace write `\{`) |
 | `E0101` | Unexpected token (expected such-and-such) |
 | `E0102` | Expected an expression |
-| `E0103` | Feature not supported yet (type arguments for a non-generic function, built-in functions as values) |
+| `E0103` | Feature not supported (type arguments for a non-generic function, `all` or `timeout` as a value) |
 | `E0104` | Invalid assignment target |
 | `E0105` | `var` at file level |
 | `E0107` | Expected a pattern |
@@ -1293,5 +1299,6 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 
 ## 9. Not Implemented Yet (Planned)
 
-Built-in functions such as `print` as values (`E0103`); write `|x| print(x)`. (Working since 1.8: a function with bounds as a value
-(§4.16); since 1.7: `ai.stream` and `ai.embed` (§4.6.5) and `impl<T: A>`; since 1.2, running `async fn` on several cores, §4.5.)
+Nothing planned for the language itself is missing now. (Working since 1.9: built-in functions as values (§4.15) and `ai.search`
+(§4.6.5); since 1.8: a function with bounds as a value (§4.16); since 1.7: `ai.stream` and `ai.embed` and `impl<T: A>`; since 1.2,
+running `async fn` on several cores, §4.5.)

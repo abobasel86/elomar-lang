@@ -54,7 +54,7 @@ pub fn check(program: &mut Program, opts: CheckOptions) -> Vec<Diagnostic> {
 /// for editors' completion.
 pub fn module_functions(short: &str) -> &'static [&'static str] {
     match short {
-        "ai" => &["infer", "run", "embed", "similarity", "stream"],
+        "ai" => &["infer", "run", "embed", "similarity", "search", "stream"],
         "fs" => &stdlib::FS_FUNCTIONS,
         "json" => &stdlib::JSON_FUNCTIONS,
         "http" => &stdlib::HTTP_FUNCTIONS,

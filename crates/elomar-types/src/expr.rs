@@ -426,6 +426,10 @@ impl Checker {
                     e.kind = kind;
                     return ty;
                 }
+                if let Some(kind) = self.builtin_fn_value(&name, span, hint_resolved.as_ref()) {
+                    e.kind = kind;
+                    return self.check_expr(e, hint);
+                }
                 self.check_name(&name, span)
             }
             ExprKind::List(items) => {
@@ -641,6 +645,58 @@ impl Checker {
         Some((kind, Ty::Fn(types, Box::new(ret))))
     }
 
+    /// A built-in function such as `print` or `to_string` used as a value:
+    /// the closure `|#0, ...| print(#0, ...)`, with as many parameters as
+    /// the expected function type has (or the built-in's usual number).
+    /// `all` and `timeout` work on futures and stay calls only.
+    fn builtin_fn_value(&mut self, name: &str, span: Span, hint: Option<&Ty>) -> Option<ExprKind> {
+        if self.lookup_local(name).is_some()
+            || self.consts.contains_key(name)
+            || self.fns.contains_key(name)
+        {
+            return None;
+        }
+        let usual = match name {
+            "print" | "input" | "to_float" | "to_int" | "to_string" | "parse_int"
+            | "parse_float" | "assert" | "set" | "abs" => 1,
+            "min" | "max" | "assert_eq" => 2,
+            _ => return None,
+        };
+        let arity = match hint {
+            Some(Ty::Fn(params, _)) => params.len(),
+            _ => usual,
+        };
+        let params: Vec<String> = (0..arity).map(|i| format!("#{i}")).collect();
+        let named = |n: &str| Expr {
+            kind: ExprKind::Name(n.to_string()),
+            span,
+        };
+        let args = params
+            .iter()
+            .map(|p| Arg {
+                name: None,
+                value: named(p),
+            })
+            .collect();
+        Some(ExprKind::Lambda {
+            params: params
+                .into_iter()
+                .map(|p| LambdaParam {
+                    name: Ident { name: p, span },
+                    ty: None,
+                })
+                .collect(),
+            body: Box::new(ArmBody::Expr(Expr {
+                kind: ExprKind::Call {
+                    callee: Box::new(named(name)),
+                    type_args: Vec::new(),
+                    args,
+                },
+                span,
+            })),
+        })
+    }
+
     fn check_name(&mut self, name: &str, span: Span) -> Ty {
         if let Some(local) = self.lookup_local(name).cloned() {
             self.note_local(name, &local, span);
@@ -723,13 +779,13 @@ impl Checker {
                     "E0103",
                     span,
                     Text::new(
-                        "a built-in function cannot be used as a value yet",
-                        "لا يمكن استخدام الدوال المدمجة كقيم بعد",
+                        format!("`{name}` works on futures and cannot be used as a value"),
+                        format!("`{name}` تعمل على المستقبلات ولا يمكن استخدامها كقيمة"),
                     ),
                 )
                 .with_hint(Text::new(
-                    format!("wrap it in a closure: `|x| {name}(x)`"),
-                    format!("ضعها داخل دالة مجهولة: `|x| {name}(x)`"),
+                    format!("call it directly: `await {name}(...)`"),
+                    format!("استدعها مباشرة: `await {name}(...)`"),
                 )),
             );
             return Ty::Error;

@@ -424,6 +424,94 @@ fn main() {{
     )
 }
 
+/// A program built to exercise traits: `impl<T: A>` for a generic type,
+/// functions with bounds called directly, passed on, and used as values,
+/// and built-in functions used as values, in `map`, `fold` and `par_map`.
+/// A description that divides by zero for one number makes some fail.
+fn trait_program(rng: &mut Rng) -> String {
+    let c = rng.below(12) as i64;
+    let depth = rng.below(4);
+    let mut boxed = format!("{}", rng.below(20));
+    for _ in 0..depth {
+        boxed = format!("{{ item: {boxed} }}");
+    }
+    let mut box_ty = "Int".to_string();
+    for _ in 0..depth {
+        box_ty = format!("Box<{box_ty}>");
+    }
+    let mut body = String::new();
+    for _ in 0..1 + rng.below(5) {
+        let line = match rng.below(12) {
+            0 => "xs.map(show)".to_string(),
+            1 => "xs.par_map(show).take(5)".to_string(),
+            2 => "xs.map(twice).take(3)".to_string(),
+            3 => "apply(show, xs.length)".to_string(),
+            4 => "boxes.map(show)".to_string(),
+            5 => "xs.map(to_string).join(\",\")".to_string(),
+            6 => "xs.map(|x| x - k).map(abs).sum()".to_string(),
+            7 => "xs.fold(0, max)".to_string(),
+            8 => "xs.map(to_float).sum()".to_string(),
+            9 => "words.map(parse_int)".to_string(),
+            10 => "show(b)".to_string(),
+            _ => "f(k)".to_string(),
+        };
+        body.push_str(&format!(
+            "    print({line})
+"
+        ));
+    }
+    format!(
+        "trait Describe {{
+    fn describe(self) -> String
+}}
+
+type Box<T> = {{ item: T }}
+
+impl Describe for Int {{
+    fn describe(self) -> String {{
+        return \"n{{10 div (self - {c} + 100) }}{{self}}\"
+    }}
+}}
+
+impl<T: Describe> Describe for Box<T> {{
+    fn describe(self) -> String {{
+        return \"[{{self.item.describe()}}]\"
+    }}
+}}
+
+fn show<T: Describe>(x: T) -> String {{
+    return x.describe()
+}}
+
+fn twice<T: Describe>(x: T) -> String {{
+    return show(x) + show(x)
+}}
+
+fn apply(g: fn(Int) -> String, x: Int) -> String {{
+    return g(x)
+}}
+
+fn wrap(x: Int) -> Box<Int> {{
+    return {{ item: x }}
+}}
+
+fn main() {{
+    let k = {k}
+    let xs = [{xs}]
+    let words = [\"1\", \"x\", \"{k}\"]
+    let b: {box_ty} = {boxed}
+    let boxes = xs.map(wrap)
+    let f: fn(Int) -> String = show
+{body}}}
+",
+        k = rng.below(10),
+        xs = (0..rng.below(8))
+            .map(|_| (rng.below(240) as i64 - 120).to_string())
+            .collect::<Vec<_>>()
+            .join(", "),
+    )
+}
+
 fn collect_seeds(root: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let mut stack: Vec<PathBuf> = [
@@ -471,8 +559,9 @@ static LAST_PANIC: Mutex<String> = Mutex::new(String::new());
 /// Programs that ran, and those whose results were compared.
 static RAN: AtomicU64 = AtomicU64::new(0);
 static COMPARED: AtomicU64 = AtomicU64::new(0);
-/// Programs made by [`par_program`].
+/// Programs made by [`par_program`] and [`trait_program`].
 static PAR: AtomicU64 = AtomicU64::new(0);
+static TRAITS: AtomicU64 = AtomicU64::new(0);
 
 fn main() {
     let mut seconds = 30u64;
@@ -523,6 +612,9 @@ fn main() {
         let src = if rng.below(5) == 0 {
             PAR.fetch_add(1, Ordering::Relaxed);
             par_program(&mut rng)
+        } else if rng.below(8) == 0 {
+            TRAITS.fetch_add(1, Ordering::Relaxed);
+            trait_program(&mut rng)
         } else if rng.below(10) == 0 {
             base.clone()
         } else {
@@ -557,10 +649,11 @@ fn main() {
         crashes.len()
     );
     println!(
-        "  {} ran, {} compared in both engines, {} made for the par_ methods",
+        "  {} ran, {} compared in both engines, {} made for the par_ methods, {} for traits",
         RAN.load(Ordering::Relaxed),
         COMPARED.load(Ordering::Relaxed),
-        PAR.load(Ordering::Relaxed)
+        PAR.load(Ordering::Relaxed),
+        TRAITS.load(Ordering::Relaxed)
     );
     for (n, (place, (_, count))) in crashes.iter().enumerate() {
         println!("  crash-{n}.elo  ({count}×)  {place}");

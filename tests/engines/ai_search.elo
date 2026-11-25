@@ -1,0 +1,23 @@
+// ai.search: texts ranked by meaning, with the offline mock model.
+use std.ai
+
+async fn main() {
+    let notes = ["paying the bill", "feeding the cat", "where the cat sleeps", "the bill is late"]
+    match await ai.search("mock", "the cat sleeps", notes) {
+        Ok(hits) => {
+            for h in hits {
+                print(h.text, h.score.round_to(3))
+            }
+            print(hits[0].text)
+        }
+        Err(e) => print("failed:", e.kind())
+    }
+    match await ai.search("mock", "anything", []) {
+        Ok(hits) => print(hits.is_empty())
+        Err(e) => print("failed:", e.kind())
+    }
+    match await ai.search("no-such-model", "x", ["a"]) {
+        Ok(_) => print("unexpected")
+        Err(e) => print(e.kind())
+    }
+}

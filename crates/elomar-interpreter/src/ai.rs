@@ -121,6 +121,49 @@ pub(crate) fn run_embed(
     embed_result(ai.embed(&request))
 }
 
+/// `ai.search`: the texts with their similarity to `query`, most similar
+/// first (equal scores keep the order of `texts`). The query and the texts
+/// are embedded together, as by `await all`; the first error is the result.
+pub(crate) fn run_search(
+    ai: &mut AiRuntime,
+    model: &str,
+    query: &str,
+    texts: &[String],
+    timeout_ms: Option<i64>,
+) -> Value {
+    if texts.is_empty() {
+        return Value::Result(Ok(Rc::new(Value::list(Vec::new()))));
+    }
+    let requests: Vec<AiRequest> = std::iter::once(query)
+        .chain(texts.iter().map(String::as_str))
+        .map(|t| embed_request(ai, model, t, timeout_ms))
+        .collect();
+    let mut vectors = Vec::with_capacity(requests.len());
+    for answer in ai.embed_all(&requests) {
+        match answer {
+            Ok(v) => vectors.push(v),
+            Err(e) => return Value::Result(Err(Rc::new(ai_error_value(&e)))),
+        }
+    }
+    let q = &vectors[0];
+    let mut hits: Vec<(f64, &String)> = texts
+        .iter()
+        .zip(&vectors[1..])
+        .map(|(t, v)| (cosine(q, v), t))
+        .collect();
+    hits.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let hits = hits
+        .into_iter()
+        .map(|(score, text)| {
+            Value::Record(Rc::new(vec![
+                (Rc::from("text"), Value::Str(Rc::new(text.clone()))),
+                (Rc::from("score"), Value::Float(score)),
+            ]))
+        })
+        .collect();
+    Value::Result(Ok(Rc::new(Value::list(hits))))
+}
+
 /// The request of an `ai.embed(model, text[, timeout])` call.
 pub(crate) fn embed_request(
     ai: &AiRuntime,
@@ -157,8 +200,11 @@ pub(crate) fn similarity(args: &[Value]) -> f64 {
             _ => Vec::new(),
         }
     };
-    let (a, b) = (floats(args.first()), floats(args.get(1)));
-    let dot: f64 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+    cosine(&floats(args.first()), &floats(args.get(1)))
+}
+
+fn cosine(a: &[f64], b: &[f64]) -> f64 {
+    let dot: f64 = a.iter().zip(b).map(|(x, y)| x * y).sum();
     let n = a.len().min(b.len());
     let na = a[..n].iter().map(|x| x * x).sum::<f64>().sqrt();
     let nb = b[..n].iter().map(|x| x * x).sum::<f64>().sqrt();

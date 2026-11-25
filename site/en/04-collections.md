@@ -46,6 +46,17 @@ fn main() {
 }
 ```
 
+Built-in functions can be passed the same way:
+
+```elomar
+fn main() {
+    print(["3", "x", "12"].map(parse_int))               // [Some(3), None, Some(12)]
+    print([-2, 5, -7].map(abs), [4, 9, 2].fold(0, max))  // [2, 5, 7] 9
+    let say = print
+    say("done")
+}
+```
+
 More useful methods: `take(n)`, `skip(n)`, `unique()`, `reverse()`,
 `enumerate()`, `chunks(n)`, `flat_map(f)` and `group_by(f)`:
 

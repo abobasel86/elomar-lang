@@ -714,8 +714,12 @@ fn closure_errors() {
     ok(
         "fn main() {\n  let f = |x: Int| {\n    var y = x\n    y += 1\n    return y\n  }\n  print(f(1))\n}",
     );
-    // Built-ins are not values yet.
-    assert_eq!(codes("fn main() {\n  let p = print\n}"), vec!["E0103"]);
+    // Built-ins are values, except the ones that work on futures.
+    ok(
+        "fn main() {\n  let p = print\n  p(1)\n  let xs: List<String> = [1, 2].map(to_string)\n  let f: fn(Float, Float) -> Float = max\n  print(xs, f(1.5, 2.0), [-1, 2].map(abs), [\"1\", \"x\"].map(parse_int))\n}",
+    );
+    assert_eq!(codes("async fn main() {\n  let a = all\n}"), vec!["E0103"]);
+    assert_eq!(codes("pub fn run() {\n  let p = print\n}"), vec!["E3002"]);
     // Wrong arity and argument types.
     assert_eq!(
         codes("fn main() {\n  let f = |a: Int, b: Int| a + b\n  print(f(1))\n}"),
