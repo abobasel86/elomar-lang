@@ -937,6 +937,7 @@ fn main() {
 
 - `use app.a.b` يحمّل الملف `src/a/b.elo` من مجلد المشروع (مجلد `elomar.toml`، أو مجلد البرنامج إن لم يوجد)؛ وإن لم يوجد
   مجلد `src/` يُبحث بجانب `elomar.toml`. الاسم المختصر هو آخر جزء (`b`).
+  ويجوز أن يكون اسم وحدة قياسية (`use app.csv` للملف `src/csv.elo`)؛ ولا يكون `E1002` إلا في ملف يستورد `std.csv` و`app.csv` معًا.
 - الوصول بالاسم المؤهَّل: `students.level(s)` و`students.Student` و`grading.Level.Excellent` (في التعابير والأنماط والأنواع).
 - أو باستيراد أسماء محددة: `use app.students.{Student, level}` ثم `level(s)` و`Student` مباشرة (ومنها الأنواع المعدودة: `use app.grading.{Level}` ثم `Level.Excellent`).
   الاسم المستورد الذي يتعارض مع عنصر في الملف نفسه أو مع استيراد آخر `E1002`، وغير الموجود `E1008`، وغير `pub` `E1012`.

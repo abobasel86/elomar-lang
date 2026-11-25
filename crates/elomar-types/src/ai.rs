@@ -117,6 +117,23 @@ impl Checker {
             .join(".");
         match KNOWN_MODULES.iter().find(|(p, _)| *p == path) {
             Some((_, Some(short))) => {
+                let taken = self
+                    .scopes_mod
+                    .app_aliases
+                    .get(&u.module)
+                    .is_some_and(|a| a.contains_key(*short));
+                if taken {
+                    let span = u.path.last().map_or(u.span, |i| i.span);
+                    self.error(
+                        "E1002",
+                        span,
+                        Text::new(
+                            format!("the name `{short}` is already used by another import"),
+                            format!("الاسم `{short}` مستخدم مسبقًا لاستيراد آخر"),
+                        ),
+                    );
+                    return;
+                }
                 self.import_std(&u.module, short);
             }
             Some((_, None)) => {}

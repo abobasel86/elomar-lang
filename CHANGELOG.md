@@ -8,6 +8,12 @@ change the language.
 
 ### Fixed
 
+- A module of your project or of a package may again be named like a
+  standard module, such as `src/csv.elo` with `use app.csv` (or a package's
+  `use csvkit.csv`). Since 0.7.0 added `std.csv`, `use app.csv` was refused
+  everywhere as "already used by another import"; now only a file that
+  imports both `std.csv` and `app.csv` is `E1002`, in either order.
+
 - The installers and `elomar upgrade` find the latest version from where
   `github.com/.../releases/latest` redirects to, instead of the GitHub API,
   whose low limit per address failed on shared networks (HTTP 403). The

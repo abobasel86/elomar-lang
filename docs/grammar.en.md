@@ -941,6 +941,7 @@ fn main() {
 
 - `use app.a.b` loads the file `src/a/b.elo` from the project folder (the folder of `elomar.toml`, or the program's folder if there is none). If there is no
   `src/` folder, it looks next to `elomar.toml`. The short name is the last part (`b`).
+  It may be the name of a standard module (`use app.csv` for `src/csv.elo`); only a file that imports both `std.csv` and `app.csv` is `E1002`.
 - Access by qualified name: `students.level(s)`, `students.Student` and `grading.Level.Excellent` (in expressions, patterns and types).
 - Or by importing specific names: `use app.students.{Student, level}`, then `level(s)` and `Student` directly (enums too: `use app.grading.{Level}`, then `Level.Excellent`).
   An imported name that conflicts with an item in the same file or with another import is `E1002`, one that does not exist is `E1008`, and one that is not `pub` is `E1012`.

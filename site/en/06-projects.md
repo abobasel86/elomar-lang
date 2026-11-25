@@ -53,6 +53,11 @@ fn main() {
 You can also import names directly: `use app.grading.{level}` and then call
 `level(95)`.
 
+A module may have the same name as a standard module: your own `src/csv.elo`
+is `use app.csv`, then `csv.parse(...)` calls your function. Only one file
+cannot import both `std.csv` and `app.csv`, since `csv` would then mean two
+things.
+
 ## Tests
 
 Every `.elo` file in `tests/` holds tests: functions whose names start with

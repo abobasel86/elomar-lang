@@ -24,12 +24,6 @@ pub(crate) fn base_name(name: &str) -> &str {
     name.rsplit_once('.').map_or(name, |(_, n)| n)
 }
 
-/// Names `use std.*` binds; an app module cannot reuse them as an alias.
-const STD_SHORT_NAMES: [&str; 18] = [
-    "ai", "fs", "json", "http", "db", "py", "mcp", "agent", "math", "random", "time", "os",
-    "regex", "encoding", "crypto", "server", "process", "csv",
-];
-
 #[derive(Default)]
 pub(crate) struct ModuleScopes {
     /// Module being checked; empty for the main file.
@@ -167,8 +161,15 @@ impl Checker {
             .app_aliases
             .entry(u.module.clone())
             .or_default();
-        let clash = STD_SHORT_NAMES.contains(&alias.name.as_str())
-            || aliases.get(&alias.name).is_some_and(|t| *t != target);
+        // A std module only takes its name in a file that imports it, so an
+        // app module may be called `csv` as long as that file has no
+        // `use std.csv` (`check_use` reports the other order).
+        let clash = aliases.get(&alias.name).is_some_and(|t| *t != target)
+            || self
+                .scopes_mod
+                .std_imports
+                .get(&u.module)
+                .is_some_and(|s| s.contains(&alias.name));
         if clash {
             self.error(
                 "E1002",

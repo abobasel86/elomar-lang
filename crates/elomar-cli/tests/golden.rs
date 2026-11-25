@@ -413,6 +413,54 @@ fn modules_run_and_respect_pub() {
     assert!(stderr.contains("mark it `pub` in src/lib.elo"), "{stderr}");
 }
 
+/// An app module may share a std module's name (`src/csv.elo`); only a
+/// file that imports both is `E1002`, whichever comes first.
+#[test]
+fn module_named_like_a_std_module() {
+    const CSV: &str = "pub fn parse(text: String) -> String {\n    return \"mine: \" + text\n}\n";
+    let ok = module_project(
+        "modules-std-name",
+        &[
+            ("elomar.toml", ""),
+            ("src/csv.elo", CSV),
+            (
+                "src/main.elo",
+                "use app.csv\nfn main() {\n    print(csv.parse(\"a,b\"))\n}\n",
+            ),
+        ],
+    );
+    let out = elomar(&["run", ok.to_str().unwrap()]);
+    assert_eq!(
+        lines(&String::from_utf8_lossy(&out.stdout)),
+        "mine: a,b\n",
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    for (name, main) in [
+        (
+            "modules-std-name-1",
+            "use std.csv\nuse app.csv\nfn main() {}\n",
+        ),
+        (
+            "modules-std-name-2",
+            "use app.csv\nuse std.csv\nfn main() {}\n",
+        ),
+    ] {
+        let both = module_project(
+            name,
+            &[
+                ("elomar.toml", ""),
+                ("src/csv.elo", CSV),
+                ("src/main.elo", main),
+            ],
+        );
+        let (codes, stderr) = check_codes(&both);
+        assert_eq!(codes, vec!["E1002"], "{stderr}");
+        assert!(stderr.contains("src/main.elo:2:9"), "{stderr}");
+    }
+}
+
 #[test]
 fn module_errors() {
     let missing = module_project(
