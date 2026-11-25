@@ -22,12 +22,30 @@ fn installer_url() -> String {
     format!("https://raw.githubusercontent.com/{REPO}/main/{file}")
 }
 
-/// The latest released version, such as `1.11.0`.
+/// The latest released version, such as `1.11.0`: from where
+/// `releases/latest` redirects to (which, unlike the API, has no low limit
+/// per address), else from the API.
 fn latest_version() -> Result<String, String> {
     let agent = elomar_tls::agent_builder()
         .timeout(Duration::from_secs(20))
+        .redirects(0)
         .user_agent(concat!("elomar-lang/", env!("CARGO_PKG_VERSION")))
         .build();
+    let redirect = match agent
+        .head(&format!("https://github.com/{REPO}/releases/latest"))
+        .call()
+    {
+        Ok(r) | Err(ureq::Error::Status(_, r)) => r.header("location").map(str::to_string),
+        Err(_) => None,
+    };
+    if let Some(tag) = redirect
+        .as_deref()
+        .and_then(|l| l.rsplit_once("/releases/tag/"))
+        .map(|(_, tag)| tag.trim_start_matches('v').to_string())
+        .filter(|v| !v.is_empty())
+    {
+        return Ok(tag);
+    }
     let body = agent
         .get(&format!(
             "https://api.github.com/repos/{REPO}/releases/latest"

@@ -4,6 +4,15 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Fixed
+
+- The installers and `elomar upgrade` find the latest version from where
+  `github.com/.../releases/latest` redirects to, instead of the GitHub API,
+  whose low limit per address failed on shared networks (HTTP 403). The
+  API is still tried if the redirect gives nothing.
+
 ## [1.12.0] - 2026-11-25
 
 ### Added

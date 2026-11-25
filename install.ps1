@@ -27,9 +27,24 @@
     if ($env:ELOMAR_VERSION) {
         $tag = 'v' + $env:ELOMAR_VERSION.TrimStart('v')
     } else {
-        $latest = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" `
-            -Headers @{ 'User-Agent' = 'elomar-installer' }
-        $tag = $latest.tag_name
+        # github.com/.../releases/latest redirects to .../releases/tag/vX.Y.Z.
+        # Unlike the API, it has no low limit per address (shared networks).
+        $tag = $null
+        try {
+            $request = [Net.HttpWebRequest]::Create("https://github.com/$repo/releases/latest")
+            $request.Method = 'HEAD'
+            $request.AllowAutoRedirect = $false
+            $request.UserAgent = 'elomar-installer'
+            $response = $request.GetResponse()
+            $location = $response.Headers['Location']
+            $response.Close()
+            if ($location -match '/releases/tag/(v[^/]+)$') { $tag = $Matches[1] }
+        } catch { }
+        if (-not $tag) {
+            $latest = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" `
+                -Headers @{ 'User-Agent' = 'elomar-installer' }
+            $tag = $latest.tag_name
+        }
     }
     $version = $tag.TrimStart('v')
     $name = "elomar-$version-$target"

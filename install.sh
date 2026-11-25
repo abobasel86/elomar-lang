@@ -58,9 +58,20 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 if [ -n "${ELOMAR_VERSION:-}" ]; then
     tag="v${ELOMAR_VERSION#v}"
 else
-    fetch "https://api.github.com/repos/$repo/releases/latest" "$tmp/latest.json" ||
-        fail "could not ask GitHub for the latest release"
-    tag="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp/latest.json" | head -n 1)"
+    # github.com/.../releases/latest redirects to .../releases/tag/vX.Y.Z.
+    # Unlike the API, it has no low limit per address (shared networks).
+    if command -v curl > /dev/null 2>&1; then
+        url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2> /dev/null || true)"
+    else
+        url="$(wget -q -S --max-redirect=0 "https://github.com/$repo/releases/latest" 2>&1 | sed -n 's/^ *[Ll]ocation: *//p' | tr -d '\r' | head -n 1)"
+    fi
+    tag=""
+    case "$url" in */releases/tag/*) tag="${url##*/}" ;; esac
+    if [ -z "$tag" ]; then
+        fetch "https://api.github.com/repos/$repo/releases/latest" "$tmp/latest.json" ||
+            fail "could not ask GitHub for the latest release"
+        tag="$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp/latest.json" | head -n 1)"
+    fi
     [ -n "$tag" ] || fail "could not read the latest release's version"
 fi
 version="${tag#v}"
