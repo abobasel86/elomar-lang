@@ -1,0 +1,23 @@
+// A model on your own computer: a typed answer, a streamed answer, and a
+// search by meaning. Run `ollama serve` first (the Ollama app does it).
+use std.ai
+
+type Ticket = { category: String, urgent: Bool }
+
+async fn main() {
+    match await ai.infer<Ticket>("local", "Classify the support request.", "I was charged twice, fix it now!", 120s) {
+        Ok(t) => print("ticket:", t.category, t.urgent)
+        Err(e) => print("infer failed:", e.kind(), e.message())
+    }
+
+    let answer = await ai.stream("local", "Answer in one short sentence.", "Why is the sky blue?", |piece| print(piece), 120s)
+    if answer.is_err() {
+        print("stream failed")
+    }
+
+    let notes = ["the invoice is overdue", "a cat dozing on the sofa", "feeding the dog", "paying rent"]
+    match await ai.search("vectors", "a sleepy kitten", notes, 120s) {
+        Ok(hits) => print("closest:", hits[0].text, hits[0].score.round_to(3))
+        Err(e) => print("search failed:", e.kind(), e.message())
+    }
+}

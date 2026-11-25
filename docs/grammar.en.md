@@ -376,13 +376,39 @@ network_hosts = ["api.openai.com"] # denied by default: any host not listed is r
 |---|---|
 | Calling a cloud model (any provider other than `mock`) produces `net` in addition to `ai`. If the model name is not a string literal, it is assumed to be a cloud model whenever a cloud model exists in the configuration | `E3001` / `E3002` at compile time |
 | The host (or `host:port`) is not in `network_hosts` | `Err` of kind `PolicyDenied` without any connection. It does not count toward `max_calls_per_run` |
-| The environment variable is not defined or is empty | `Authentication` without any connection |
+| The environment variable is not defined or is empty | `Authentication` without any connection, except for a `base_url` on this computer (`localhost`, `127.0.0.1`), which is sent without a key (since 1.10) |
 | HTTP 401/403 → `Authentication` · 429 → `RateLimited` (or `BudgetExceeded` when the credit runs out) · 400 for context length → `ContextLimitExceeded` · other 400/422 and 404 for an unknown model → `UnsupportedCapability` (an error about the model id ends with a hint to check `model` in elomar.toml) · 5xx and other 404 → `ProviderUnavailable` · timeout → `Timeout` · connection failure → `Network` · model refusal → `PolicyDenied` · truncated answer → `ContextLimitExceeded` | An `Err` value |
 | `base_url` with `http` for a non-local host, or a model without `model` | Configuration error before the run (exit code 2) |
 
 **Implementation details:** the Chat Completions API with Structured Outputs in `strict` mode. Non-record types are wrapped in `{ "value": ... }`
 and then unwrapped, and `String` is requested as free text. `instructions` goes in the system message, with a note that the user message is data, not instructions. `input`
 goes in the user message. Redirects are not followed. The key is read on every call and is masked (`sk-***`) in error messages.
+
+**Local models (since 1.10):** a server on the same computer that speaks the OpenAI API, such as Ollama, works with no key:
+
+```toml
+[ai.models.local]
+provider = "openai"
+model = "qwen2.5:7b"                      # a model pulled with `ollama pull`
+base_url = "http://localhost:11434/v1"
+
+[permissions]
+network_hosts = ["localhost:11434"]
+```
+
+`ai.infer`, `ai.stream`, `ai.embed` and `ai.search` all work with it. A local model is still `net` (it is reached over HTTP).
+
+**Embedding cache (since 1.10):**
+
+```toml
+[ai.cache]
+embeddings = "embeddings.cache.json"     # a path inside the project folder
+```
+
+The vectors of `ai.embed` and `ai.search` from models that use the network are kept in this JSON file, by the provider, vendor model
+id and `base_url`, and by the exact text. A text already in the file is not sent again and does not count toward `max_calls_per_run`;
+changing `model` in elomar.toml makes the old vectors unused. An absolute path or one with `..` is a configuration error. A file that
+cannot be read or written only means nothing is saved.
 
 ### 4.6.2.1 The Anthropic Provider (Claude)
 

@@ -36,6 +36,8 @@ pub struct OpenAiProvider {
     port: u16,
     key_env: String,
     key: KeySource,
+    /// A server on this computer (such as Ollama), which needs no key.
+    loopback: bool,
     agent: ureq::Agent,
 }
 
@@ -111,6 +113,7 @@ impl OpenAiProvider {
             port,
             key_env,
             key,
+            loopback,
             agent: elomar_tls::agent_builder().redirects(0).build(),
         })
     }
@@ -204,7 +207,8 @@ impl OpenAiProvider {
     }
 
     fn post(&self, url: &str, body: &Value, timeout_ms: u64) -> Result<ureq::Response, AiError> {
-        let Some(key) = (self.key)() else {
+        let key = (self.key)();
+        if key.is_none() && !self.loopback {
             return Err(AiError::new(
                 AiErrorKind::Authentication,
                 format!(
@@ -212,14 +216,16 @@ impl OpenAiProvider {
                     self.key_env
                 ),
             ));
-        };
-        let response = self
+        }
+        let mut request = self
             .agent
             .post(url)
             .timeout(Duration::from_millis(timeout_ms.max(1)))
-            .set("Authorization", &format!("Bearer {key}"))
-            .set("Content-Type", "application/json")
-            .send_string(&body.to_string());
+            .set("Content-Type", "application/json");
+        if let Some(key) = key {
+            request = request.set("Authorization", &format!("Bearer {key}"));
+        }
+        let response = request.send_string(&body.to_string());
         match response {
             Ok(resp) => Ok(resp),
             Err(ureq::Error::Status(code, resp)) => {

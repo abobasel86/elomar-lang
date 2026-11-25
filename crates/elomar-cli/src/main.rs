@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use elomar_ai_core::{AiRuntime, ModelProvider, ProjectConfig, UnavailableProvider, parse_config};
+use elomar_ai_core::{
+    AiRuntime, EmbeddingCache, ModelProvider, ProjectConfig, UnavailableProvider, parse_config,
+};
 use elomar_ai_provider_anthropic::AnthropicProvider;
 use elomar_ai_provider_mock::MockProvider;
 use elomar_ai_provider_openai::OpenAiProvider;
@@ -470,6 +472,7 @@ pub(crate) fn ai_runtime_from(
         None => ProjectConfig::default(),
     };
     let config_error = |message: String| message;
+    let project = base.clone();
     let fs = FsPolicy::new(
         base,
         &config.permissions.filesystem_read,
@@ -482,6 +485,22 @@ pub(crate) fn ai_runtime_from(
         "mock",
         Box::new(MockProvider::new(Vec::new()).expect("no rules to validate")),
     );
+    let mut cache = match &config.ai.cache.embeddings {
+        Some(file) => {
+            let relative = Path::new(file);
+            if relative.is_absolute()
+                || relative
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                return Err(format!(
+                    "`[ai.cache] embeddings = {file:?}` must be a path inside the project folder"
+                ));
+            }
+            Some(EmbeddingCache::open(project.join(relative)))
+        }
+        None => None,
+    };
     let mut cloud_models = Vec::new();
     for (name, model) in config.ai.models {
         let provider: Box<dyn ModelProvider> = match model.provider.as_str() {
@@ -499,8 +518,22 @@ pub(crate) fn ai_runtime_from(
         };
         if provider.capabilities().uses_network {
             cloud_models.push(name.clone());
+            if let Some(cache) = cache.as_mut() {
+                cache.add_model(
+                    &name,
+                    format!(
+                        "{} {} {}",
+                        model.provider,
+                        model.model.as_deref().unwrap_or(""),
+                        model.base_url.as_deref().unwrap_or("")
+                    ),
+                );
+            }
         }
         runtime.register(name, provider);
+    }
+    if let Some(cache) = cache {
+        runtime = runtime.with_embedding_cache(cache);
     }
     Ok(LoadedAi {
         runtime,

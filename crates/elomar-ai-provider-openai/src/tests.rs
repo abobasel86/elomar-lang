@@ -242,6 +242,22 @@ fn missing_key_fails_before_any_request() {
 }
 
 #[test]
+fn a_local_server_needs_no_key() {
+    let (url, rx) = fake_openai(200, completion("\"hi\""), Duration::ZERO);
+    let answer = provider(&url, None)
+        .infer(&request(Schema::String, 5_000))
+        .unwrap();
+    assert!(answer.contains("hi"));
+    assert!(!rx.recv().unwrap().to_lowercase().contains("authorization"));
+    // With a key, it is sent.
+    let (url, rx) = fake_openai(200, completion("\"hi\""), Duration::ZERO);
+    provider(&url, Some("local-key"))
+        .infer(&request(Schema::String, 5_000))
+        .unwrap();
+    assert!(rx.recv().unwrap().contains("Bearer local-key"));
+}
+
+#[test]
 fn config_validation() {
     let cfg = |model: Option<&str>, base: Option<&str>| ModelConfig {
         provider: "openai".into(),

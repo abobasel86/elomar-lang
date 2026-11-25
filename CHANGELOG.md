@@ -4,6 +4,18 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Models on your computer**: an `openai` model whose `base_url` is on
+  `localhost` (such as Ollama at `http://localhost:11434/v1`) needs no
+  key. `ai.infer`, `ai.stream`, `ai.embed` and `ai.search` were checked
+  with Ollama. New example: `examples/ai-local`.
+- **Embedding cache**: `[ai.cache] embeddings = "file.json"` keeps the
+  vectors of `ai.embed` and `ai.search`, so a text already embedded is not
+  sent again and does not count toward `max_calls_per_run`.
+
 ## [1.9.0] - 2026-11-25
 
 ### Added

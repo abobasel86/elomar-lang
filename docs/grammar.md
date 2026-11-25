@@ -374,13 +374,39 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 |---|---|
 | استدعاء نموذج سحابي (أي مزود غير `mock`) يُحدث `net` إضافة إلى `ai`. إن لم يكن اسم النموذج نصًا حرفيًا يُفترض أنه سحابي متى وُجد نموذج سحابي في الإعداد | `E3001` / `E3002` وقت الترجمة |
 | المضيف (أو `host:port`) غير موجود في `network_hosts` | `Err` بنوع `PolicyDenied` دون أي اتصال، ولا يُحتسب ضمن `max_calls_per_run` |
-| متغير البيئة غير معرّف أو فارغ | `Authentication` دون أي اتصال |
+| متغير البيئة غير معرّف أو فارغ | `Authentication` دون أي اتصال، إلا مع `base_url` على هذا الجهاز (`localhost` أو `127.0.0.1`) فيُرسل الطلب دون مفتاح (منذ 1.10) |
 | HTTP 401/403 → `Authentication` · 429 → `RateLimited` (أو `BudgetExceeded` عند نفاد الرصيد) · 400 لطول السياق → `ContextLimitExceeded` · 400/422 أخرى و404 لنموذج غير موجود → `UnsupportedCapability` (والخطأ المتعلق بمعرّف النموذج ينتهي بتلميح لمراجعة `model` في elomar.toml) · 5xx و404 أخرى → `ProviderUnavailable` · انقضاء المهلة → `Timeout` · فشل الاتصال → `Network` · رفض النموذج → `PolicyDenied` · قطع الإجابة → `ContextLimitExceeded` | قيمة `Err` |
 | `base_url` بـ `http` لمضيف غير محلي، أو نموذج بلا `model` | خطأ إعداد قبل التشغيل (رمز خروج 2) |
 
 **تفاصيل التنفيذ:** واجهة Chat Completions مع Structured Outputs بوضع `strict`؛ الأنواع غير السجلية تُغلَّف بـ `{ "value": ... }`
 ثم تُفك، و`String` يُطلب نصًا حرًا. `instructions` في رسالة النظام مع تنبيه بأن رسالة المستخدم بيانات لا تعليمات، و`input`
 في رسالة المستخدم. إعادة التوجيه (Redirects) لا تُتبع، والمفتاح يُقرأ عند كل استدعاء ويُخفى (`sk-***`) في رسائل الخطأ.
+
+**النماذج المحلية (منذ 1.10):** خادم على الجهاز نفسه يتحدث بواجهة OpenAI، مثل Ollama، يعمل دون مفتاح:
+
+```toml
+[ai.models.local]
+provider = "openai"
+model = "qwen2.5:7b"                      # نموذج نُزّل بـ `ollama pull`
+base_url = "http://localhost:11434/v1"
+
+[permissions]
+network_hosts = ["localhost:11434"]
+```
+
+وتعمل معه `ai.infer` و`ai.stream` و`ai.embed` و`ai.search`. والنموذج المحلي يبقى `net` لأنه يُبلغ عبر HTTP.
+
+**ذاكرة التضمينات (منذ 1.10):**
+
+```toml
+[ai.cache]
+embeddings = "embeddings.cache.json"     # مسار داخل مجلد المشروع
+```
+
+تُحفظ متجهات `ai.embed` و`ai.search` من النماذج التي تستخدم الشبكة في ملف JSON هذا، بحسب المزود ومعرّف النموذج و`base_url`،
+وبحسب النص بالضبط. النص الموجود في الملف لا يُرسل مرة أخرى ولا يُحتسب ضمن `max_calls_per_run`، وتغيير `model` في elomar.toml
+يجعل المتجهات القديمة غير مستخدمة. والمسار المطلق أو الذي فيه `..` خطأ إعداد. والملف الذي لا يمكن قراءته أو كتابته يعني فقط أن
+شيئًا لا يُحفظ.
 
 ### 4.6.2.1 مزود Anthropic (Claude)
 

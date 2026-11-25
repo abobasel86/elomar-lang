@@ -1,0 +1,26 @@
+# Models on this computer with Ollama: no key, no cost per call.
+# This example is not part of the automated tests: it needs Ollama running.
+[package]
+name = "ai-local"
+version = "0.1.0"
+entry = "main.elo"
+
+[ai.models.local]
+provider = "openai"                   # Ollama speaks the OpenAI API
+model = "qwen2.5:7b"                  # ollama pull qwen2.5:7b
+base_url = "http://localhost:11434/v1"
+
+[ai.models.vectors]
+provider = "openai"
+model = "nomic-embed-text"            # ollama pull nomic-embed-text
+base_url = "http://localhost:11434/v1"
+
+# Vectors already made are kept here and never asked for again.
+[ai.cache]
+embeddings = "embeddings.cache.json"
+
+[ai.policy]
+max_calls_per_run = 20
+
+[permissions]
+network_hosts = ["localhost:11434"]

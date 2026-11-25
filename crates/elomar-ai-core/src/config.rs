@@ -91,6 +91,18 @@ pub struct AiConfig {
     pub models: BTreeMap<String, ModelConfig>,
     #[serde(default)]
     pub policy: AiPolicy,
+    #[serde(default)]
+    pub cache: AiCache,
+}
+
+/// `[ai.cache]`: files that keep answers between runs.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AiCache {
+    /// A JSON file, relative to the project folder, for the vectors of
+    /// `ai.embed` and `ai.search` from models that use the network.
+    #[serde(default)]
+    pub embeddings: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -6,8 +6,11 @@
 //! This crate knows nothing about the interpreter's values or about any
 //! specific provider.
 
+mod cache;
 mod config;
 mod schema;
+
+pub use cache::EmbeddingCache;
 
 use std::collections::HashMap;
 
@@ -312,6 +315,8 @@ pub struct AiRuntime {
     permissions: Permissions,
     mcp: McpConfig,
     calls: u64,
+    /// Embeddings already received (`[ai.cache]`).
+    cache: Option<EmbeddingCache>,
 }
 
 impl AiRuntime {
@@ -322,6 +327,35 @@ impl AiRuntime {
             permissions: Permissions::default(),
             mcp: McpConfig::default(),
             calls: 0,
+            cache: None,
+        }
+    }
+
+    /// Keeps embeddings in `cache`, so the same text is not sent again.
+    pub fn with_embedding_cache(mut self, cache: EmbeddingCache) -> Self {
+        self.cache = Some(cache);
+        self
+    }
+
+    /// The embedding cache, if `[ai.cache]` set one.
+    pub fn embedding_cache(&self) -> Option<&EmbeddingCache> {
+        self.cache.as_ref()
+    }
+
+    /// A cached embedding: the model must exist, but nothing is sent and
+    /// no call is counted.
+    fn cached(&self, request: &AiRequest) -> Option<Vec<f64>> {
+        if !self.models.contains_key(&request.model) {
+            return None;
+        }
+        self.cache
+            .as_ref()?
+            .get(&request.model, &request.input_text())
+    }
+
+    fn remember(&mut self, request: &AiRequest, answer: &Result<Vec<f64>, AiError>) {
+        if let (Some(cache), Ok(v)) = (self.cache.as_mut(), answer) {
+            cache.put(&request.model, &request.input_text(), v);
         }
     }
 
@@ -486,8 +520,16 @@ impl AiRuntime {
     /// The embedding of `request.input_text()`, after the same checks as
     /// [`AiRuntime::infer`] (budget, model, network permission).
     pub fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
+        if let Some(v) = self.cached(request) {
+            return Ok(v);
+        }
         let provider = self.checked_provider(request)?;
-        checked_embedding(provider.embed(request))
+        let answer = checked_embedding(provider.embed(request));
+        self.remember(request, &answer);
+        if let Some(cache) = self.cache.as_mut() {
+            cache.save();
+        }
+        answer
     }
 
     /// Several embeddings, as for `await all([...])` over `ai.embed`: each
@@ -499,6 +541,10 @@ impl AiRuntime {
             (0..requests.len()).map(|_| None).collect();
         let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
         for (i, request) in requests.iter().enumerate() {
+            if let Some(v) = self.cached(request) {
+                out[i] = Some(Ok(v));
+                continue;
+            }
             if let Err(e) = self.checked_provider(request) {
                 out[i] = Some(Err(e));
                 continue;
@@ -513,13 +559,20 @@ impl AiRuntime {
             let batch: Vec<&AiRequest> = idx.iter().map(|&i| &requests[i]).collect();
             let mut answers = provider.embed_batch(&batch).into_iter();
             for i in idx {
-                out[i] = Some(checked_embedding(answers.next().unwrap_or_else(|| {
+                let answer = checked_embedding(answers.next().unwrap_or_else(|| {
                     Err(AiError::new(
                         AiErrorKind::InvalidStructuredOutput,
                         "the provider returned fewer embeddings than texts",
                     ))
-                })));
+                }));
+                if let (Some(cache), Ok(v)) = (self.cache.as_mut(), &answer) {
+                    cache.put(&requests[i].model, &requests[i].input_text(), v);
+                }
+                out[i] = Some(answer);
             }
+        }
+        if let Some(cache) = self.cache.as_mut() {
+            cache.save();
         }
         out.into_iter()
             .map(|r| r.expect("every request answered"))
@@ -754,5 +807,70 @@ mod tests {
             results[5].as_ref().unwrap_err().kind,
             AiErrorKind::BudgetExceeded
         );
+    }
+
+    /// Embeds by text length and counts what it is asked.
+    struct Counting(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+    impl ModelProvider for Counting {
+        fn provider_name(&self) -> &str {
+            "counting"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities {
+                structured_output: true,
+                uses_network: true,
+            }
+        }
+        fn infer(&mut self, _request: &AiRequest) -> Result<String, AiError> {
+            Ok("\"x\"".into())
+        }
+        fn embed(&mut self, request: &AiRequest) -> Result<Vec<f64>, AiError> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Ok(vec![request.input_text().len() as f64, 1.0])
+        }
+    }
+
+    #[test]
+    fn embedding_cache_saves_calls_across_runs() {
+        let dir = std::env::temp_dir().join(format!("elomar-cache-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("vectors.json");
+        let _ = std::fs::remove_file(&file);
+        let req = |text: &str, model: &str| AiRequest {
+            model: model.into(),
+            instructions: String::new(),
+            input: serde_json::Value::String(text.into()),
+            schema: Schema::List(Box::new(Schema::Float)),
+            timeout_ms: 1_000,
+        };
+        let asked = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let n = |a: &std::sync::atomic::AtomicUsize| a.load(std::sync::atomic::Ordering::Relaxed);
+        let runtime = |identity: &str| {
+            let mut cache = EmbeddingCache::open(file.clone());
+            cache.add_model("vec", identity.to_string());
+            let mut rt = AiRuntime::new(AiPolicy::default()).with_embedding_cache(cache);
+            rt.register("vec", Box::new(Counting(asked.clone())));
+            rt
+        };
+        let mut rt = runtime("openai m1");
+        assert_eq!(rt.embed(&req("cat", "vec")).unwrap(), vec![3.0, 1.0]);
+        assert_eq!(rt.embed(&req("cat", "vec")).unwrap(), vec![3.0, 1.0]);
+        let all = rt.embed_all(&[req("cat", "vec"), req("kitten", "vec"), req("x", "nope")]);
+        assert_eq!(all[1].as_ref().unwrap(), &vec![6.0, 1.0]);
+        assert_eq!(
+            all[2].as_ref().unwrap_err().kind,
+            AiErrorKind::ProviderUnavailable
+        );
+        assert_eq!((n(&asked), rt.calls()), (2, 2));
+        // The next run reads the file.
+        let mut rt = runtime("openai m1");
+        rt.embed_all(&[req("kitten", "vec"), req("cat", "vec")]);
+        assert_eq!((n(&asked), rt.calls()), (2, 0));
+        // Another model id under the same name starts afresh.
+        let mut rt = runtime("openai m2");
+        rt.embed(&req("cat", "vec")).unwrap();
+        assert_eq!(n(&asked), 3);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
