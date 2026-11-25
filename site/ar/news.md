@@ -7,6 +7,17 @@ other: en/news.html
 
 # الجديد
 
+## 1.10: نموذج مجاني على جهازك
+
+- **نماذج على جهازك دون مفتاح**: وجّه نموذج `openai` إلى [Ollama](https://ollama.com)
+  (`base_url = "http://localhost:11434/v1"`)، فتعمل `ai.infer` و`ai.stream` و`ai.embed` و`ai.search` على جهازك أنت، دون
+  مفتاح ودون كلفة لكل استدعاء. والبرنامج نفسه يعمل مع OpenAI أو Claude بتغيير `elomar.toml` وحده.
+- **ذاكرة التضمينات**: `[ai.cache] embeddings = "embeddings.cache.json"` تحفظ المتجهات بين التشغيلات، فلا يُرسل شيء عند
+  البحث في الملاحظات نفسها مرة أخرى. على جهاز الاختبار استغرق التشغيل الثاني 70 جزءًا من الألف من الثانية بدل 3.4 ثانية.
+
+ويعرض [درس الذكاء الاصطناعي](09-ai.html) الميزتين، والمثال
+[`examples/ai-local`](https://github.com/abobasel86/elomar-lang/tree/main/examples/ai-local) جاهز للتشغيل.
+
 ## 1.9: كل دالة قيمة، والبحث بالمعنى
 
 - **الدوال المدمجة صارت قيمًا**: `xs.map(to_string)` و`xs.fold(0, max)` و`["1", "x"].map(parse_int)` و`let say = print`.
@@ -100,7 +111,8 @@ other: en/news.html
 
 | الإصدار | ما جاء به |
 |---|---|
-| **1.9** | الدوال المدمجة كقيم؛ `ai.search` |
+| **1.10** | نماذج محلية (Ollama) دون مفتاح؛ ذاكرة للتضمينات |
+| 1.9 | الدوال المدمجة كقيم؛ `ai.search` |
 | 1.8 | الدوال ذات القيود كقيم؛ `ai.embed` دفعة واحدة؛ HTTPS خلف برامج الحماية والخوادم الوسيطة |
 | 1.7 | `ai.stream` و`ai.embed` و`ai.similarity`؛ `impl<T: A>`؛ دوال للقواميس والمجموعات؛ المواصفة بالإنجليزية |
 | 1.6 | `par_flat_map` و`par_group_by` و`par_sum_by` و`par_min_by` و`par_max_by`؛ حقول وسجلات أسرع؛ صفحتا [المرجع](12-reference.html) و[السرعة](11-speed.html) |

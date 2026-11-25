@@ -48,7 +48,7 @@ The model's answer is checked against `Ticket` before your code sees it, a
 failure is a value you must handle, and `"mock"` runs offline; switch to
 OpenAI or Claude in `elomar.toml` without changing the code.
 
-> **Project status: v1.9.0, stable.** Programs written for 1.0 keep working in
+> **Project status: v1.10.0, stable.** Programs written for 1.0 keep working in
 > every 1.x version: see [`docs/stability.md`](docs/stability.md).
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
@@ -363,6 +363,7 @@ cargo run --profile fuzzing -p elomar-fuzz -- --seconds 60
 17. ✅ v1.7: `ai.stream` and `ai.embed`; `impl<T: A>`; `filter`, `map` and friends on maps and sets; the specification in English.
 18. ✅ v1.8: functions with trait bounds as values; `await all` embeds many texts in one request; HTTPS behind antivirus programs and proxies.
 19. ✅ v1.9: built-in functions as values, so every function is a value; `ai.search` ranks texts by meaning.
+20. ✅ v1.10: models on your own computer (Ollama) with no key; an embedding cache.
 
 ## Editors
 

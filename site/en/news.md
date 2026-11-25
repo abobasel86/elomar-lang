@@ -7,6 +7,21 @@ other: ar/news.html
 
 # What's new
 
+## 1.10: a free model on your computer
+
+- **Models on your computer, no key**: point an `openai` model at
+  [Ollama](https://ollama.com) (`base_url = "http://localhost:11434/v1"`)
+  and `ai.infer`, `ai.stream`, `ai.embed` and `ai.search` run on your own
+  machine, with no key and no cost per call. The same program runs on
+  OpenAI or Claude by changing `elomar.toml` alone.
+- **Embedding cache**: `[ai.cache] embeddings = "embeddings.cache.json"`
+  keeps vectors between runs, so searching the same notes again sends
+  nothing. On a test machine the second run took 70 ms instead of 3.4 s.
+
+[The AI lesson](09-ai.html) shows both, and
+[`examples/ai-local`](https://github.com/abobasel86/elomar-lang/tree/main/examples/ai-local)
+is ready to run.
+
 ## 1.9: every function is a value, and search by meaning
 
 - **Built-in functions are values**: `xs.map(to_string)`,
@@ -132,7 +147,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.9** | Built-in functions as values; `ai.search` |
+| **1.10** | Local models (Ollama) without a key; an embedding cache |
+| 1.9 | Built-in functions as values; `ai.search` |
 | 1.8 | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |
 | 1.7 | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
 | 1.6 | `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by`, `par_max_by`; faster fields and records; the [reference](12-reference.html) and [speed](11-speed.html) pages |
