@@ -128,7 +128,7 @@ impl AnthropicProvider {
             port,
             key_env,
             key,
-            agent: ureq::AgentBuilder::new().redirects(0).build(),
+            agent: elomar_tls::agent_builder().redirects(0).build(),
             assistant_turns: HashMap::new(),
         })
     }
@@ -457,8 +457,26 @@ fn status_error(code: u16, body: &str) -> AiError {
         408 | 504 => AiErrorKind::Timeout,
         _ => AiErrorKind::ProviderUnavailable,
     };
-    AiError::new(kind, format!("Anthropic returned HTTP {code}: {message}"))
+    let error_type = detail
+        .as_ref()
+        .and_then(|d| d["error"]["type"].as_str())
+        .unwrap_or_default();
+    let hint = if (code == 404 && error_type == "not_found_error" && message.starts_with("model:"))
+        || (code == 400 && message.to_lowercase().contains("model id"))
+    {
+        MODEL_HINT
+    } else {
+        ""
+    };
+    AiError::new(
+        kind,
+        format!("Anthropic returned HTTP {code}: {message}{hint}"),
+    )
 }
+
+/// Added to an error about the model id itself.
+pub const MODEL_HINT: &str =
+    " (check the vendor model id in `model = \"...\"` under `[ai.models]` in elomar.toml)";
 
 fn transport_error(e: &(dyn std::error::Error + 'static), timeout_ms: u64) -> AiError {
     let mut source: Option<&(dyn std::error::Error + 'static)> = Some(e);

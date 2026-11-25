@@ -173,6 +173,37 @@ fn maps_errors() {
 }
 
 #[test]
+fn points_at_the_model_id() {
+    let cases = [
+        (
+            400,
+            r#"{"error": {"message": "invalid model ID", "code": null}}"#,
+        ),
+        (
+            404,
+            r#"{"error": {"message": "The model `x` does not exist", "code": "model_not_found"}}"#,
+        ),
+    ];
+    for (status, body) in cases {
+        let (url, _rx) = fake_openai(status, body.to_string(), Duration::ZERO);
+        let e = provider(&url, Some("k"))
+            .infer(&request(ticket(), 5_000))
+            .unwrap_err();
+        assert_eq!(e.kind, AiErrorKind::UnsupportedCapability, "{}", e.message);
+        assert!(e.message.ends_with(MODEL_HINT), "{}", e.message);
+    }
+    let (url, _rx) = fake_openai(
+        400,
+        r#"{"error": {"message": "bad schema"}}"#.to_string(),
+        Duration::ZERO,
+    );
+    let e = provider(&url, Some("k"))
+        .infer(&request(ticket(), 5_000))
+        .unwrap_err();
+    assert!(!e.message.contains("elomar.toml"), "{}", e.message);
+}
+
+#[test]
 fn refusals_and_truncation() {
     let refusal = json!({
         "choices": [{ "message": { "content": null, "refusal": "I can't help with that." }, "finish_reason": "stop" }]

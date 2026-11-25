@@ -73,7 +73,7 @@ pub(crate) fn call(permissions: &Permissions, func: &str, args: &[Value]) -> Val
         Ok(u) => u,
         Err(e) => return e,
     };
-    let agent = ureq::AgentBuilder::new()
+    let agent = elomar_tls::agent_builder()
         .redirects(0)
         .timeout(TIMEOUT)
         .user_agent(concat!("elomar-lang/", env!("CARGO_PKG_VERSION")))

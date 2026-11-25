@@ -12,7 +12,7 @@ repository.workspace = true
 # SQLite (`std.db`), HTTP requests (`std.http`) and secure random numbers.
 # Turn off for targets without them, such as the browser playground.
 default = ["native"]
-native = ["dep:rusqlite", "dep:ureq", "dep:getrandom"]
+native = ["dep:rusqlite", "dep:ureq", "dep:elomar-tls", "dep:getrandom"]
 
 [dependencies]
 elomar-diagnostics.workspace = true
@@ -24,6 +24,7 @@ serde_json.workspace = true
 unicode-segmentation.workspace = true
 rusqlite = { workspace = true, optional = true }
 ureq = { workspace = true, optional = true }
+elomar-tls = { workspace = true, optional = true }
 url.workspace = true
 regex.workspace = true
 sha2.workspace = true

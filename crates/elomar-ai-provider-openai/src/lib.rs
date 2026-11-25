@@ -111,7 +111,7 @@ impl OpenAiProvider {
             port,
             key_env,
             key,
-            agent: ureq::AgentBuilder::new().redirects(0).build(),
+            agent: elomar_tls::agent_builder().redirects(0).build(),
         })
     }
 
@@ -484,10 +484,27 @@ fn status_error(code: u16, body: &str) -> AiError {
         429 => AiErrorKind::RateLimited,
         400 if api_code == "context_length_exceeded" => AiErrorKind::ContextLimitExceeded,
         400 | 422 => AiErrorKind::UnsupportedCapability,
+        404 if api_code == "model_not_found" => AiErrorKind::UnsupportedCapability,
         408 | 504 => AiErrorKind::Timeout,
         _ => AiErrorKind::ProviderUnavailable,
     };
-    AiError::new(kind, format!("OpenAI returned HTTP {code}: {message}"))
+    let hint = if matches!(code, 400 | 404) && about_the_model(&api_code, &message) {
+        MODEL_HINT
+    } else {
+        ""
+    };
+    AiError::new(
+        kind,
+        format!("OpenAI returned HTTP {code}: {message}{hint}"),
+    )
+}
+
+/// Added to an error about the model id itself.
+pub const MODEL_HINT: &str =
+    " (check the vendor model id in `model = \"...\"` under `[ai.models]` in elomar.toml)";
+
+fn about_the_model(api_code: &str, message: &str) -> bool {
+    api_code == "model_not_found" || message.to_lowercase().contains("model id")
 }
 
 fn transport_error(e: &(dyn std::error::Error + 'static), timeout_ms: u64) -> AiError {

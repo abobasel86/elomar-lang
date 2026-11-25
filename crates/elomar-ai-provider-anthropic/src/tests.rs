@@ -206,7 +206,15 @@ fn maps_errors() {
             .unwrap_err();
         assert_eq!(e.kind, kind, "HTTP {status}: {}", e.message);
         assert!(!e.message.contains("abcdef"), "key leaked: {}", e.message);
+        assert!(!e.message.contains("elomar.toml"), "{}", e.message);
     }
+    let body = err("not_found_error", "model: claude-nope");
+    let (url, _rx) = fake_one(404, body);
+    let e = provider(&url, "claude-nope", Some("k"))
+        .infer(&request(ticket(), 5_000))
+        .unwrap_err();
+    assert_eq!(e.kind, AiErrorKind::UnsupportedCapability);
+    assert!(e.message.ends_with(MODEL_HINT), "{}", e.message);
 }
 
 #[test]

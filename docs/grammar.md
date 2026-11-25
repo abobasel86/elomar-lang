@@ -375,7 +375,7 @@ network_hosts = ["api.openai.com"] # منع افتراضي: أي مضيف غير
 | استدعاء نموذج سحابي (أي مزود غير `mock`) يُحدث `net` إضافة إلى `ai`. إن لم يكن اسم النموذج نصًا حرفيًا يُفترض أنه سحابي متى وُجد نموذج سحابي في الإعداد | `E3001` / `E3002` وقت الترجمة |
 | المضيف (أو `host:port`) غير موجود في `network_hosts` | `Err` بنوع `PolicyDenied` دون أي اتصال، ولا يُحتسب ضمن `max_calls_per_run` |
 | متغير البيئة غير معرّف أو فارغ | `Authentication` دون أي اتصال |
-| HTTP 401/403 → `Authentication` · 429 → `RateLimited` (أو `BudgetExceeded` عند نفاد الرصيد) · 400 لطول السياق → `ContextLimitExceeded` · 400/422 أخرى → `UnsupportedCapability` · 5xx و404 → `ProviderUnavailable` · انقضاء المهلة → `Timeout` · فشل الاتصال → `Network` · رفض النموذج → `PolicyDenied` · قطع الإجابة → `ContextLimitExceeded` | قيمة `Err` |
+| HTTP 401/403 → `Authentication` · 429 → `RateLimited` (أو `BudgetExceeded` عند نفاد الرصيد) · 400 لطول السياق → `ContextLimitExceeded` · 400/422 أخرى و404 لنموذج غير موجود → `UnsupportedCapability` (والخطأ المتعلق بمعرّف النموذج ينتهي بتلميح لمراجعة `model` في elomar.toml) · 5xx و404 أخرى → `ProviderUnavailable` · انقضاء المهلة → `Timeout` · فشل الاتصال → `Network` · رفض النموذج → `PolicyDenied` · قطع الإجابة → `ContextLimitExceeded` | قيمة `Err` |
 | `base_url` بـ `http` لمضيف غير محلي، أو نموذج بلا `model` | خطأ إعداد قبل التشغيل (رمز خروج 2) |
 
 **تفاصيل التنفيذ:** واجهة Chat Completions مع Structured Outputs بوضع `strict`؛ الأنواع غير السجلية تُغلَّف بـ `{ "value": ... }`
@@ -650,6 +650,8 @@ fn main() {
 - كل استدعاء هو تأثير `net`، والمضيف يجب أن يكون في `[permissions] network_hosts` (`host` أو `host:port`، بلا أحرف بدل) وإلا `HttpError.PolicyDenied`.
 - `https` إلزامي إلا لـ `localhost` و`127.0.0.1`؛ والعنوان غير الصالح `InvalidUrl`.
 - لا تُتبع إعادة التوجيه (3xx) لأنها قد تقود إلى مضيف غير مسموح؛ يحصل البرنامج على الاستجابة نفسها.
+- اتصالات HTTPS (هنا وفي مزودي الذكاء الاصطناعي) تثق بالشهادة إن انتهت سلسلتها إلى الجذور المضمّنة في Elomar أو إلى جذور النظام نفسه
+  (منذ 1.8)، فتعمل خلف برامج الحماية وخوادم الشركات الوسيطة التي تفحص HTTPS بجذر خاص بها.
 - حالة الخطأ مثل 404 أو 500 **ليست** `Err`: هي استجابة بـ `status` الخاص بها. `Err` لفشل الاتصال فقط: `Timeout` (30 ثانية) و`Network` و`TooLarge` (أكبر من 10 MB أو ليست نصًا).
 - لتحويل الجسم إلى نوع: `json.parse<Todo>(resp.body)`.
 

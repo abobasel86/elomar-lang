@@ -11,6 +11,7 @@ members = [
     "crates/elomar-fmt",
     "crates/elomar-types",
     "crates/elomar-policy",
+    "crates/elomar-tls",
     "crates/elomar-ai-core",
     "crates/elomar-ai-provider-mock",
     "crates/elomar-ai-provider-openai",
@@ -42,6 +43,7 @@ elomar-types = { path = "crates/elomar-types" }
 elomar-policy = { path = "crates/elomar-policy" }
 # Without its default `native` feature; crates that need SQLite and HTTP turn it on.
 elomar-interpreter = { path = "crates/elomar-interpreter", default-features = false }
+elomar-tls = { path = "crates/elomar-tls" }
 elomar-ai-core = { path = "crates/elomar-ai-core" }
 elomar-ai-provider-mock = { path = "crates/elomar-ai-provider-mock" }
 elomar-ai-provider-openai = { path = "crates/elomar-ai-provider-openai" }

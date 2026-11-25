@@ -18,6 +18,16 @@ change the language.
   request instead of one request per text. Results keep their order, and
   each call keeps its own checks and `Result`.
 
+### Fixed
+
+- **HTTPS behind antivirus programs and proxies**: `std.http` and the
+  OpenAI and Anthropic providers now trust the system's certificates as
+  well as the bundled ones. Before, a program that inspects HTTPS (such as
+  Kaspersky, or a company proxy) made calls fail with `UnknownIssuer`.
+- **Unknown model ids**: OpenAI's 404 `model_not_found` is now
+  `UnsupportedCapability` instead of `ProviderUnavailable`, and an error
+  about the model id ends with a hint to check `model` in `elomar.toml`.
+
 ## [1.7.0] - 2026-11-24
 
 ### Added

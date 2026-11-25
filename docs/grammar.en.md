@@ -377,7 +377,7 @@ network_hosts = ["api.openai.com"] # denied by default: any host not listed is r
 | Calling a cloud model (any provider other than `mock`) produces `net` in addition to `ai`. If the model name is not a string literal, it is assumed to be a cloud model whenever a cloud model exists in the configuration | `E3001` / `E3002` at compile time |
 | The host (or `host:port`) is not in `network_hosts` | `Err` of kind `PolicyDenied` without any connection. It does not count toward `max_calls_per_run` |
 | The environment variable is not defined or is empty | `Authentication` without any connection |
-| HTTP 401/403 → `Authentication` · 429 → `RateLimited` (or `BudgetExceeded` when the credit runs out) · 400 for context length → `ContextLimitExceeded` · other 400/422 → `UnsupportedCapability` · 5xx and 404 → `ProviderUnavailable` · timeout → `Timeout` · connection failure → `Network` · model refusal → `PolicyDenied` · truncated answer → `ContextLimitExceeded` | An `Err` value |
+| HTTP 401/403 → `Authentication` · 429 → `RateLimited` (or `BudgetExceeded` when the credit runs out) · 400 for context length → `ContextLimitExceeded` · other 400/422 and 404 for an unknown model → `UnsupportedCapability` (an error about the model id ends with a hint to check `model` in elomar.toml) · 5xx and other 404 → `ProviderUnavailable` · timeout → `Timeout` · connection failure → `Network` · model refusal → `PolicyDenied` · truncated answer → `ContextLimitExceeded` | An `Err` value |
 | `base_url` with `http` for a non-local host, or a model without `model` | Configuration error before the run (exit code 2) |
 
 **Implementation details:** the Chat Completions API with Structured Outputs in `strict` mode. Non-record types are wrapped in `{ "value": ... }`
@@ -654,6 +654,7 @@ fn main() {
 - Every call is a `net` effect, and the host must be in `[permissions] network_hosts` (`host` or `host:port`, no wildcards). Otherwise `HttpError.PolicyDenied`.
 - `https` is required except for `localhost` and `127.0.0.1`. An invalid address is `InvalidUrl`.
 - Redirects (3xx) are not followed, because they may lead to a host that is not allowed. The program gets that response itself.
+- HTTPS (here and in the AI providers) trusts a certificate that chains to the roots bundled with Elomar or to the system's own (since 1.8), so it works behind antivirus programs and company proxies that inspect HTTPS with a root of their own.
 - An error status such as 404 or 500 is **not** an `Err`: it is a response with its own `status`. `Err` is only for connection failures: `Timeout` (30 seconds), `Network` and `TooLarge` (larger than 10 MB, or not text).
 - To convert the body to a type: `json.parse<Todo>(resp.body)`.
 

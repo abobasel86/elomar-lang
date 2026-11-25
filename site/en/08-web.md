@@ -103,4 +103,6 @@ fn main() {
 ```
 
 Hosts must be allowed first: `network_hosts = ["example.com"]` under
-`[permissions]`.
+`[permissions]`. HTTPS trusts the certificates bundled with Elomar and the
+ones your system trusts, so it works behind antivirus programs and company
+proxies that inspect secure connections.

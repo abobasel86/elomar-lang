@@ -1,0 +1,15 @@
+[package]
+name = "elomar-tls"
+description = "HTTPS settings shared by Elomar-Lang's network code: the bundled roots plus the system's own certificates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ureq.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rustls-native-certs = "0.8"
+webpki-roots = "0.26"
