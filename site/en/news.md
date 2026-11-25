@@ -7,6 +7,25 @@ other: ar/news.html
 
 # What's new
 
+## 1.8: bounded functions as values, and embedding in batches
+
+- **Functions with trait bounds are values**: `[1, 2].map(show)`,
+  `let f = show` and `apply(show, 3)` work when `show` is
+  `fn show<T: Describe>`.
+- **`await all` embeds together**: the `ai.embed` calls in one `all` go to
+  each model at once, and an OpenAI model embeds up to 256 texts in one
+  request.
+- **HTTPS behind antivirus programs and proxies**: `std.http` and the AI
+  providers trust your system's certificates too, so calls work where a
+  program such as Kaspersky inspects secure connections.
+- **Clearer model errors**: if the vendor rejects a model id, the error
+  says to check `model` in `elomar.toml`.
+- Streaming and embeddings were checked against the real OpenAI and Claude
+  services.
+
+[The AI lesson](09-ai.html) shows batching and how each user sets their
+own key.
+
 ## 1.7: streaming, meaning, and generic traits
 
 - **`ai.stream`** shows an answer while the model writes it: your function
@@ -97,7 +116,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.7** | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
+| **1.8** | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |
+| 1.7 | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
 | 1.6 | `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by`, `par_max_by`; faster fields and records; the [reference](12-reference.html) and [speed](11-speed.html) pages |
 | 1.5 | `par_any`, `par_all`, `par_find`, `par_count`, `par_sort_by`; appending in place; fast indexing into text |
 | 1.4 | `par_filter` and `par_fold` |
