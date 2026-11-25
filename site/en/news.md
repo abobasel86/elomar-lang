@@ -7,6 +7,16 @@ other: ar/news.html
 
 # What's new
 
+## 1.12.1: ARM, and two fixes
+
+- **Linux and Windows on ARM**: ready-made builds for Raspberry Pi, ARM
+  servers and Windows on ARM laptops. The one-line installers pick them.
+- A module may again be named like a standard module (`src/csv.elo` with
+  `use app.csv`, or a package's `csvkit.csv`); only a file that imports both
+  `std.csv` and `app.csv` is an error.
+- The installers and `elomar upgrade` no longer fail with HTTP 403 on
+  shared networks.
+
 ## 1.12: install in one line, upgrade in one word
 
 - **Install with one line.** On Windows (PowerShell):
@@ -176,7 +186,7 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.12** | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project |
+| **1.12** | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project; ARM builds (1.12.1) |
 | 1.11 | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |
 | 1.10 | Local models (Ollama) without a key; an embedding cache |
 | 1.9 | Built-in functions as values; `ai.search` |

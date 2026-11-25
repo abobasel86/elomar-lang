@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.12.1
+
+Works with Elomar-Lang 1.12.1 (ARM builds for Linux and Windows).
+
 ## 1.12.0
 
 Works with Elomar-Lang 1.12.0 (`elomar upgrade`, a wider `elomar doctor`).
