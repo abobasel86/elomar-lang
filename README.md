@@ -211,7 +211,24 @@ which runs Elomar-Lang in your browser.
 
 ## Getting started
 
-Download `elomar` for your system from the
+Install with one line. On Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex
+```
+
+On Linux or macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh
+```
+
+The installer checks the download against the release's `SHA256SUMS.txt`,
+puts `elomar` in `~/.elomar/bin` and adds it to your `PATH`; `elomar upgrade`
+moves to a newer release later. Contributions are welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+Or download `elomar` for your system from the
 [latest release](https://github.com/abobasel86/elomar-lang/releases/latest):
 
 | System | File |
@@ -268,7 +285,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `elomar check --format json [--stdin] FILE` | Diagnostics as JSON for editors (`main` not required) |
 | `elomar new NAME` | Create a project with a program, a module and a passing test |
 | `elomar new NAME --ai PROVIDER` | The same, calling a model, with `elomar.toml` set for `mock`, `ollama`, `openai` or `anthropic` |
-| `elomar doctor` | Check the project's AI setup: the configuration, each model's key, network permission, its server and its model id |
+| `elomar doctor` | Check the project's setup: the configuration, each model's key, network permission, server and model id, and Python, MCP servers, packages and folders |
+| `elomar upgrade [--check] [--force]` | Move to the newest release with the official installer |
 | `elomar test [PATH] [--filter TEXT]` | Run the `test_*` functions in `tests/` |
 | `elomar fmt [PATHS] [--check] [--stdin]` | Format `.elo` files (comments kept; never changes meaning) |
 | `elomar add NAME[@VERSION]` | Add a package from the registry |

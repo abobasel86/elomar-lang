@@ -1,0 +1,54 @@
+name: Bug report / الإبلاغ عن خطأ
+description: Something does not work as it should / شيء لا يعمل كما ينبغي
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! Security problems go privately: see SECURITY.md.
+        شكرًا لك! الثغرات الأمنية تُبلَّغ سرًا: انظر SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version / الإصدار
+      description: The output of `elomar --version` / ناتج `elomar --version`
+      placeholder: elomar 1.11.0 (Elomar-Lang spec 1.0.0)
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System / النظام
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Browser playground / ساحة التجربة في المتصفح
+    validations:
+      required: true
+  - type: textarea
+    id: program
+    attributes:
+      label: The smallest program that shows it / أصغر برنامج يُظهر المشكلة
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected / ما توقعته
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened (the full output) / ما حدث (الناتج كاملًا)
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: For AI problems, the output of `elomar doctor` / لمشكلات الذكاء الاصطناعي، ناتج `elomar doctor`
+      description: It never prints keys. Never paste an API key here. / لا يطبع أي مفتاح. لا تلصق مفتاحًا هنا أبدًا.
+      render: text

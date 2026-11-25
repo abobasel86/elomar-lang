@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Tutorial and reference / الدروس والمرجع
+    url: https://abobasel86.github.io/elomar-lang/
+    about: Lessons in English and Arabic, and every function and method / دروس بالعربية والإنجليزية، وكل دالة ووظيفة
+  - name: Security problem / مشكلة أمنية
+    url: https://github.com/abobasel86/elomar-lang/security
+    about: Report it privately, not in an issue / أبلغ عنها سرًا، لا في مسألة عامة

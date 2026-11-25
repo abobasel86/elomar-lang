@@ -9,6 +9,23 @@ slug: 01-start
 
 ## التثبيت
 
+على **Windows** الصق هذا السطر في PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex
+```
+
+وعلى **Linux** أو **macOS** الصقه في الطرفية:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh
+```
+
+ينزّل المثبّت آخر إصدار لنظامك، ويتحقق منه ببصمات الإصدار، ويضع `elomar` في مجلد خاص به (`.elomar/bin` في مجلدك الرئيسي)
+ويضيف هذا المجلد إلى `PATH`. افتح نافذة طرفية جديدة بعده. ولاحقًا ينقلك `elomar upgrade` إلى أحدث إصدار.
+
+أو ثبّته يدويًا:
+
 1. افتح [صفحة آخر إصدار](https://github.com/abobasel86/elomar-lang/releases/latest)
    ونزّل الملف المناسب لنظامك:
 
@@ -117,5 +134,6 @@ elomar --lang ar run hello.elo
 | `elomar fmt file.elo` | تنسيق الكود بالأسلوب الموحد |
 | `elomar new myapp` | إنشاء مشروع مع اختبارات |
 | `elomar new myapp --ai ollama` | إنشاء مشروع يستدعي نموذجًا (`mock` أو `ollama` أو `openai` أو `anthropic`) |
-| `elomar doctor` | فحص إعداد الذكاء الاصطناعي في المشروع: المفاتيح والصلاحيات والخوادم ومعرّفات النماذج |
+| `elomar doctor` | فحص إعداد المشروع: مفاتيح الذكاء الاصطناعي ونماذجه، والصلاحيات، وPython، وخوادم MCP، والحزم |
+| `elomar upgrade` | الانتقال إلى أحدث إصدار |
 | `elomar test` | تشغيل اختبارات المشروع |

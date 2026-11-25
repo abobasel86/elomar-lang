@@ -1,0 +1,21 @@
+name: Feature or idea / ميزة أو فكرة
+description: Something the language, its tools or its lessons could do / شيء يمكن أن تقدمه اللغة أو أدواتها أو دروسها
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do? / ماذا تحاول أن تفعل؟
+      description: The task or problem, before any solution. / المهمة أو المشكلة، قبل أي حل.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help / ما الذي سيساعد
+      description: For a language feature, a short example of the code you would like to write. / لميزة في اللغة، مثال قصير على الكود الذي تود كتابته.
+      render: text
+  - type: textarea
+    id: today
+    attributes:
+      label: How you do it today / كيف تفعل ذلك الآن

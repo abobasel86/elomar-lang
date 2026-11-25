@@ -88,3 +88,30 @@ jobs:
         with:
           name: fuzz-crashes
           path: target/fuzz-results/
+
+  installers:
+    name: Installer (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      # The scripts in this commit install the latest release, then run it.
+      - name: install.sh
+        if: runner.os != 'Windows'
+        run: |
+          sh install.sh
+          "$HOME/.elomar/bin/elomar" --version
+          "$HOME/.elomar/bin/elomar" new hello --ai mock
+          cd hello && "$HOME/.elomar/bin/elomar" run src/main.elo
+      - name: install.ps1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Content install.ps1 -Raw | Invoke-Expression
+          elomar --version
+          elomar new hello --ai mock
+          Set-Location hello
+          elomar run src/main.elo

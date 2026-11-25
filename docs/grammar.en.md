@@ -1024,7 +1024,11 @@ fn test_greets_by_name() {
 - `elomar doctor` (since 1.11) checks the project's AI setup and says what to fix: `elomar.toml` is valid; for each model, the key's
   environment variable is set (not needed for a server on `localhost`), its host is in `network_hosts`, its server answers, and the
   model id is among those listed by `GET .../models` (which costs nothing). Keys are never printed, and only allowed hosts are asked.
-  The exit code is 1 if there is a problem.
+  The exit code is 1 if there is a problem. Since 1.12 it also checks packages (downloaded and locked), Python (when `python = true`),
+  the commands of MCP servers and of `[permissions] commands`, and the folders of `filesystem_read` and `filesystem_write`.
+- `elomar upgrade` (since 1.12) asks GitHub for the latest release and, when it is newer, runs the official installer (`install.ps1` or
+  `install.sh`, which checks the download against `SHA256SUMS.txt`) into the folder of the running `elomar`. `--check` only says whether a
+  newer version exists; `--force` reinstalls. An `elomar` installed with `cargo install` is told to upgrade the same way.
 - `elomar build FILE [-o OUT]` checks the program, then writes a single executable file: a copy of `elomar` itself with the program files at its end
   (the main file, its modules and the modules of its packages) and `elomar.toml`. When run, it runs the program directly, all arguments reach `os.args()`,
   and it does not need Elomar-Lang to be installed. A program with errors is not built (exit code 1). The file is only for the system it was built on.

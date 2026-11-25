@@ -163,7 +163,8 @@ permission in `elomar.toml` ([lesson 7](07-data.html)).
 | `elomar test` | Run a project's tests |
 | `elomar new name` | Create a project |
 | `elomar new name --ai PROVIDER` | Create a project that calls a model: `mock`, `ollama`, `openai` or `anthropic` |
-| `elomar doctor` | Check the AI setup: keys, permissions, servers, model ids |
+| `elomar doctor` | Check the setup: AI keys, permissions, servers and model ids; Python, MCP servers, packages, folders |
+| `elomar upgrade [--check]` | Move to the newest release (or only say whether there is one) |
 | `elomar build file.elo` | Make an executable |
 | `elomar add` · `elomar remove` · `elomar update` · `elomar search` · `elomar publish` | Packages ([lesson 6](06-projects.html)) |
 | `elomar lsp` · `elomar dap` | The language server and the debugger, for editors |

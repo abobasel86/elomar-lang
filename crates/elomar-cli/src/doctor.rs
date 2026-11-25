@@ -2,8 +2,12 @@
 //! what to fix: the configuration, each model's key, network permission,
 //! whether its server answers, and whether the model id exists there.
 //!
+//! It also checks the rest of the project: packages, Python, MCP servers,
+//! the programs `process.run` may start, and the folders `std.fs` may use.
+//!
 //! The only requests it makes are `GET .../models`, which cost nothing,
 //! and only to hosts the project already allows. Keys are never printed.
+//! Nothing is started except `python --version` when Python is enabled.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -122,6 +126,7 @@ pub(crate) fn run(reporter: &Reporter) -> ExitCode {
             );
         }
     }
+    check_project(&mut report, &config, &root);
     finish(&report)
 }
 
@@ -364,4 +369,150 @@ fn check_model(report: &mut Report, config: &ProjectConfig, name: &str, model: &
         )
     };
     report.line(if local { Level::Fail } else { Level::Warn }, &en, &ar);
+}
+
+/// Packages, Python, MCP servers, programs and folders.
+fn check_project(report: &mut Report, config: &ProjectConfig, root: &Path) {
+    match elomar_pkg::dependencies(root) {
+        Ok(deps) if deps.is_empty() => {}
+        Ok(deps) => match elomar_pkg::resolve(root, elomar_pkg::Mode::Offline) {
+            Ok(_) => report.line(
+                Level::Ok,
+                &format!("{} package(s) downloaded and locked", deps.len()),
+                &format!("{} حزمة منزّلة ومثبّتة في elomar.lock", deps.len()),
+            ),
+            Err(e) => report.line(
+                Level::Fail,
+                &format!("packages: {e}; run `elomar update` (online)"),
+                &format!("الحزم: {e}؛ شغّل `elomar update` (مع الإنترنت)"),
+            ),
+        },
+        Err(e) => report.line(
+            Level::Fail,
+            &format!("packages: {e}"),
+            &format!("الحزم: {e}"),
+        ),
+    }
+
+    if config.permissions.python {
+        let python = std::env::var("ELOMAR_PYTHON")
+            .ok()
+            .filter(|p| !p.trim().is_empty())
+            .unwrap_or_else(|| if cfg!(windows) { "python" } else { "python3" }.to_string());
+        let version = std::process::Command::new(&python)
+            .arg("--version")
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| {
+                let text = if o.stdout.is_empty() {
+                    o.stderr
+                } else {
+                    o.stdout
+                };
+                String::from_utf8_lossy(&text).trim().to_string()
+            });
+        match version {
+            Some(v) => report.line(
+                Level::Ok,
+                &format!("python = true: `{python}` is {v}"),
+                &format!("python = true: `{python}` هو {v}"),
+            ),
+            None => report.line(
+                Level::Fail,
+                &format!("python = true, but `{python}` does not run; install Python or set ELOMAR_PYTHON to its path"),
+                &format!("python = true، لكن `{python}` لا يعمل؛ ثبّت Python أو اضبط ELOMAR_PYTHON على مساره"),
+            ),
+        }
+    }
+
+    for (name, server) in &config.mcp.servers {
+        match find_program(&server.command, root) {
+            Some(path) => report.line(
+                Level::Ok,
+                &format!(
+                    "MCP server `{name}`: `{}` found ({})",
+                    server.command,
+                    path.display()
+                ),
+                &format!(
+                    "خادم MCP `{name}`: `{}` موجود ({})",
+                    server.command,
+                    path.display()
+                ),
+            ),
+            None => report.line(
+                Level::Fail,
+                &format!(
+                    "MCP server `{name}`: `{}` is not installed or not on PATH",
+                    server.command
+                ),
+                &format!(
+                    "خادم MCP `{name}`: `{}` غير مثبّت أو ليس في PATH",
+                    server.command
+                ),
+            ),
+        }
+    }
+
+    for command in &config.permissions.commands {
+        if find_program(command, root).is_none() {
+            report.line(
+                Level::Warn,
+                &format!("commands: `{command}` is allowed but not found on PATH"),
+                &format!("commands: `{command}` مسموح لكنه غير موجود في PATH"),
+            );
+        }
+    }
+
+    for folder in &config.permissions.filesystem_read {
+        if !root.join(folder).exists() {
+            report.line(
+                Level::Warn,
+                &format!("filesystem_read: `{folder}` does not exist (yet)"),
+                &format!("filesystem_read: `{folder}` غير موجود (بعد)"),
+            );
+        }
+    }
+    for folder in &config.permissions.filesystem_write {
+        let path = root.join(folder);
+        let parent_ok = path.exists() || path.parent().is_some_and(Path::is_dir);
+        if !parent_ok {
+            report.line(
+                Level::Warn,
+                &format!("filesystem_write: neither `{folder}` nor its folder exists"),
+                &format!("filesystem_write: لا `{folder}` ولا مجلده موجود"),
+            );
+        }
+    }
+}
+
+/// Where `program` is: a path (relative to the project), or a name looked
+/// up in PATH (with the Windows extensions).
+fn find_program(program: &str, root: &Path) -> Option<std::path::PathBuf> {
+    let given = Path::new(program);
+    if given.components().count() > 1 || given.is_absolute() {
+        let path = root.join(given);
+        return path.is_file().then_some(path);
+    }
+    let extensions: Vec<String> = if cfg!(windows) {
+        std::env::var("PATHEXT")
+            .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into())
+            .split(';')
+            .map(str::to_ascii_lowercase)
+            .chain([String::new()])
+            .collect()
+    } else {
+        vec![String::new()]
+    };
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        for ext in &extensions {
+            let candidate = dir.join(format!("{program}{ext}"));
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
 }

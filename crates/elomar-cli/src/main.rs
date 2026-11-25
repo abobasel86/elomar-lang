@@ -92,8 +92,18 @@ enum Command {
         #[arg(long, value_name = "PROVIDER")]
         ai: Option<String>,
     },
-    /// Check the project's AI setup: keys, permissions, servers and model ids
+    /// Check the project's setup: AI keys, permissions, servers and model
+    /// ids, MCP servers, Python, packages and folders
     Doctor,
+    /// Move this `elomar` to the newest release
+    Upgrade {
+        /// Only say whether a newer version exists
+        #[arg(long)]
+        check: bool,
+        /// Install the latest release even if this one is as new
+        #[arg(long)]
+        force: bool,
+    },
     /// Type code and see the result at once (an interactive prompt)
     Repl,
     /// Run the language server (LSP) on standard input/output, for editors
@@ -264,6 +274,7 @@ fn main() -> ExitCode {
         Command::Lsp => return lsp::serve(lang),
         Command::Repl => return repl::run(&reporter),
         Command::Doctor => return doctor::run(&reporter),
+        Command::Upgrade { check, force } => return upgrade::run(*check, *force, &reporter),
         Command::Dap => return dap::serve(lang),
         Command::Add {
             name,
@@ -425,6 +436,7 @@ mod repl;
 mod scaffold;
 mod scaffold_ai;
 mod testing;
+mod upgrade;
 
 /// The project folder: where `elomar.toml` is, else the program's folder.
 /// Relative paths and modules (`src/`) are looked up from here.

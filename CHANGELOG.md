@@ -4,6 +4,21 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **One-line installers**: `install.ps1` (Windows) and `install.sh` (Linux,
+  macOS) download the latest release, check it against `SHA256SUMS.txt`,
+  put `elomar` in `~/.elomar/bin` and add it to `PATH`. CI runs them on
+  Linux, macOS and Windows.
+- **`elomar upgrade`** (`--check`, `--force`): moves to the newest release
+  with the official installer.
+- **`elomar doctor`** also checks packages, Python, the commands of MCP
+  servers and of `[permissions] commands`, and the permitted folders.
+- `CONTRIBUTING.md`, `SECURITY.md`, issue forms and a pull request
+  template, in English and Arabic.
+
 ## [1.11.0] - 2026-11-25
 
 ### Added

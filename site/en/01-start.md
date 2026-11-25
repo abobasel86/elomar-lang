@@ -9,6 +9,26 @@ slug: 01-start
 
 ## Install
 
+On **Windows**, paste this into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex
+```
+
+On **Linux** or **macOS**, paste this into a terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh
+```
+
+The installer downloads the latest release for your system, checks it
+against the release's checksums, puts `elomar` in a folder of its own
+(`.elomar/bin` in your home folder) and adds that folder to your `PATH`.
+Open a new terminal afterwards. Later, `elomar upgrade` moves you to the
+newest version.
+
+Or install by hand:
+
 1. Open the [latest release](https://github.com/abobasel86/elomar-lang/releases/latest)
    and download the file for your system:
 
@@ -123,5 +143,6 @@ so you can see why.
 | `elomar fmt file.elo` | Format the code in the standard style |
 | `elomar new myapp` | Create a project with tests |
 | `elomar new myapp --ai ollama` | Create a project that calls a model (`mock`, `ollama`, `openai` or `anthropic`) |
-| `elomar doctor` | Check a project's AI setup: keys, permissions, servers and model ids |
+| `elomar doctor` | Check a project's setup: AI keys and models, permissions, Python, MCP servers, packages |
+| `elomar upgrade` | Move to the newest version |
 | `elomar test` | Run a project's tests |

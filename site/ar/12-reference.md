@@ -161,7 +161,8 @@ slug: 12-reference
 | `elomar test` | يشغّل اختبارات المشروع |
 | `elomar new name` | ينشئ مشروعًا |
 | `elomar new name --ai PROVIDER` | ينشئ مشروعًا يستدعي نموذجًا: `mock` أو `ollama` أو `openai` أو `anthropic` |
-| `elomar doctor` | يفحص إعداد الذكاء الاصطناعي: المفاتيح والصلاحيات والخوادم ومعرّفات النماذج |
+| `elomar doctor` | يفحص الإعداد: مفاتيح الذكاء الاصطناعي والصلاحيات والخوادم ومعرّفات النماذج؛ وPython وخوادم MCP والحزم والمجلدات |
+| `elomar upgrade [--check]` | ينتقل إلى أحدث إصدار (أو يخبر فقط إن كان هناك أحدث) |
 | `elomar build file.elo` | يصنع ملفًا تنفيذيًا |
 | `elomar add` · `elomar remove` · `elomar update` · `elomar search` · `elomar publish` | الحزم ([الدرس 6](06-projects.html)) |
 | `elomar lsp` · `elomar dap` | خادم اللغة والمنقّح، للمحررات |
