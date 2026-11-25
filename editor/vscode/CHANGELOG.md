@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.9.0
+
+Works with Elomar-Lang 1.9.0 (built-in functions as values, `ai.search`).
+
 ## 1.8.0
 
 Works with Elomar-Lang 1.8.0 (functions with trait bounds as values, batched `ai.embed`).

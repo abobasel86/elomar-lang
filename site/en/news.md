@@ -7,6 +7,22 @@ other: ar/news.html
 
 # What's new
 
+## 1.9: every function is a value, and search by meaning
+
+- **Built-in functions are values**: `xs.map(to_string)`,
+  `xs.fold(0, max)`, `["1", "x"].map(parse_int)` and `let say = print`.
+  With 1.8's functions with bounds, every function in the language can now
+  be passed as a value, and the specification's "not implemented yet"
+  list is empty.
+- **`ai.search(model, query, texts)`** returns the texts closest in
+  meaning to a question, with their scores, in one call. The texts are
+  embedded together, so an OpenAI model needs one request for up to 256.
+- The fuzzer now also builds programs around traits and function values
+  and checks that both engines agree on them.
+
+[Lesson 4](04-collections.html) passes built-in functions, and
+[the AI lesson](09-ai.html) shows `ai.search`.
+
 ## 1.8: bounded functions as values, and embedding in batches
 
 - **Functions with trait bounds are values**: `[1, 2].map(show)`,
@@ -116,7 +132,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.8** | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |
+| **1.9** | Built-in functions as values; `ai.search` |
+| 1.8 | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |
 | 1.7 | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
 | 1.6 | `par_flat_map`, `par_group_by`, `par_sum_by`, `par_min_by`, `par_max_by`; faster fields and records; the [reference](12-reference.html) and [speed](11-speed.html) pages |
 | 1.5 | `par_any`, `par_all`, `par_find`, `par_count`, `par_sort_by`; appending in place; fast indexing into text |
