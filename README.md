@@ -16,6 +16,7 @@
   <a href="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/abobasel86/elomar-lang/actions/workflows/ci.yml/badge.svg"></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-0f6e63"></a>
   <a href="https://github.com/sponsors/abobasel86"><img alt="Sponsor" src="https://img.shields.io/github/sponsors/abobasel86?label=Sponsor&logo=GitHub&color=ea4aaa"></a>
+  <a href="https://x.com/ElomarLang"><img alt="Follow @ElomarLang on X" src="https://img.shields.io/badge/follow-%40ElomarLang-0f6e63?logo=x"></a>
 </p>
 
 <p align="center">
