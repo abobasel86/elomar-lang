@@ -19,10 +19,6 @@
         [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
     $repo = 'abobasel86/elomar-lang'
-    $target = 'x86_64-pc-windows-msvc'
-    if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-        Write-Host 'Note: there is no ARM64 build yet; the x64 build runs under emulation.'
-    }
 
     if ($env:ELOMAR_VERSION) {
         $tag = 'v' + $env:ELOMAR_VERSION.TrimStart('v')
@@ -47,21 +43,36 @@
         }
     }
     $version = $tag.TrimStart('v')
-    $name = "elomar-$version-$target"
     $base = "https://github.com/$repo/releases/download/$tag"
     $dir = if ($env:ELOMAR_INSTALL_DIR) { $env:ELOMAR_INSTALL_DIR } else { Join-Path $HOME '.elomar\bin' }
 
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('elomar-install-' + [guid]::NewGuid())
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
-        Write-Host "Downloading Elomar-Lang $version ..."
-        Invoke-WebRequest "$base/$name.zip" -OutFile (Join-Path $tmp "$name.zip") -UseBasicParsing
         Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile (Join-Path $tmp 'SHA256SUMS.txt') -UseBasicParsing
+        $sums = Get-Content (Join-Path $tmp 'SHA256SUMS.txt')
+        $lineFor = {
+            param($file)
+            $sums | Where-Object { ($_ -split '\s+')[-1].TrimStart('*') -eq $file } | Select-Object -First 1
+        }
 
-        $line = Get-Content (Join-Path $tmp 'SHA256SUMS.txt') |
-            Where-Object { ($_ -split '\s+')[-1].TrimStart('*') -eq "$name.zip" } |
-            Select-Object -First 1
+        # Windows on ARM gets the ARM64 build when the release has one (from
+        # 1.12.1); otherwise the x64 build, which runs under emulation.
+        $target = 'x86_64-pc-windows-msvc'
+        $arm = $env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64'
+        if ($arm) {
+            if (& $lineFor "elomar-$version-aarch64-pc-windows-msvc.zip") {
+                $target = 'aarch64-pc-windows-msvc'
+            } else {
+                Write-Host "Note: $version has no ARM64 build; the x64 build runs under emulation."
+            }
+        }
+        $name = "elomar-$version-$target"
+        $line = & $lineFor "$name.zip"
         if (-not $line) { throw "SHA256SUMS.txt has no line for $name.zip" }
+
+        Write-Host "Downloading Elomar-Lang $version ($target) ..."
+        Invoke-WebRequest "$base/$name.zip" -OutFile (Join-Path $tmp "$name.zip") -UseBasicParsing
         $expected = ($line -split '\s+')[0].ToLowerInvariant()
         # .NET directly: works in every PowerShell, whatever modules it can load.
         $stream = [IO.File]::OpenRead((Join-Path $tmp "$name.zip"))

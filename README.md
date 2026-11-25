@@ -234,7 +234,9 @@ Or download `elomar` for your system from the
 | System | File |
 |---|---|
 | Windows (x64) | `elomar-<version>-x86_64-pc-windows-msvc.zip` |
+| Windows (ARM) | `elomar-<version>-aarch64-pc-windows-msvc.zip` |
 | Linux (x64) | `elomar-<version>-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux (ARM, such as Raspberry Pi) | `elomar-<version>-aarch64-unknown-linux-gnu.tar.gz` |
 | macOS (Apple silicon) | `elomar-<version>-aarch64-apple-darwin.tar.gz` |
 | macOS (Intel) | `elomar-<version>-x86_64-apple-darwin.tar.gz` |
 

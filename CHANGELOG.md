@@ -6,6 +6,13 @@ change the language.
 
 ## [Unreleased]
 
+### Added
+
+- **ARM builds**: Linux on ARM (`aarch64-unknown-linux-gnu`, such as
+  Raspberry Pi and ARM servers) and Windows on ARM
+  (`aarch64-pc-windows-msvc`), built and tested on ARM machines. The
+  installers pick them on those systems.
+
 ### Fixed
 
 - A module of your project or of a package may again be named like a

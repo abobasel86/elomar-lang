@@ -35,7 +35,9 @@ Or install by hand:
    | System | File |
    |---|---|
    | Windows | `elomar-<version>-x86_64-pc-windows-msvc.zip` |
+   | Windows on ARM | `elomar-<version>-aarch64-pc-windows-msvc.zip` |
    | Linux | `elomar-<version>-x86_64-unknown-linux-gnu.tar.gz` |
+   | Linux on ARM (such as Raspberry Pi) | `elomar-<version>-aarch64-unknown-linux-gnu.tar.gz` |
    | macOS (Apple chips) | `elomar-<version>-aarch64-apple-darwin.tar.gz` |
    | macOS (Intel) | `elomar-<version>-x86_64-apple-darwin.tar.gz` |
 

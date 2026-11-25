@@ -1,4 +1,5 @@
-# Builds `elomar` for Windows, Linux and macOS and the VS Code extension.
+# Builds `elomar` for Windows, Linux and macOS (x64 and ARM) and the VS Code
+# extension.
 #
 # - Pushing a tag `vX.Y.Z` (matching `version` in Cargo.toml) builds
 #   everything and creates the GitHub release, with the notes of that
@@ -31,6 +32,13 @@ jobs:
           # An older Ubuntu, so the binary also runs on older glibc.
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            native: true
+          # ARM: Raspberry Pi and ARM servers; Windows on ARM laptops.
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            native: true
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
             native: true
           - os: macos-latest
             target: aarch64-apple-darwin
