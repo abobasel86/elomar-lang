@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.11.0
+
+Works with Elomar-Lang 1.11.0 (`elomar new --ai`, `elomar doctor`).
+
 ## 1.10.0
 
 Works with Elomar-Lang 1.10.0 (local models without a key, `[ai.cache]`).

@@ -7,6 +7,20 @@ other: ar/news.html
 
 # What's new
 
+## 1.11: from nothing to a working AI project
+
+- **`elomar new helpdesk --ai ollama`** (or `mock`, `openai`,
+  `anthropic`) creates a project that calls a model: `elomar.toml` set for
+  that provider, a module that classifies requests with `ai.infer`, a
+  search with `ai.search`, and tests that pass offline.
+- **`elomar doctor`** says what is missing before you run: a key that is
+  not set or that the provider rejects, a host that is not allowed, a
+  server that is not running, or a model id the provider does not have
+  (with similar ids, or the `ollama pull` to run). It asks only for the
+  list of models, which costs nothing, and never prints a key.
+- [The AI lesson](09-ai.html) has three exercises you solve in the
+  browser.
+
 ## 1.10: a free model on your computer
 
 - **Models on your computer, no key**: point an `openai` model at
@@ -147,7 +161,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.10** | Local models (Ollama) without a key; an embedding cache |
+| **1.11** | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |
+| 1.10 | Local models (Ollama) without a key; an embedding cache |
 | 1.9 | Built-in functions as values; `ai.search` |
 | 1.8 | Functions with trait bounds as values; `ai.embed` in batches; HTTPS behind antivirus programs and proxies |
 | 1.7 | `ai.stream`, `ai.embed`, `ai.similarity`; `impl<T: A>`; map and set methods; the specification in English |
