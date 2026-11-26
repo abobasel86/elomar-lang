@@ -695,6 +695,13 @@ impl Server {
         for f in elomar_types::BUILTIN_FUNCTIONS {
             add(f, 3, Some("built-in"));
         }
+        // Their Arabic names (`اطبع` is `print`, `نص` is `String`).
+        for &(ar, en) in elomar_ast::arabic::VALUE_NAMES {
+            add(ar, 3, Some(en));
+        }
+        for &(ar, en) in elomar_ast::arabic::TYPE_NAMES {
+            add(ar, 22, Some(en));
+        }
         if let Some(a) = &doc.analysis {
             for h in &a.info.hovers {
                 let (s, e) = (h.span.start as usize, h.span.end as usize);

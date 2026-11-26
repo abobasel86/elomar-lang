@@ -259,10 +259,10 @@ impl Value {
         }
     }
 
-    /// How the value appears inside a list or record: strings are quoted.
+    /// How the value appears inside a list or record: strings are quoted (see [`quoted`]).
     fn fmt_nested(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Str(s) => write!(f, "{s:?}"),
+            Value::Str(s) => f.write_str(&quoted(s)),
             other => write!(f, "{other}"),
         }
     }
@@ -399,6 +399,28 @@ impl fmt::Display for Value {
             }
         }
     }
+}
+
+/// `s` in double quotes, as a string appears inside a list, record or
+/// `Ok(...)`. Only `"`, `\` and control characters are escaped, so Arabic
+/// harakat (`عددًا`) and other combining marks are shown as written.
+pub(crate) fn quoted(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\0' => out.push_str("\\0"),
+            c if c.is_control() => out.push_str(&format!("\\u{{{:x}}}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 #[cfg(test)]

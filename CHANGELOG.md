@@ -4,6 +4,28 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Arabic names for the built-in functions, constructors and core types**:
+  `اطبع` (`print`), `اقرأ` (`input`), `إلى_نص`, `إلى_صحيح`, `إلى_عشري`,
+  `حلل_صحيح`, `حلل_عشري`, `تأكد`, `تأكد_تساوي`, `مجموعة` (`set` and
+  `Set`), `أصغر`, `أكبر`, `مطلق`, `الكل`, `مهلة`; `قيمة`/`لاشيء`
+  (`Some`/`None`), `نجاح`/`فشل` (`Ok`/`Err`); and the types `صحيح`,
+  `عشري`, `منطقي`, `نص`, `قائمة`, `قاموس`, `اختياري`, `نتيجة`, `مدة`.
+  They are not reserved: the parser rewrites them to English
+  (`elomar_ast::arabic`) except where the program's own name hides them, so
+  no program changes meaning. The editor highlights and completes them.
+  See `examples/arabic-names`.
+
+### Fixed
+
+- A string inside a list, record, `Ok(...)` or `Err(...)` is printed with
+  its Arabic harakat as written (`"عددًا"`), not as `\u{64b}` escapes.
+- `elomar fmt` keeps `قائمة<صحيح>` and other Arabic built-in types with
+  type arguments tight.
+
 ## [1.13.1] - 2026-11-26
 
 ### Added

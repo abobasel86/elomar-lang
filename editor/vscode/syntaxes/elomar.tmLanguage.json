@@ -10,6 +10,7 @@
     { "include": "#numbers" },
     { "include": "#effects" },
     { "include": "#arabic-keywords" },
+    { "include": "#arabic-builtins" },
     { "include": "#use" },
     { "include": "#declarations" },
     { "include": "#keywords" },
@@ -19,6 +20,27 @@
     { "include": "#operators" }
   ],
   "repository": {
+    "arabic-builtins": {
+      "comment": "Arabic names of built-in functions, constructors and types (اطبع is print, نص is String)",
+      "patterns": [
+        {
+          "name": "support.function.builtin.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ت[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ك[\\p{Mn}ـ]*د[\\p{Mn}ـ]*_ت[\\p{Mn}ـ]*س[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*و[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*_ص[\\p{Mn}ـ]*ح[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*_ع[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|ح[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*_ص[\\p{Mn}ـ]*ح[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|ح[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*_ع[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*_ن[\\p{Mn}ـ]*ص[\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ج[\\p{Mn}ـ]*م[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ط[\\p{Mn}ـ]*ب[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ق[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ك[\\p{Mn}ـ]*د[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ص[\\p{Mn}ـ]*غ[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ك[\\p{Mn}ـ]*ب[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ط[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*|م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])(?=\\s*\\()"
+        },
+        {
+          "name": "support.function.constructor.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ق[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ج[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|ف[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])(?=\\s*\\()"
+        },
+        {
+          "name": "constant.language.none.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ل[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ش[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ء[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "support.type.builtin.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*خ[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ج[\\p{Mn}ـ]*م[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*ط[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|ق[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ئ[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ق[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*م[\\p{Mn}ـ]*و[\\p{Mn}ـ]*س[\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ج[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ص[\\p{Mn}ـ]*ح[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|ع[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*د[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ص[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])(?=\\s*(?:<|>|,|\\)|=|\\{|$))"
+        }
+      ]
+    },
     "arabic-keywords": {
       "comment": "Arabic keywords (دالة is fn, ليكن is let, ...), with or without hamza, harakat or tatweel",
       "patterns": [

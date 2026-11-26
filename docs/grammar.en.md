@@ -56,6 +56,37 @@ start in `رئيسية` instead of `main` when it has no `main`.
 `elomar fmt --keywords ar` writes every keyword in Arabic, and
 `--keywords en` in English; without the option each keeps its spelling.
 
+### 1.0.2 Arabic Names for Built-ins (since 1.14)
+
+The built-in functions, the constructors and the core types also have
+Arabic names. Unlike keywords they are **not reserved**: the parser rewrites
+each to its English name, except where the program's own function, type,
+constant, parameter, variable, closure parameter or pattern binding of that
+name is visible, which hides the built-in there (as it would hide `print`).
+They match like the Arabic keywords (hamza, `ى`, `ة`, harakat and tatweel do
+not matter). Messages show the English names.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `print` | `اطبع` | `min` | `أصغر` |
+| `input` | `اقرأ` | `max` | `أكبر` |
+| `to_string` | `إلى_نص` | `abs` | `مطلق` |
+| `to_int` | `إلى_صحيح` | `all` | `الكل` |
+| `to_float` | `إلى_عشري` | `timeout` | `مهلة` |
+| `parse_int` | `حلل_صحيح` | `Some` | `قيمة` |
+| `parse_float` | `حلل_عشري` | `None` | `لاشيء` |
+| `assert` | `تأكد` | `Ok` | `نجاح` |
+| `assert_eq` | `تأكد_تساوي` | `Err` | `فشل` |
+| `set` | `مجموعة` |  | |
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `Int` | `صحيح` | `Set` | `مجموعة` |
+| `Float` | `عشري` | `Map` | `قاموس` |
+| `Bool` | `منطقي` | `Option` | `اختياري` |
+| `String` | `نص` | `Result` | `نتيجة` |
+| `List` | `قائمة` | `Duration` | `مدة` |
+
 ### 1.1 Line Ends
 
 The lexer keeps a line end as a **statement separator** only if all three conditions hold:

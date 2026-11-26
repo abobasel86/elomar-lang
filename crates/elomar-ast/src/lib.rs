@@ -2,6 +2,8 @@
 
 pub use elomar_diagnostics::Span;
 
+pub mod arabic;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ident {
     pub name: String,

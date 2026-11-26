@@ -96,14 +96,16 @@ of `main`:
 دالة رئيسية() {
     ليكن الاسم = "لينا"
     إذا الاسم.length > 3 {
-        print("مرحبًا يا {الاسم}")
+        اطبع("مرحبًا يا {الاسم}")
     } وإلا {
-        print("أهلًا")
+        اطبع("أهلًا")
     }
 }
 ```
 
-Write in English, in Arabic, or both: it is the same program. The lessons
+`اطبع` is `print`: the built-in functions and types have Arabic names too
+([all of them](12-reference.html#arabic-names)). Write in English, in Arabic,
+or both: it is the same program. The lessons
 use the English keywords; all the Arabic ones are in the
 [table of keywords](12-reference.html#keywords). Above every lesson,
 **«دالة ليكن إذا»** shows all the examples with Arabic keywords, and the

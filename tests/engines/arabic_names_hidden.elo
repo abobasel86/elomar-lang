@@ -1,0 +1,30 @@
+// The Arabic built-in names (اطبع, نص, قيمة, ...) are not reserved: a
+// program's own function, type, parameter, variable, closure parameter or
+// pattern with that name hides the built-in where it is visible.
+type نص = { القيمة: Int }
+
+fn أكبر(a: Int) -> Int {
+    return a * 100
+}
+
+fn مع_معامل(قيمة: Int) -> Int {
+    return قيمة + 1
+}
+
+fn main() {
+    let n: نص = { القيمة: 5 }
+    print(n.القيمة)
+    print(أكبر(2))
+    print(مع_معامل(41))
+    let f = |اطبع: Int| اطبع * 2
+    print(f(21))
+    match Some(3) {
+        Some(مطلق) => print(مطلق)
+        None => print("none")
+    }
+    for مهلة in [7, 8] {
+        print(مهلة)
+    }
+    // Outside those places, the built-ins work.
+    اطبع(مطلق(-9), قيمة(1), لاشيء == None)
+}

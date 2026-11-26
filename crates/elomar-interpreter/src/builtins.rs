@@ -149,7 +149,7 @@ fn conversion(span: Span, x: f64) -> RuntimeError {
 
 pub(crate) fn missing_key(key: &Value, span: Span) -> RuntimeError {
     let shown = match key {
-        Value::Str(s) => format!("{s:?}"),
+        Value::Str(s) => crate::value::quoted(s),
         other => other.to_string(),
     };
     RuntimeError::new(
@@ -385,7 +385,7 @@ pub(crate) fn call_function(
 /// A value as it would appear inside a list: strings are quoted.
 fn repr(v: &Value) -> String {
     match v {
-        Value::Str(s) => format!("{s:?}"),
+        Value::Str(s) => crate::value::quoted(s),
         other => other.to_string(),
     }
 }

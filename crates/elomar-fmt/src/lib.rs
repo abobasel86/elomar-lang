@@ -402,7 +402,9 @@ fn type_brackets(tokens: &[&Token]) -> Vec<bool> {
             }
         }
         let Some(close) = close else { continue };
-        let capitalized = name.chars().next().is_some_and(char::is_uppercase);
+        // `List<Int>`, or a built-in type with its Arabic name: `قائمة<صحيح>`.
+        let capitalized = name.chars().next().is_some_and(char::is_uppercase)
+            || elomar_ast::arabic::type_name(name).is_some();
         let called = tokens.get(close + 1).is_some_and(|t| t.kind == LParen);
         if capitalized || called {
             for (j, t) in tokens.iter().enumerate().take(close + 1).skip(i) {
@@ -758,6 +760,20 @@ fn g() {
         assert_eq!(
             convert_keywords("let s = \"open", Keywords::Arabic),
             "let s = \"open"
+        );
+    }
+
+    #[test]
+    fn arabic_type_names_take_type_arguments() {
+        assert_eq!(
+            fmt("let xs : قائمة < صحيح > = []
+fn f() -> نتيجة<صحيح,نص> {
+}
+"),
+            "let xs: قائمة<صحيح> = []
+fn f() -> نتيجة<صحيح, نص> {
+}
+"
         );
     }
 

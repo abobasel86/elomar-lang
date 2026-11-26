@@ -32,7 +32,9 @@ pub fn parse_tokens(tokens: Vec<Token>) -> (Program, Vec<Diagnostic>) {
         diags: Vec::new(),
         self_ty: None,
     };
-    let program = p.program();
+    let mut program = p.program();
+    // `اطبع` is `print`, `نص` is `String`, ... (unless the program hides them).
+    elomar_ast::arabic::resolve(&mut program);
     (program, p.diags)
 }
 

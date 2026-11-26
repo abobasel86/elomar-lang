@@ -41,8 +41,36 @@ can be mixed in one file, and neither can be a name.
   `--keywords en` in English.
 - **«دالة ليكن إذا»** above every lesson shows its examples with Arabic
   keywords; **fn ⇄ دالة** in the playground rewrites your program.
-- Type names (`Int`, `String`), built-in functions (`print`) and modules
-  (`std.json`) stay in English.
+- Modules (`std.json`) and the methods of each type (`.length`, `.map`)
+  stay in English.
+
+## Arabic names for built-ins {#arabic-names}
+
+The built-in functions, constructors and core types have Arabic names too:
+`اطبع("مرحبًا")` is `print("مرحبًا")`, and `قائمة<نص>` is `List<String>`.
+They are not reserved: if your program has its own `نص` (a variable,
+function or type), that one is used where it is visible.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `print` | `اطبع` | `min` | `أصغر` |
+| `input` | `اقرأ` | `max` | `أكبر` |
+| `to_string` | `إلى_نص` | `abs` | `مطلق` |
+| `to_int` | `إلى_صحيح` | `all` | `الكل` |
+| `to_float` | `إلى_عشري` | `timeout` | `مهلة` |
+| `parse_int` | `حلل_صحيح` | `Some` | `قيمة` |
+| `parse_float` | `حلل_عشري` | `None` | `لاشيء` |
+| `assert` | `تأكد` | `Ok` | `نجاح` |
+| `assert_eq` | `تأكد_تساوي` | `Err` | `فشل` |
+| `set` | `مجموعة` |  | |
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `Int` | `صحيح` | `Set` | `مجموعة` |
+| `Float` | `عشري` | `Map` | `قاموس` |
+| `Bool` | `منطقي` | `Option` | `اختياري` |
+| `String` | `نص` | `Result` | `نتيجة` |
+| `List` | `قائمة` | `Duration` | `مدة` |
 
 ## Built-in functions
 

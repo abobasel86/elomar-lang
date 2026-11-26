@@ -323,6 +323,7 @@ version = "1.13.1"
 name = "elomar-fmt"
 version = "1.13.1"
 dependencies = [
+ "elomar-ast",
  "elomar-diagnostics",
  "elomar-lexer",
 ]

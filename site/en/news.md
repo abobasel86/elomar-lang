@@ -7,6 +7,18 @@ other: ar/news.html
 
 # What's new
 
+## Arabic names for built-ins
+
+- **`اطبع` is `print`, `نص` is `String`**: the built-in functions, `قيمة` /
+  `لاشيء` / `نجاح` / `فشل` (`Some` / `None` / `Ok` / `Err`) and the core
+  types (`صحيح`, `نص`, `قائمة<…>`, `نتيجة<…>`, …) have Arabic names. With the
+  Arabic keywords, a whole program can now be in Arabic; the
+  [gallery](playground.html#example=keywords) has one.
+- They are not reserved: a variable named `نص` in your program still works,
+  and hides the type only where it is visible.
+- All of them are in the [reference](12-reference.html#arabic-names).
+- A string inside a list or `Err(...)` now prints its harakat as written.
+
 ## 1.13.1: Arabic keywords on every lesson page
 
 - Above every lesson, **«fn let if» / «دالة ليكن إذا»** switches all the

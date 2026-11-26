@@ -79,6 +79,9 @@ by the compiler when they are not declared.
   (or `en`) rewrites a file in one language. See
   [`examples/arabic-keywords`](examples/arabic-keywords) and the
   [table](https://abobasel86.github.io/elomar-lang/en/12-reference.html#keywords).
+- **Arabic names for built-ins:** `اطبع` is `print`, `نص` is `String`,
+  `قائمة<صحيح>` is `List<Int>`, `قيمة(x)` is `Some(x)`. Not reserved: a
+  program's own name hides them. See [`examples/arabic-names`](examples/arabic-names).
 - Structural records and value semantics (no surprising aliasing).
 - `match` with exhaustiveness checking.
 - Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`
@@ -498,13 +501,13 @@ dual licensed as above, without any additional terms or conditions.
 وفيها معرض برامج قصيرة تعمل بنقرة واحدة.
 
 **اكتب بكلمات عربية:** لكل كلمة محجوزة كتابة عربية (`دالة` هي `fn`، و`ليكن` هي `let`،
-و`إذا` هي `if`)، ويجوز المزج بين اللغتين، و`elomar fmt --keywords ar` يحوّل الملف كله إلى العربية:
+و`إذا` هي `if`)، وللدوال والأنواع المدمجة أسماء عربية (`اطبع` هي `print`، و`نص` هي `String`)، ويجوز المزج بين اللغتين، و`elomar fmt --keywords ar` يحوّل الملف كله إلى العربية:
 
 ```elomar
 دالة رئيسية() {
     لكل ع في 1..=3 {
         إذا ع == 2 { تابع }
-        print("العدد", ع)
+        اطبع("العدد", ع)
     }
 }
 ```
