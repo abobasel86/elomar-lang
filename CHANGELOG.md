@@ -4,7 +4,13 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
-## [Unreleased]
+## [1.13.0] - 2026-11-26
+
+**Upgrading:** the Arabic keywords are reserved, so a program that names a
+variable, function or type `نوع`, `في`, `عام`, `هذا`, `تابع` or another word
+in the table can no longer use that name. Such a program stops with
+`E0101`, and the message names the keyword and suggests another name
+(`نوع_`). No example or lesson uses these names.
 
 ### Added
 
