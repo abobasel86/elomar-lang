@@ -509,7 +509,10 @@ dual licensed as above, without any additional terms or conditions.
 }
 ```
 
-الجدول الكامل في [المرجع](https://abobasel86.github.io/elomar-lang/ar/12-reference.html#keywords).
+الجدول الكامل في [المرجع](https://abobasel86.github.io/elomar-lang/ar/12-reference.html#keywords)، وفوق كل درس
+في الموقع زر يعرض الأمثلة بالكلمات العربية.
+
+<p align="center"><img src="docs/images/demo-keywords.gif" width="780" alt="برنامج بكلمات عربية، ومخرجاته، ثم تحويله بالأمر elomar fmt --keywords en"></p>
 
 لتشغيل مثال بالعربية من نسخة المصدر:
 

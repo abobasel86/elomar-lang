@@ -39,6 +39,8 @@ can be mixed in one file, and neither can be a name.
 - A program starts in `main`, or in `رئيسية` when it has no `main`.
 - `elomar fmt --keywords ar` writes every keyword in a file in Arabic, and
   `--keywords en` in English.
+- **«دالة ليكن إذا»** above every lesson shows its examples with Arabic
+  keywords; **fn ⇄ دالة** in the playground rewrites your program.
 - Type names (`Int`, `String`), built-in functions (`print`) and modules
   (`std.json`) stay in English.
 

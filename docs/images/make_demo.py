@@ -1,6 +1,7 @@
 """An animated terminal demo (GIF) of real Elomar-Lang output.
 
-    python -I mkdemo.py <elomar.exe> <work dir> <out.gif>
+    python -I make_demo.py <elomar.exe> <work dir> <out.gif>             (demo.gif)
+    python -I make_demo.py <elomar.exe> <work dir> <out.gif> keywords    (demo-keywords.gif)
 
 Runs the commands for real in <work dir> and draws what they print."""
 import os
@@ -15,6 +16,7 @@ from bidi.algorithm import get_display
 from PIL import Image, ImageDraw, ImageFont
 
 ELOMAR, WORK, OUT = sys.argv[1], pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+KEYWORDS = sys.argv[4:] == ["keywords"]
 F = "C:/Windows/Fonts/"
 W, H = 1040, 580
 SIZE, LINE = 19, 27
@@ -29,17 +31,23 @@ TOP = 52
 ARABIC = re.compile(r"[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 
 
-def run(*args, cwd):
+def run(*args, cwd, stdin=None):
     env = dict(os.environ, ELOMAR_LANG="en")
     r = subprocess.run([ELOMAR, *args], cwd=cwd, capture_output=True, text=True,
-                       encoding="utf-8", env=env)
+                       encoding="utf-8", env=env, input=stdin)
     return (r.stdout + r.stderr).rstrip("\n").split("\n")
 
 
-def draw_line(d, x, y, text, color):
+def draw_line(d, x, y, text, color, rtl_code=False):
     """Draws one terminal line; Arabic runs in Tahoma, in visual order,
-    each Arabic run kept as wide as its characters would be in the grid."""
-    if ARABIC.search(text):
+    each Arabic run kept as wide as its characters would be in the grid.
+    With `rtl_code`, the line is code shown right to left, as an editor
+    shows code with Arabic keywords: its indentation is on the right."""
+    if rtl_code:
+        indent = len(text) - len(text.lstrip(" "))
+        text = get_display(arabic_reshaper.reshape(text.strip()), base_dir="R")
+        x = W - 24 - indent * CELL - run_width(text, grid=False)
+    elif ARABIC.search(text):
         rtl = bool(ARABIC.match(text.lstrip()))
         text = get_display(arabic_reshaper.reshape(text), base_dir="R" if rtl else "L")
         if rtl:  # a right-to-left line starts at the right edge
@@ -48,7 +56,8 @@ def draw_line(d, x, y, text, color):
     for run_text, is_ar in split_runs(text):
         if is_ar:
             w = ARAB.getlength(run_text)
-            cells = len(run_text) * CELL
+            # In right-to-left code, Arabic keeps its natural width.
+            cells = 0 if rtl_code else len(run_text) * CELL
             d.text((x + max(0, cells - w) / 2, y + SIZE), run_text, font=ARAB, fill=color, anchor="ls")
             x += max(w, cells)
         else:
@@ -67,12 +76,18 @@ def split_runs(text):
     return runs
 
 
-def run_width(text):
-    return sum(max(ARAB.getlength(t), len(t) * CELL) if a else MONO.getlength(t)
+def run_width(text, grid=True):
+    return sum(max(ARAB.getlength(t), len(t) * CELL if grid else 0) if a else MONO.getlength(t)
                for t, a in split_runs(text))
 
 
 def color_of(line):
+    if KEYWORDS:
+        if line.startswith("$ "):
+            return FG
+        if re.match(r"^\s*(دالة|fn) ", line):
+            return GOLD
+        return GREEN if "←" in line and not line.lstrip().startswith("print") else FG
     if line.startswith("$ "):
         return FG
     if re.match(r"^(error|خطأ)", line.strip()) or line.lstrip().startswith(("^", "|")) and "^" in line:
@@ -86,7 +101,7 @@ def color_of(line):
     return MUTED if line.startswith(("  helpdesk", "  elomar", " -->")) else FG
 
 
-def frame(lines, caption, cursor=False):
+def frame(lines, caption, cursor=False, rtl=()):
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
     d.rectangle([0, 0, W, 38], fill=BAR)
@@ -94,12 +109,12 @@ def frame(lines, caption, cursor=False):
         d.ellipse([16 + i * 22, 13, 28 + i * 22, 25], fill=c)
     d.text((W / 2, 19), "Elomar-Lang", font=MONO_B, fill=MUTED, anchor="mm")
     y = TOP
-    for ln in lines:
+    for i, ln in enumerate(lines):
         if ln.startswith("$ "):
             d.text((24, y + SIZE), "$", font=MONO_B, fill=TEAL, anchor="ls")
             draw_line(d, 24 + 2 * CELL, y, ln[2:], FG)
         else:
-            draw_line(d, 24, y, ln, color_of(ln))
+            draw_line(d, 24, y, ln, color_of(ln), rtl_code=i in rtl)
         y += LINE
     if cursor:
         last = lines[-1] if lines else ""
@@ -107,7 +122,7 @@ def frame(lines, caption, cursor=False):
         d.rectangle([cx, y - LINE + 3, cx + CELL - 2, y - 4], fill=FG)
     # The caption bar at the bottom says what the scene shows.
     d.rectangle([0, H - 58, W, H], fill=(15, 110, 99))
-    d.text((W / 2, H - 29), caption, font=CAPTION, fill=(255, 255, 255), anchor="mm")
+    d.text((W / 2, H - 29), get_display(arabic_reshaper.reshape(caption), base_dir="L"), font=CAPTION, fill=(255, 255, 255), anchor="mm")
     return img
 
 
@@ -119,42 +134,78 @@ def add(img, ms):
     durations.append(ms)
 
 
-def scene(cmd, output, caption, before=()):
+def scene(cmd, output, caption, before=(), rtl_output=False, rtl_before=(), hold=2600):
     lines = list(before)
+    rtl = set(rtl_before)
     for i in range(0, len(cmd) + 1, 2):
-        add(frame(lines + ["$ " + cmd[:i]], caption, cursor=True), 45)
-    add(frame(lines + ["$ " + cmd], caption, cursor=True), 450)
+        add(frame(lines + ["$ " + cmd[:i]], caption, cursor=True, rtl=rtl), 45)
+    add(frame(lines + ["$ " + cmd], caption, cursor=True, rtl=rtl), 450)
     shown = lines + ["$ " + cmd]
     for ln in output:
+        if rtl_output:
+            rtl.add(len(shown))
         shown.append(ln)
-        add(frame(shown, caption), 70)
-    add(frame(shown, caption), 2600)
+        add(frame(shown, caption, rtl=rtl), 70)
+    add(frame(shown, caption, rtl=rtl), hold)
     return shown
 
 
 shutil.rmtree(WORK, ignore_errors=True)
 WORK.mkdir(parents=True)
 
-out1 = run("new", "helpdesk", "--ai", "mock", cwd=WORK)
-scene("elomar new helpdesk --ai mock", out1,
-      "A new project with AI: classify tickets into your own types")
 
-proj = WORK / "helpdesk"
-code = (proj / "src/tickets.elo").read_text(encoding="utf-8").splitlines()
-start = next(i for i, l in enumerate(code) if l.startswith("pub type Ticket"))
-end = next(i for i, l in enumerate(code) if l.strip() == ")") + 1
-shown = scene("cat src/tickets.elo", code[start:end], "The model must answer with your own type",
-              before=["$ cd helpdesk"])
-out2 = run("run", "src/main.elo", cwd=proj)
-scene("elomar run src/main.elo", out2,
-      "Typed answers from the model, and search by meaning", before=shown)
+def demo_ai():
+    out1 = run("new", "helpdesk", "--ai", "mock", cwd=WORK)
+    scene("elomar new helpdesk --ai mock", out1,
+          "A new project with AI: classify tickets into your own types")
 
-src = 'fn main() {\n    let الدرجة: Int = "95"\n    print(الدرجة)\n}\n'
-(WORK / "grade.elo").write_text(src, encoding="utf-8")
-shown = scene("cat grade.elo", src.rstrip("\n").split("\n"), "Names and error messages in Arabic")
-out3 = run("run", "--lang", "ar", "grade.elo", cwd=WORK)
-scene("elomar run --lang ar grade.elo", out3, "Names and error messages in Arabic",
-      before=shown)
+    proj = WORK / "helpdesk"
+    code = (proj / "src/tickets.elo").read_text(encoding="utf-8").splitlines()
+    start = next(i for i, l in enumerate(code) if l.startswith("pub type Ticket"))
+    end = next(i for i, l in enumerate(code) if l.strip() == ")") + 1
+    shown = scene("cat src/tickets.elo", code[start:end], "The model must answer with your own type",
+                  before=["$ cd helpdesk"])
+    out2 = run("run", "src/main.elo", cwd=proj)
+    scene("elomar run src/main.elo", out2,
+          "Typed answers from the model, and search by meaning", before=shown)
+
+    src = 'fn main() {\n    let الدرجة: Int = "95"\n    print(الدرجة)\n}\n'
+    (WORK / "grade.elo").write_text(src, encoding="utf-8")
+    shown = scene("cat grade.elo", src.rstrip("\n").split("\n"), "Names and error messages in Arabic")
+    out3 = run("run", "--lang", "ar", "grade.elo", cwd=WORK)
+    scene("elomar run --lang ar grade.elo", out3, "Names and error messages in Arabic",
+          before=shown)
+
+
+def demo_keywords():
+    src = """دالة التقدير(الدرجة: Int) -> String {
+    إذا الدرجة >= 90 { أرجع "ممتاز" }
+    أرجع "جيد"
+}
+
+دالة رئيسية() {
+    ليكن الطلاب = ["لينا": 95, "عمر": 80]
+    لكل الاسم في الطلاب.keys() {
+        print(الاسم, "←", التقدير(الطلاب[الاسم]))
+    }
+}
+"""
+    (WORK / "grades.elo").write_text(src, encoding="utf-8")
+    code = src.splitlines()
+    shown = scene("cat grades.elo", code, "A whole program with Arabic keywords", rtl_output=True)
+    rtl = [i for i, l in enumerate(shown) if i > 0 and not l.startswith("$ ")]
+    out = run("run", "grades.elo", cwd=WORK)
+    scene("elomar run grades.elo", out, "Same language, same output", before=shown,
+          rtl_before=rtl, rtl_output=True)
+    english = run("fmt", "--stdin", "--keywords", "en", cwd=WORK, stdin=src)
+    scene("elomar fmt --keywords en --stdin < grades.elo", english,
+          "One command switches every keyword (and back with --keywords ar)", hold=3400)
+
+
+if KEYWORDS:
+    demo_keywords()
+else:
+    demo_ai()
 
 # The last card: where to try it.
 end = Image.new("RGB", (W, H))

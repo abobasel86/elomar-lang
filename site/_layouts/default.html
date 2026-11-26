@@ -59,6 +59,13 @@
     </aside>
     {% endif %}
     <main>
+      {% if page.slug %}
+      <div id="kw-switch" class="kw-switch" data-base="{{ '/' | relative_url }}">
+        <span>{% if lang == "ar" %}الكلمات المحجوزة في الأمثلة:{% else %}Keywords in the examples:{% endif %}</span>
+        <button type="button" data-to="en" lang="en" dir="ltr">fn let if</button>
+        <button type="button" data-to="ar" lang="ar" dir="rtl">دالة ليكن إذا</button>
+      </div>
+      {% endif %}
       {{ content }}
       {% if page.slug and site.data.exercises[page.slug] %}
       {% include exercises.html lang=lang %}
@@ -97,5 +104,6 @@
     <a href="https://github.com/sponsors/abobasel86">Sponsor ♥</a>
     {% endif %}
   </footer>
+  {% if page.slug %}<script src="{{ '/assets/keywords.js' | relative_url }}?v={{ site.time | date: '%s' }}"></script>{% endif %}
 </body>
 </html>

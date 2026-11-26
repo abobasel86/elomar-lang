@@ -105,7 +105,9 @@ of `main`:
 
 Write in English, in Arabic, or both: it is the same program. The lessons
 use the English keywords; all the Arabic ones are in the
-[table of keywords](12-reference.html#keywords).
+[table of keywords](12-reference.html#keywords). Above every lesson,
+**«دالة ليكن إذا»** shows all the examples with Arabic keywords, and the
+[playground](playground.html) has a **fn ⇄ دالة** button for your program.
 
 ## Try things at the prompt
 

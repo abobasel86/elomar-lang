@@ -21,7 +21,9 @@
 //! returned.
 
 use elomar_diagnostics::Diagnostic;
-use elomar_lexer::{Token, TokenKind};
+use std::borrow::Cow;
+
+use elomar_lexer::{StrPart, Token, TokenKind};
 
 #[derive(Debug)]
 pub enum FormatError {
@@ -175,20 +177,20 @@ struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    fn text(&self, tok: &Token) -> &'a str {
-        if let Some(lang) = self.keywords
-            && let Some((en, ar)) = elomar_lexer::keyword_spellings(&tok.kind)
-        {
-            return match lang {
-                Keywords::English => en,
-                Keywords::Arabic => ar,
-            };
-        }
+    fn text(&self, tok: &Token) -> Cow<'a, str> {
         let s = &self.src[tok.span.start as usize..tok.span.end as usize];
+        if let Some(lang) = self.keywords {
+            if let Some(spelling) = spelling(&tok.kind, lang) {
+                return Cow::Borrowed(spelling);
+            }
+            if let TokenKind::Template(parts) = &tok.kind {
+                return Cow::Owned(template_keywords(s, parts, lang));
+            }
+        }
         if tok.kind == TokenKind::Comment && s.starts_with("//") {
-            s.trim_end()
+            Cow::Borrowed(s.trim_end())
         } else {
-            s
+            Cow::Borrowed(s)
         }
     }
 
@@ -310,7 +312,7 @@ impl<'a> Printer<'a> {
             } else if tok.kind == TokenKind::RBrace {
                 in_effects = false;
             }
-            s.push_str(self.text(tok));
+            s.push_str(&self.text(tok));
         }
         s
     }
@@ -428,6 +430,66 @@ fn without_trailing_semis<'t>(line: &[&'t Token]) -> Vec<&'t Token> {
     code
 }
 
+/// `src` with every keyword written in `lang` and nothing else changed:
+/// spacing, comments and strings stay as they are (keywords inside a
+/// string's `{...}` change too). Code with lexical errors is returned as is.
+/// The website's keyword switch uses it on lesson code.
+pub fn convert_keywords(src: &str, lang: Keywords) -> String {
+    let (_, diags) = elomar_lexer::lex(src);
+    if diags.is_empty() {
+        code_keywords(src, lang)
+    } else {
+        src.to_string()
+    }
+}
+
+/// How a keyword token is written in `lang`.
+fn spelling(kind: &TokenKind, lang: Keywords) -> Option<&'static str> {
+    elomar_lexer::keyword_spellings(kind).map(|(en, ar)| match lang {
+        Keywords::English => en,
+        Keywords::Arabic => ar,
+    })
+}
+
+/// A string literal `text` with the keywords inside its `{...}` parts
+/// written in `lang`: `"{self.name}"` becomes `"{هذا.name}"`.
+fn template_keywords(text: &str, parts: &[StrPart], lang: Keywords) -> String {
+    let mut out = String::new();
+    let mut at = 0;
+    for part in parts {
+        if let StrPart::Code { src, offset } = part
+            && text.get(*offset..offset + src.len()) == Some(src.as_str())
+        {
+            out.push_str(&text[at..*offset]);
+            out.push_str(&code_keywords(src, lang));
+            at = offset + src.len();
+        }
+    }
+    out.push_str(&text[at..]);
+    out
+}
+
+/// `code` with every keyword written in `lang`, including in nested strings.
+fn code_keywords(code: &str, lang: Keywords) -> String {
+    let (tokens, _) = elomar_lexer::lex(code);
+    let mut out = String::new();
+    let mut at = 0;
+    for tok in &tokens {
+        let (start, end) = (tok.span.start as usize, tok.span.end as usize);
+        let replaced = match &tok.kind {
+            TokenKind::Template(parts) => Some(template_keywords(&code[start..end], parts, lang)),
+            kind => spelling(kind, lang).map(str::to_string),
+        };
+        if let Some(r) = replaced {
+            out.push_str(&code[at..start]);
+            out.push_str(&r);
+            at = end;
+        }
+    }
+    out.push_str(&code[at..]);
+    out
+}
+
 /// Whether `a` and `b` lex to the same program: the same tokens, where a
 /// `;` and a statement-ending line break count as the same separator.
 fn same_program(a: &str, b: &str) -> bool {
@@ -440,6 +502,19 @@ fn same_program(a: &str, b: &str) -> bool {
         for t in tokens {
             let k = match t.kind {
                 TokenKind::Semi => TokenKind::Newline,
+                // `{self.n}` and `{هذا.n}` in a string are the same code.
+                TokenKind::Template(parts) => TokenKind::Template(
+                    parts
+                        .into_iter()
+                        .map(|p| match p {
+                            StrPart::Code { src, .. } => StrPart::Code {
+                                src: code_keywords(&src, Keywords::English),
+                                offset: 0,
+                            },
+                            lit => lit,
+                        })
+                        .collect(),
+                ),
                 k => k,
             };
             let sep = k == TokenKind::Newline;
@@ -648,6 +723,42 @@ fn g() {
 "
         );
         assert_eq!(format_with(&en, Some(Keywords::Arabic)).unwrap(), ar);
+
+        // Inside `{...}` of a string too, also nested; text stays as it is.
+        let src = "fn f(self) -> String {
+    return \"if {self.n} {if true { \"in {self.m}\" } else { \"\" }}\"
+}
+";
+        let ar = format_with(src, Some(Keywords::Arabic)).unwrap();
+        assert_eq!(
+            ar,
+            "دالة f(هذا) -> String {
+    أرجع \"if {هذا.n} {إذا صح { \"in {هذا.m}\" } وإلا { \"\" }}\"
+}
+"
+        );
+        assert_eq!(format_with(&ar, Some(Keywords::English)).unwrap(), src);
+    }
+
+    #[test]
+    fn convert_keywords_changes_only_keywords() {
+        let src = "fn main() {   // fn stays in comments
+  let s = \"for {true}\"
+}
+";
+        let ar = convert_keywords(src, Keywords::Arabic);
+        assert_eq!(
+            ar,
+            "دالة main() {   // fn stays in comments
+  ليكن s = \"for {صح}\"
+}
+"
+        );
+        assert_eq!(convert_keywords(&ar, Keywords::English), src);
+        assert_eq!(
+            convert_keywords("let s = \"open", Keywords::Arabic),
+            "let s = \"open"
+        );
     }
 
     #[test]

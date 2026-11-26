@@ -7,6 +7,18 @@ other: ar/news.html
 
 # What's new
 
+## Arabic keywords on every lesson page
+
+- Above every lesson, **«fn let if» / «دالة ليكن إذا»** switches all the
+  examples between English and Arabic keywords; the choice is remembered
+  on your device. Code with Arabic keywords reads right to left.
+- The [playground](playground.html) has a **fn ⇄ دالة** button that
+  rewrites your program with Arabic keywords, or back.
+- `elomar fmt --keywords` now also changes keywords inside a string's
+  `{...}`.
+
+<p><img class="demo" src="../assets/demo-keywords.gif" width="1040" height="580" alt="A terminal: a program written with Arabic keywords (دالة, ليكن, إذا, لكل) shown right to left, its output, then elomar fmt --keywords en printing the same program with English keywords"></p>
+
 ## 1.13: Arabic keywords
 
 - **Write the whole program in Arabic**: `دالة` is `fn`, `ليكن` is `let`,

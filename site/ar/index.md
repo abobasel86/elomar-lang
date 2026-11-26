@@ -28,7 +28,10 @@ lang: ar
 }
 ```
 
-كل الكلمات في [جدول الكلمات المحجوزة](12-reference.html#keywords).
+كل الكلمات في [جدول الكلمات المحجوزة](12-reference.html#keywords). وزر **«دالة ليكن إذا»** فوق كل درس يعرض
+أمثلته كلها بالكلمات العربية.
+
+<p><img class="demo" src="../assets/demo-keywords.gif" width="1040" height="580" alt="طرفية: برنامج مكتوب بكلمات عربية (دالة، ليكن، إذا، لكل) يُعرض من اليمين إلى اليسار، ثم مخرجاته، ثم الأمر elomar fmt --keywords en يطبع البرنامج نفسه بالكلمات الإنجليزية"></p>
 
 {% for l in site.data.lessons -%}
 {{ forloop.index }}. [{{ l.ar }}]({{ l.slug }}.html)

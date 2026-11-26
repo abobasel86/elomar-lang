@@ -4,6 +4,22 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **A keyword switch on every lesson page** of the website: «fn let if» or
+  «دالة ليكن إذا» shows every example with English or Arabic keywords
+  (remembered on the device). The playground has a `fn ⇄ دالة` button
+  that rewrites the program in the editor. Both use the new
+  `elomar_fmt::convert_keywords`, which changes keywords only; code with
+  Arabic keywords is shown right to left.
+- `elomar fmt --keywords` now also rewrites keywords inside a string's
+  `{...}` (`"{self.name}"` becomes `"{هذا.name}"`).
+- A second demo GIF (`docs/images/demo-keywords.gif`): a program with
+  Arabic keywords, its output, and `elomar fmt --keywords en`.
+  `docs/images/make_demo.py ... keywords` makes it again.
+
 ## [1.13.0] - 2026-11-26
 
 **Upgrading:** the Arabic keywords are reserved, so a program that names a

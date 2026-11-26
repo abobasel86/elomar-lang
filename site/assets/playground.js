@@ -16,6 +16,7 @@
   const status = document.getElementById("pg-status");
   const runButton = document.getElementById("pg-run");
   const shareButton = document.getElementById("pg-share");
+  const keywordsButton = document.getElementById("pg-keywords");
   const examples = document.getElementById("pg-examples");
 
   // The examples and the gallery under the playground: site/_data/gallery.json.
@@ -29,9 +30,16 @@
     examples.appendChild(opt);
   }
 
+  // Code with Arabic keywords reads right to left, as Arabic does.
+  const ARABIC_KEYWORD = /(^|[^\p{L}\p{N}_])(دالة|ليكن|متغير|إذا|لكل|نوع|استخدم)(?![\p{L}\p{N}_])/u;
+  function setDirection() {
+    editor.dir = ARABIC_KEYWORD.test(editor.value) ? "rtl" : "ltr";
+  }
+
   function loadExample(key) {
     const ex = EXAMPLES[key];
     editor.value = ex.code;
+    setDirection();
     inputs.value = ex.input || "";
   }
 
@@ -48,6 +56,7 @@
     try {
       const bytes = Uint8Array.from(atob(decodeURIComponent(m[1])), (c) => c.charCodeAt(0));
       editor.value = new TextDecoder().decode(bytes);
+      setDirection();
       return true;
     } catch (_) {
       return false;
@@ -82,6 +91,10 @@
       if (msg.ready) {
         ready = true;
         setStatus("");
+        return;
+      }
+      if (msg.answer && msg.answer.sources) {
+        keywordsAnswer(msg.answer.sources[0]);
         return;
       }
       clearTimeout(timer);
@@ -147,6 +160,26 @@
       editor.setRangeText("    ", s, editor.selectionEnd, "end");
     }
   });
+
+  // fn ⇄ دالة: writes every keyword of the program in Arabic, or, when it
+  // already is, in English (elomar_fmt::convert_keywords in the worker).
+  let keywordsTo = null;
+  function askKeywords(to) {
+    keywordsTo = to;
+    keywordsButton.disabled = true;
+    worker.postMessage({ wasmUrl, request: { keywords: to, sources: [editor.value] } });
+  }
+  function keywordsAnswer(text) {
+    ready = true;
+    if (keywordsTo === "ar" && text === editor.value) {
+      askKeywords("en");
+      return;
+    }
+    keywordsButton.disabled = false;
+    editor.value = text;
+    setDirection();
+  }
+  keywordsButton.addEventListener("click", () => askKeywords("ar"));
 
   shareButton.addEventListener("click", async () => {
     const bytes = new TextEncoder().encode(editor.value);

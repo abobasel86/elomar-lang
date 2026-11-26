@@ -210,6 +210,23 @@ pub fn run_json(request: &str) -> String {
                 .collect()
         })
         .unwrap_or_default();
+    // The keyword switch: {"keywords": "ar", "sources": [...]} gives the
+    // same sources with every keyword in Arabic (or English with "en").
+    if let Some(to) = req["keywords"].as_str() {
+        let to = match to {
+            "ar" => elomar_fmt::Keywords::Arabic,
+            _ => elomar_fmt::Keywords::English,
+        };
+        let sources: Vec<Value> = req["sources"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|s| json!(elomar_fmt::convert_keywords(s.as_str().unwrap_or(""), to)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        return json!({ "ok": true, "sources": sources }).to_string();
+    }
     if let Some(check) = req.get("check") {
         let mode = check["mode"].as_str().unwrap_or("program");
         let cases = check["cases"].as_array().cloned().unwrap_or_default();
@@ -341,6 +358,48 @@ mod exercise_tests {
             }
         }
         assert!(count >= 10, "only {count} exercises");
+    }
+
+    /// The website's keyword switch: every gallery program, with Arabic
+    /// keywords, prints the same, and switching back gives it unchanged.
+    #[test]
+    fn keyword_switch_keeps_programs_working() {
+        let gallery: Vec<Value> =
+            serde_json::from_str(include_str!("../../../site/_data/gallery.json")).unwrap();
+        let codes: Vec<&str> = gallery
+            .iter()
+            .map(|g| g["code"].as_str().unwrap())
+            .collect();
+        let ask = |to: &str, sources: &[&str]| -> Vec<String> {
+            let answer: Value = serde_json::from_str(&run_json(
+                &json!({ "keywords": to, "sources": sources }).to_string(),
+            ))
+            .unwrap();
+            answer["sources"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s.as_str().unwrap().to_string())
+                .collect()
+        };
+        let ar = ask("ar", &codes);
+        let ar_refs: Vec<&str> = ar.iter().map(String::as_str).collect();
+        let en = ask("en", &ar_refs);
+        for ((g, a), e) in gallery.iter().zip(&ar).zip(&en) {
+            let key = g["key"].as_str().unwrap();
+            assert!(a.contains("دالة"), "{key}");
+            if key != "keywords" {
+                assert_eq!(e, g["code"].as_str().unwrap(), "{key}");
+            }
+            if let Some(expected) = g["output"].as_str() {
+                let input: Vec<String> = g["input"]
+                    .as_str()
+                    .map(|i| i.lines().map(str::to_string).collect())
+                    .unwrap_or_default();
+                let r = run_program_limited(a, Lang::En, input, 60_000);
+                assert_eq!(r["output"], expected, "{key} with Arabic keywords");
+            }
+        }
     }
 
     /// Every program of the gallery under the playground (and in its

@@ -419,6 +419,7 @@ dependencies = [
  "elomar-ai-provider-mock",
  "elomar-ast",
  "elomar-diagnostics",
+ "elomar-fmt",
  "elomar-interpreter",
  "elomar-parser",
  "elomar-policy",

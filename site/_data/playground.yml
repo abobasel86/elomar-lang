@@ -13,6 +13,7 @@ en:
   timeout: "Stopped: the program ran longer than 10 seconds."
   crashed: "The program stopped unexpectedly (for example, too deep a recursion)."
   copied: Link copied.
+  keywordsTitle: "Write the keywords in Arabic (دالة, ليكن, إذا), or back in English"
   linkReady: The link is in the address bar.
   note: >-
     Programs run in your browser, offline. Files, databases, HTTP, web servers, Python and
@@ -33,6 +34,7 @@ ar:
   timeout: "توقف: استغرق البرنامج أكثر من 10 ثوانٍ."
   crashed: "توقف البرنامج بشكل غير متوقع (مثلًا: استدعاء ذاتي عميق جدًا)."
   copied: تم نسخ الرابط.
+  keywordsTitle: "اكتب الكلمات المحجوزة بالعربية (دالة، ليكن، إذا)، أو أعدها إلى الإنجليزية"
   linkReady: الرابط في شريط العنوان.
   note: >-
     تعمل البرامج في متصفحك دون إنترنت. الملفات وقواعد البيانات وHTTP وخوادم الويب وPython
