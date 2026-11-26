@@ -27,6 +27,23 @@ against the release's checksums, puts `elomar` in a folder of its own
 Open a new terminal afterwards. Later, `elomar upgrade` moves you to the
 newest version.
 
+Or with a package manager:
+
+```powershell
+# Windows, with Scoop
+scoop bucket add elomar https://github.com/abobasel86/elomar-lang
+scoop install elomar
+```
+
+```bash
+# macOS or Linux, with Homebrew
+brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang
+brew install elomar
+```
+
+Then `scoop update elomar` or `brew upgrade elomar` moves you to a new
+version.
+
 Or install by hand:
 
 1. Open the [latest release](https://github.com/abobasel86/elomar-lang/releases/latest)

@@ -11,6 +11,18 @@ change the language.
 - Links to the website show a preview when shared (X, LinkedIn, WhatsApp
   and others): every page has Open Graph and Twitter card tags with its
   title, a description in its language, and the project's image.
+- **Scoop and Homebrew**: `scoop bucket add elomar https://github.com/abobasel86/elomar-lang` then
+  `scoop install elomar` (Windows); `brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang`
+  then `brew install elomar` (macOS, Linux). `packaging/update.py` writes
+  their files (and winget's) from a release's checksums, and the release
+  workflow runs it and commits the result; CI installs with both.
+- **A gallery of programs** under the playground (`site/_data/gallery.json`,
+  which the Examples menu also uses): each card loads and runs its program,
+  and `#example=<name>` links open one directly. A test runs every program
+  in both languages and checks its output.
+- **A demo GIF** of real output (a new AI project, its types, its output,
+  an Arabic error message) in the README and on the website;
+  `docs/images/make_demo.py` makes it again.
 
 ## [1.12.1] - 2026-11-25
 

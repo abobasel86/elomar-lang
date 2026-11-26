@@ -1,7 +1,8 @@
 <div id="pg-root" class="playground"
      data-lang="{{ include.lang }}"
      data-base="{{ '/' | relative_url }}"
-     data-text="{{ include.text | jsonify | escape }}">
+     data-text="{{ include.text | jsonify | escape }}"
+     data-gallery="{{ site.data.gallery | jsonify | escape }}">
   <div class="pg-bar">
     <button id="pg-run" type="button" class="pg-run">▶ {{ include.text.run }}</button>
     <select id="pg-examples" aria-label="{{ include.text.examples }}">

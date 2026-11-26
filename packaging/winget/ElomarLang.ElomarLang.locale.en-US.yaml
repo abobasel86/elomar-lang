@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
+PackageIdentifier: ElomarLang.ElomarLang
+PackageVersion: 1.12.1
+PackageLocale: en-US
+Publisher: Elomar-Lang
+PublisherUrl: https://github.com/abobasel86
+PublisherSupportUrl: https://github.com/abobasel86/elomar-lang/issues
+PackageName: Elomar-Lang
+PackageUrl: https://abobasel86.github.io/elomar-lang/
+License: MIT OR Apache-2.0
+LicenseUrl: https://github.com/abobasel86/elomar-lang/blob/main/LICENSE-MIT
+ShortDescription: A statically typed programming language with AI built in, in English and Arabic.
+Description: |-
+  Elomar-Lang is a small statically typed language that can be learned in Arabic as well as English:
+  error messages in both languages, a full tutorial, and typed AI calls (OpenAI, Claude, or local
+  models with Ollama) built into the language.
+Moniker: elomar
+Tags:
+- programming-language
+- arabic
+- ai
+- compiler
+- interpreter
+ReleaseNotesUrl: https://github.com/abobasel86/elomar-lang/releases/tag/v1.12.1
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

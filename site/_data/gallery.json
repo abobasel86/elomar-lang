@@ -1,0 +1,145 @@
+[
+ {
+  "key": "hello",
+  "title": {
+   "en": "Hello",
+   "ar": "مرحبا"
+  },
+  "desc": {
+   "en": "Your first program: read a name and greet it, in two languages.",
+   "ar": "أول برنامج: يقرأ اسمًا ويرحّب به بلغتين."
+  },
+  "code": "fn main() {\n    let name = input(\"What is your name? \")\n    print(\"Hello, {name}!\")\n    print(\"مرحبًا يا {name}!\")\n}\n",
+  "input": "Lina",
+  "output": "What is your name? Hello, Lina!\nمرحبًا يا Lina!\n"
+ },
+ {
+  "key": "arabic",
+  "title": {
+   "en": "Arabic names",
+   "ar": "أسماء عربية"
+  },
+  "desc": {
+   "en": "Functions, variables and a map with Arabic names.",
+   "ar": "دوال ومتغيرات وقاموس بأسماء عربية."
+  },
+  "code": "fn التقدير(الدرجة: Int) -> String {\n    if الدرجة >= 90 {\n        return \"ممتاز\"\n    } else if الدرجة >= 70 {\n        return \"جيد\"\n    }\n    return \"يحتاج إلى تحسين\"\n}\n\nfn main() {\n    let الطلاب = [\"لينا\": 95, \"عمر\": 72, \"سارة\": 60]\n    for الاسم in الطلاب.keys() {\n        print(\"{الاسم}: {التقدير(الطلاب[الاسم])}\")\n    }\n}\n",
+  "output": "سارة: يحتاج إلى تحسين\nعمر: جيد\nلينا: ممتاز\n"
+ },
+ {
+  "key": "words",
+  "title": {
+   "en": "Arabic text",
+   "ar": "نص عربي"
+  },
+  "desc": {
+   "en": "Count the words of an Arabic proverb, find the longest, and the ones that repeat.",
+   "ar": "عدّ كلمات مثل عربي، وأطول كلمة فيه، والكلمات المكررة."
+  },
+  "code": "fn main() {\n    let text = \"من جد وجد ومن زرع حصد ومن سار على الدرب وصل\"\n    let words = text.words()\n    print(\"عدد الكلمات:\", words.length)\n    match words.max_by(|w| w.length) {\n        Some(w) => print(\"أطول كلمة:\", w)\n        None => print(\"لا كلمات\")\n    }\n    print(\"بالعكس:\", words.reverse().join(\" \"))\n    let counts = words.group_by(|w| w)\n    for word in counts.keys().sorted() {\n        let n = counts[word].length\n        if n > 1 {\n            print(\"«{word}» تكررت {n} مرات\")\n        }\n    }\n}\n",
+  "output": "عدد الكلمات: 11\nأطول كلمة: الدرب\nبالعكس: وصل الدرب على سار ومن حصد زرع ومن وجد جد من\n«ومن» تكررت 2 مرات\n"
+ },
+ {
+  "key": "numbers",
+  "title": {
+   "en": "Lists and closures",
+   "ar": "القوائم والدوال المجهولة"
+  },
+  "desc": {
+   "en": "Sort, filter and number a list of grades with closures.",
+   "ar": "ترتيب قائمة درجات وتصفيتها وترقيمها بالدوال المجهولة."
+  },
+  "code": "fn main() {\n    let grades = [91, 72, 55, 88, 64]\n    print(\"sorted:\", grades.sorted())\n    print(\"passed:\", grades.filter(|g| g >= 60))\n    print(\"average:\", (grades.sum() / grades.length).round_to(1))\n    for item in grades.enumerate() {\n        print(\"{item.index + 1}. {item.value}\")\n    }\n}\n",
+  "output": "sorted: [55, 64, 72, 88, 91]\npassed: [91, 72, 88, 64]\naverage: 74.0\n1. 91\n2. 72\n3. 55\n4. 88\n5. 64\n"
+ },
+ {
+  "key": "types",
+  "title": {
+   "en": "Types and errors",
+   "ar": "الأنواع والأخطاء"
+  },
+  "desc": {
+   "en": "Enums, match, and errors as values with Result.",
+   "ar": "التعدادات وmatch، والأخطاء قيمًا عادية مع Result."
+  },
+  "code": "enum Shape {\n    Circle(Float)\n    Rect(Float, Float)\n}\n\nfn area(s: Shape) -> Float {\n    return match s {\n        Shape.Circle(r) => 3.14159 * r * r\n        Shape.Rect(w, h) => w * h\n    }\n}\n\nfn parse_age(text: String) -> Result<Int, String> {\n    return match text.parse_int() {\n        Some(n) => Ok(n)\n        None => Err(\"'{text}' is not a number\")\n    }\n}\n\nfn main() {\n    print(area(Shape.Circle(1.0)), area(Shape.Rect(2.0, 3.0)))\n    print(parse_age(\"42\"), parse_age(\"abc\"))\n}\n",
+  "output": "3.14159 6.0\nOk(42) Err(\"'abc' is not a number\")\n"
+ },
+ {
+  "key": "json",
+  "title": {
+   "en": "JSON with types",
+   "ar": "JSON بالأنواع"
+  },
+  "desc": {
+   "en": "Read JSON straight into your own types; a wrong shape is an error you handle.",
+   "ar": "اقرأ JSON مباشرة إلى أنواعك؛ والشكل الخاطئ خطأ تعالجه لا انهيار."
+  },
+  "code": "use std.json\n\ntype Book = { title: String, year: Int, tags: List<String> }\n\nfn main() {\n    let text = r#\"[{\"title\": \"Kalila wa Dimna\", \"year\": 750, \"tags\": [\"fables\"]},\"#\n        + r#\"{\"title\": \"The Muqaddimah\", \"year\": 1377, \"tags\": [\"history\", \"science\"]}]\"#\n    match json.parse<List<Book>>(text) {\n        Ok(books) => {\n            for b in books.sort_by(|b| b.year) {\n                print(\"{b.year}: {b.title} ({b.tags.join(\", \")})\")\n            }\n            print(json.stringify(books.map(|b| b.title)))\n        }\n        Err(e) => print(\"not valid:\", e)\n    }\n    // A value of the wrong type is an error you handle, not a crash.\n    print(json.parse<List<Book>>(r#\"[{\"title\": 5}]\"#).is_err())\n}\n",
+  "output": "750: Kalila wa Dimna (fables)\n1377: The Muqaddimah (history, science)\n[\"Kalila wa Dimna\",\"The Muqaddimah\"]\ntrue\n"
+ },
+ {
+  "key": "dates",
+  "title": {
+   "en": "Dates",
+   "ar": "التواريخ"
+  },
+  "desc": {
+   "en": "Days between two dates, adding months and weeks, and formatting.",
+   "ar": "الأيام بين تاريخين، وإضافة الأشهر والأسابيع، وتنسيق التاريخ."
+  },
+  "code": "use std.time\n\nfn main() {\n    let start = time.make(2026, 1, 1)\n    let exam = time.make(2026, 6, 15)\n    print(\"days until the exam:\", time.days_between(start, exam))\n    let next = time.add_months(exam, 3)\n    print(\"three months later:\", time.format_as(next, \"YYYY-MM-DD\"))\n    for week in 1..=3 {\n        print(\"week {week}:\", time.format_as(time.add_days(start, 7 * week), \"DD/MM\"))\n    }\n}\n",
+  "output": "days until the exam: 165\nthree months later: 2026-09-15\nweek 1: 08/01\nweek 2: 15/01\nweek 3: 22/01\n"
+ },
+ {
+  "key": "primes",
+  "title": {
+   "en": "Every core",
+   "ar": "كل الأنوية"
+  },
+  "desc": {
+   "en": "Find the primes below 50,000 with par_filter, on every processor core.",
+   "ar": "الأعداد الأولية تحت 50,000 بـ par_filter، على كل أنوية المعالج."
+  },
+  "code": "fn is_prime(n: Int) -> Bool {\n    if n < 2 {\n        return false\n    }\n    var d = 2\n    while d * d <= n {\n        if n % d == 0 {\n            return false\n        }\n        d += 1\n    }\n    return true\n}\n\nfn main() {\n    var numbers = []\n    for n in 1..50000 {\n        numbers.push(n)\n    }\n    // par_filter checks the numbers on every processor core\n    // (in the browser, one after another), with the same result.\n    let primes = numbers.par_filter(is_prime)\n    print(\"primes below 50000:\", primes.length)\n    print(\"the last five:\", primes.skip(primes.length - 5))\n}\n",
+  "output": "primes below 50000: 5133\nthe last five: [49943, 49957, 49991, 49993, 49999]\n"
+ },
+ {
+  "key": "ai",
+  "title": {
+   "en": "AI (offline mock)",
+   "ar": "الذكاء الاصطناعي (نموذج تجريبي)"
+  },
+  "desc": {
+   "en": "Ask a model for a typed summary (offline, with the mock model).",
+   "ar": "اطلب من نموذج ملخصًا بنوع محدد (دون إنترنت، بالنموذج التجريبي)."
+  },
+  "code": "use std.ai\n\ntype Summary = { title: String, points: List<String> }\n\nasync fn main() {\n    // \"mock\" answers offline with a value of the requested type.\n    match await ai.infer<Summary>(\n        model: \"mock\",\n        instructions: \"Summarize the text\",\n        input: \"Elomar-Lang has AI built into the language.\"\n    ) {\n        Ok(s) => print(\"title:\", s.title, \"points:\", s.points.length)\n        Err(e) => print(\"failed:\", e.kind())\n    }\n}\n",
+  "output": "title: mock points: 0\n"
+ },
+ {
+  "key": "ticket",
+  "title": {
+   "en": "AI: classify a ticket",
+   "ar": "ذكاء اصطناعي: تصنيف طلب"
+  },
+  "desc": {
+   "en": "The model must answer with your enum; match on it like any value.",
+   "ar": "على النموذج أن يجيب بتعدادك أنت، فتطابقه كأي قيمة."
+  },
+  "code": "use std.ai\n\nenum Priority {\n    Low\n    Normal\n    Urgent\n}\n\ntype Ticket = { category: String, priority: Priority, summary: String }\n\nasync fn main() {\n    // \"mock\" answers offline with a value of the type you ask for.\n    // With a real model only the name changes: \"gpt\", \"claude\" or \"local\".\n    let message = \"The app crashes every time I open it!\"\n    match await ai.infer<Ticket>(\n        model: \"mock\",\n        instructions: \"Classify the support message\",\n        input: message\n    ) {\n        Ok(t) => {\n            let label = match t.priority {\n                Priority.Urgent => \"now\"\n                Priority.Normal => \"today\"\n                Priority.Low => \"this week\"\n            }\n            print(\"category:\", t.category, \"| answer:\", label)\n        }\n        Err(e) => print(\"the model failed:\", e.kind())\n    }\n}\n",
+  "output": "category: mock | answer: this week\n"
+ },
+ {
+  "key": "toolbox",
+  "title": {
+   "en": "Toolbox",
+   "ar": "صندوق الأدوات"
+  },
+  "desc": {
+   "en": "Math, time, regular expressions and hashing from the standard library.",
+   "ar": "الرياضيات والوقت والتعابير النمطية والتجزئة من المكتبة القياسية."
+  },
+  "code": "use std.math\nuse std.time\nuse std.regex\nuse std.crypto\n\nfn main() {\n    print(math.pi.round_to(5), math.sqrt(2))\n    print(time.format(time.now()))\n    print(regex.find_all(r\"\\d+\", \"rooms 12, 7 and 30\"))\n    print(crypto.sha256(\"elomar\"))\n    print(crypto.uuid())\n}\n"
+ }
+]

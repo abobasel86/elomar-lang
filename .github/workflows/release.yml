@@ -4,6 +4,8 @@
 # - Pushing a tag `vX.Y.Z` (matching `version` in Cargo.toml) builds
 #   everything and creates the GitHub release, with the notes of that
 #   version from CHANGELOG.md.
+# - After the release, the Scoop, Homebrew and winget files on main are
+#   updated to it (packaging/update.py).
 # - Running it by hand (workflow_dispatch) only builds the files, to try
 #   the workflow; they are kept as artifacts of the run.
 name: Release
@@ -144,3 +146,17 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "Elomar-Lang ${GITHUB_REF_NAME}" \
             --notes-file notes.md
+      # Scoop, Homebrew and winget read the files written by
+      # packaging/update.py from main; point them at this release. A failure
+      # here does not undo the release: run the script by hand instead.
+      - name: Package managers
+        continue-on-error: true
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          git fetch --depth 1 origin main
+          git checkout -B main FETCH_HEAD
+          python3 packaging/update.py "$version" dist/SHA256SUMS.txt
+          git add bucket Formula packaging/winget
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]"               -c user.email="41898282+github-actions[bot]@users.noreply.github.com"               commit -m "Package managers: Elomar-Lang $version"
+          git push origin main

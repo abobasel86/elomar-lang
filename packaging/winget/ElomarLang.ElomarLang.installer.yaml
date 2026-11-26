@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
+PackageIdentifier: ElomarLang.ElomarLang
+PackageVersion: 1.12.1
+InstallerType: zip
+NestedInstallerType: portable
+Commands:
+- elomar
+FileExtensions:
+- elo
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.12.1/elomar-1.12.1-x86_64-pc-windows-msvc.zip
+  InstallerSha256: 467D0A58C38B21913ED46B428EE500F5871D8BB542C565A9E15EB12574D17472
+  NestedInstallerFiles:
+  - RelativeFilePath: elomar-1.12.1-x86_64-pc-windows-msvc\elomar.exe
+    PortableCommandAlias: elomar
+- Architecture: arm64
+  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.12.1/elomar-1.12.1-aarch64-pc-windows-msvc.zip
+  InstallerSha256: 062D39F6E714943252102DC682A866EA6A796BC53A0057AF2959056A3D7DC678
+  NestedInstallerFiles:
+  - RelativeFilePath: elomar-1.12.1-aarch64-pc-windows-msvc\elomar.exe
+    PortableCommandAlias: elomar
+ManifestType: installer
+ManifestVersion: 1.9.0

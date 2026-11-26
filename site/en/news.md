@@ -7,6 +7,20 @@ other: ar/news.html
 
 # What's new
 
+## Scoop and Homebrew, a gallery, and a demo
+
+- **Install with Scoop or Homebrew**:
+  `scoop bucket add elomar https://github.com/abobasel86/elomar-lang` then `scoop install elomar` on Windows;
+  `brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang` then `brew install elomar` on macOS
+  and Linux. Each release updates them, so `scoop update` and
+  `brew upgrade` find the new version. See [Getting started](01-start.html).
+- **A gallery of programs** under the [playground](playground.html#ex-hello):
+  Arabic text, JSON read into your own types, dates, every processor core,
+  and typed AI answers. A card opens its program and runs it; its link
+  (`playground.html#example=json`, for instance) opens it for anyone.
+- **A short demo** on the [home page](index.html): a new AI project, its
+  types, its output, and an error message in Arabic.
+
 ## 1.12.1: ARM, and two fixes
 
 - **Linux and Windows on ARM**: ready-made builds for Raspberry Pi, ARM

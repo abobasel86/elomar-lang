@@ -343,6 +343,38 @@ mod exercise_tests {
         assert!(count >= 10, "only {count} exercises");
     }
 
+    /// Every program of the gallery under the playground (and in its
+    /// Examples menu) runs in both languages and prints what the gallery
+    /// says it prints.
+    #[test]
+    fn site_gallery_programs_run() {
+        let data: Value =
+            serde_json::from_str(include_str!("../../../site/_data/gallery.json")).unwrap();
+        let programs = data.as_array().unwrap();
+        let mut keys = std::collections::HashSet::new();
+        for ex in programs {
+            let key = ex["key"].as_str().unwrap();
+            assert!(keys.insert(key), "{key}: two programs with this key");
+            let inputs: Vec<&str> = ex["input"].as_str().map(|i| vec![i]).unwrap_or_default();
+            for lang in ["en", "ar"] {
+                assert!(ex["title"][lang].is_string(), "{key}: title.{lang}");
+                assert!(ex["desc"][lang].is_string(), "{key}: desc.{lang}");
+                let req = json!({ "source": ex["code"], "lang": lang, "inputs": inputs,
+                                  "limit_ms": 60_000 });
+                let r: Value = serde_json::from_str(&run_json(&req.to_string())).unwrap();
+                // Outside the browser this build has no random source (the
+                // page gives it one), so `crypto.uuid()` may stop here.
+                let no_random = r["errors"].as_str().unwrap_or("").contains("R0006");
+                assert!(r["ok"] == true || no_random, "{key} ({lang}): {r}");
+                if let Some(expected) = ex["output"].as_str() {
+                    assert_eq!(r["output"], expected, "{key} ({lang})");
+                }
+            }
+        }
+        assert!(keys.contains("hello"), "the playground starts with `hello`");
+        assert!(programs.len() >= 10, "only {} programs", programs.len());
+    }
+
     #[test]
     fn explains_wrong_answers() {
         let cases = [json!({ "expr": "double(2)", "expect": "4" })];

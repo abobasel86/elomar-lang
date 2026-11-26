@@ -97,6 +97,18 @@ a { color: var(--accent); }
 @media (prefers-color-scheme: dark) { .pg-errors { color: #ff8a80; } }
 .pg-note { color: var(--muted); font-size: 0.88rem; }
 
+img.demo { display: block; max-width: 100%; height: auto; border-radius: 10px; margin: 1rem auto; }
+
+/* The gallery under the playground */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.9rem; margin: 1rem 0 2rem; }
+.gallery-card {
+  display: flex; flex-direction: column; gap: 0.35rem; padding: 0.9rem 1rem; border: 1px solid var(--line);
+  border-radius: 10px; color: var(--fg); text-decoration: none; background: var(--code-bg);
+}
+.gallery-card:hover, .gallery-card:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.gallery-card span { font-size: 0.9rem; color: var(--muted); }
+.gallery-card .gallery-run { margin-top: auto; color: var(--accent); font-weight: 600; }
+
 /* Exercises at the end of a lesson */
 .exercises { margin-top: 2.5rem; padding-top: 0.5rem; border-top: 2px solid var(--accent); }
 .ex-progress { font-size: 0.95rem; font-weight: 400; color: var(--muted); }

@@ -1,0 +1,14 @@
+{%- comment -%}
+The gallery under the playground: one card per program of
+site/_data/gallery.json. A card's link (#example=<key>) loads and runs it,
+and can be shared as it is.
+{%- endcomment -%}
+<div class="gallery">
+{%- for ex in site.data.gallery %}
+  <a class="gallery-card" id="ex-{{ ex.key }}" href="#example={{ ex.key }}">
+    <strong>{{ ex.title[include.lang] }}</strong>
+    <span>{{ ex.desc[include.lang] }}</span>
+    <span class="gallery-run">▶ {{ include.run }}</span>
+  </a>
+{%- endfor %}
+</div>

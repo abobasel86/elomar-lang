@@ -26,6 +26,10 @@
   <a href="https://open-vsx.org/extension/abobasel86/elomar-lang"><b>Editor extension</b></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/demo.gif" width="780" alt="A terminal: elomar new helpdesk --ai mock creates a project; its Ticket type and ai.infer call; elomar run prints [URGENT] billing; then an Arabic error message for a variable with an Arabic name">
+</p>
+
 ```elomar
 use std.ai
 
@@ -208,7 +212,10 @@ suite.
 
 Or try it without installing anything in the
 **[playground](https://abobasel86.github.io/elomar-lang/en/playground.html)**,
-which runs Elomar-Lang in your browser.
+which runs Elomar-Lang in your browser. Its gallery has short programs
+(Arabic text, JSON into your own types, dates, every processor core, typed
+AI answers) that open and run with one click, each with a link you can
+share.
 
 ## Getting started
 
@@ -228,6 +235,23 @@ The installer checks the download against the release's `SHA256SUMS.txt`,
 puts `elomar` in `~/.elomar/bin` and adds it to your `PATH`; `elomar upgrade`
 moves to a newer release later. Contributions are welcome: see
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Or with a package manager:
+
+```powershell
+# Windows, with Scoop
+scoop bucket add elomar https://github.com/abobasel86/elomar-lang
+scoop install elomar
+```
+
+```bash
+# macOS or Linux, with Homebrew
+brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang
+brew install elomar
+```
+
+Then `scoop update elomar` or `brew upgrade elomar` moves you to a new
+version.
 
 Or download `elomar` for your system from the
 [latest release](https://github.com/abobasel86/elomar-lang/releases/latest):
@@ -320,6 +344,8 @@ cargo run -p elomar-cli -- --lang ar check tests/fail/unknown_name.elo
 | `crates/elomar-cli` | The `elomar` command |
 | `editor/vscode` | VS Code extension (no build step) |
 | `examples/` | Programs with expected output (run by the test suite) |
+| `bucket/`, `Formula/`, `packaging/` | Scoop, Homebrew and winget files, written for each release by `packaging/update.py` |
+| `site/` | The website: tutorial, playground and its gallery (`site/_data/gallery.json`) |
 | `tests/fail/` | Programs that must fail with specific error codes |
 | `docs/grammar.md` | Authoritative grammar, semantics and error codes (version 1.0.0), in Arabic |
 | `docs/grammar.en.md` | Its English translation |
@@ -454,10 +480,16 @@ dual licensed as above, without any additional terms or conditions.
 ينفذ نواة اللغة: الأنواع والاستنتاج، والسجلات، و`match`، والتأثيرات، ورسائل الأخطاء
 بالعربية والإنجليزية.
 
-**التثبيت:** نزّل ملف `elomar` المناسب لنظامك من
-[آخر إصدار](https://github.com/abobasel86/elomar-lang/releases/latest)، وفك ضغطه،
-وضع `elomar` في مجلد ضمن `PATH`. ثم ابحث عن **Elomar-Lang** في قائمة الإضافات في
-VS Code أو VSCodium أو Cursor وثبّتها.
+**التثبيت بسطر واحد:** على Windows في PowerShell:
+`irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex`،
+وعلى Linux أو macOS:
+`curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh`.
+أو بمدير حزم: `scoop bucket add elomar https://github.com/abobasel86/elomar-lang` ثم `scoop install elomar` على Windows،
+و`brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang` ثم `brew install elomar` على macOS وLinux.
+ثم ابحث عن **Elomar-Lang** في قائمة الإضافات في VS Code أو VSCodium أو Cursor وثبّتها.
+
+جرّبها دون تثبيت في [صفحة التجربة](https://abobasel86.github.io/elomar-lang/ar/playground.html)،
+وفيها معرض برامج قصيرة تعمل بنقرة واحدة.
 
 لتشغيل مثال بالعربية من نسخة المصدر:
 

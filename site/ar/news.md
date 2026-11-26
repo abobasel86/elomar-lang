@@ -7,6 +7,17 @@ other: en/news.html
 
 # الجديد
 
+## Scoop وHomebrew، ومعرض برامج، وعرض قصير
+
+- **التثبيت بـ Scoop أو Homebrew**:
+  `scoop bucket add elomar https://github.com/abobasel86/elomar-lang` ثم `scoop install elomar` على Windows،
+  و`brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang` ثم `brew install elomar` على macOS وLinux.
+  كل إصدار جديد يحدّثهما، فيجده `scoop update` و`brew upgrade`. التفاصيل في [البداية](01-start.html).
+- **معرض برامج** تحت [صفحة التجربة](playground.html#ex-hello): نص عربي، وJSON يُقرأ إلى أنواعك،
+  والتواريخ، وكل أنوية المعالج، وإجابات ذكاء اصطناعي بأنواع محددة. البطاقة تفتح برنامجها وتشغّله،
+  ورابطها (مثلًا `playground.html#example=json`) يفتحه لأي شخص.
+- **عرض قصير** في [صفحة الدروس](index.html): مشروع ذكاء اصطناعي جديد، وأنواعه، ومخرجاته، ورسالة خطأ بالعربية.
+
 ## 1.12.1: معالجات ARM، وإصلاحان
 
 - **Linux وWindows على معالجات ARM**: نسخ جاهزة لـ Raspberry Pi وخوادم ARM وحواسيب Windows على ARM، ويختارها المثبّت

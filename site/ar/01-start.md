@@ -24,6 +24,22 @@ curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install
 ينزّل المثبّت آخر إصدار لنظامك، ويتحقق منه ببصمات الإصدار، ويضع `elomar` في مجلد خاص به (`.elomar/bin` في مجلدك الرئيسي)
 ويضيف هذا المجلد إلى `PATH`. افتح نافذة طرفية جديدة بعده. ولاحقًا ينقلك `elomar upgrade` إلى أحدث إصدار.
 
+أو بمدير حزم:
+
+```powershell
+# Windows باستخدام Scoop
+scoop bucket add elomar https://github.com/abobasel86/elomar-lang
+scoop install elomar
+```
+
+```bash
+# macOS أو Linux باستخدام Homebrew
+brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang
+brew install elomar
+```
+
+وبعدها ينقلك `scoop update elomar` أو `brew upgrade elomar` إلى أي إصدار جديد.
+
 أو ثبّته يدويًا:
 
 1. افتح [صفحة آخر إصدار](https://github.com/abobasel86/elomar-lang/releases/latest)

@@ -115,3 +115,26 @@ jobs:
           elomar new hello --ai mock
           Set-Location hello
           elomar run src/main.elo
+      # The package-manager files in this commit (packaging/update.py writes
+      # them for each release) install the latest release.
+      - name: Homebrew
+        if: runner.os != 'Windows'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"; fi
+          tap="$(brew --repository)/Library/Taps/abobasel86/homebrew-elomar"
+          mkdir -p "$tap/Formula"
+          cp Formula/elomar.rb "$tap/Formula/"
+          brew install abobasel86/elomar/elomar
+          brew test abobasel86/elomar/elomar
+          "$(brew --prefix)/bin/elomar" --version
+      - name: Scoop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-Expression "& {$(Invoke-RestMethod get.scoop.sh)} -RunAsAdmin"
+          scoop install bucket/elomar.json
+          & "$env:USERPROFILE\scoop\shims\elomar.exe" --version
+          & "$env:USERPROFILE\scoop\shims\elomar.exe" run examples/hello/main.elo

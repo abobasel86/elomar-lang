@@ -46,11 +46,32 @@ fn main() {
   regex, time, crypto, Python, packages, a formatter, tests and a VS Code
   extension.
 
+## See it work
+
+<p><img class="demo" src="assets/demo.gif" width="1040" height="580" alt="A terminal: elomar new helpdesk --ai mock creates a project; its Ticket type and ai.infer call; elomar run prints [URGENT] billing; then an Arabic error message for a variable with an Arabic name"></p>
+
+Or run short programs in your browser, with nothing to install: the
+[playground's gallery](en/playground.html#ex-hello)
+([بالعربية](ar/playground.html#ex-hello)).
+
 ## Install
 
-Download `elomar` for Windows, Linux or macOS from the
-[latest release](https://github.com/abobasel86/elomar-lang/releases/latest),
-then follow [Getting started](en/01-start.html).
+On Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.ps1 | iex
+```
+
+On Linux or macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/abobasel86/elomar-lang/main/install.sh | sh
+```
+
+Or with Scoop (`scoop bucket add elomar https://github.com/abobasel86/elomar-lang`, then `scoop install elomar`)
+or Homebrew (`brew tap abobasel86/elomar https://github.com/abobasel86/elomar-lang`, then `brew install elomar`).
+Every way is in [Getting started](en/01-start.html)
+([البداية](ar/01-start.html)).
 
 ## Sponsors
 
