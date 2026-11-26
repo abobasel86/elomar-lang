@@ -82,6 +82,10 @@ enum Command {
         /// Format standard input and print the result (for editors)
         #[arg(long)]
         stdin: bool,
+        /// Write every keyword in one language: `ar` (`دالة`, `ليكن`, …)
+        /// or `en` (`fn`, `let`, …). Without it, each keeps its spelling.
+        #[arg(long, value_name = "ar|en", value_parser = ["ar", "en"])]
+        keywords: Option<String>,
     },
     /// Create a new project folder with a program, a module and a test
     New {
@@ -308,7 +312,14 @@ fn main() -> ExitCode {
             paths,
             check,
             stdin,
-        } => return fmt::run_fmt(paths, *check, *stdin, &reporter),
+            keywords,
+        } => {
+            let keywords = keywords.as_deref().map(|k| match k {
+                "ar" => elomar_fmt::Keywords::Arabic,
+                _ => elomar_fmt::Keywords::English,
+            });
+            return fmt::run_fmt(paths, *check, *stdin, keywords, &reporter);
+        }
         Command::Check {
             file,
             format,

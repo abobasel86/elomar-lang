@@ -1,0 +1,5 @@
+// expect: E0101
+// An Arabic keyword (`نوع` is `type`) cannot be a name.
+fn main() {
+    let نوع = 1
+}

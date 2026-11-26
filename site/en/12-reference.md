@@ -13,6 +13,35 @@ the standard modules, in one page. The lessons show them at work; the
 gives every detail and error code. A method marked * changes the value, so
 the value must be in a `var`.
 
+## Keywords {#keywords}
+
+Every keyword also has an Arabic spelling. The two are the same word: they
+can be mixed in one file, and neither can be a name.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `let` | `ليكن` | `type` | `نوع` |
+| `var` | `متغير` | `enum` | `تعداد` |
+| `fn` | `دالة` | `match` | `طابق` |
+| `return` | `أرجع` | `use` | `استخدم` |
+| `if` | `إذا` | `pub` | `عام` |
+| `else` | `وإلا` | `async` | `غير_متزامن` |
+| `while` | `طالما` | `await` | `انتظر` |
+| `for` | `لكل` | `trait` | `سمة` |
+| `in` | `في` | `impl` | `نفذ` |
+| `break` | `توقف` | `self` | `هذا` |
+| `continue` | `تابع` | `as` | `بصفة` |
+| `true` | `صح` | `div` | `قسمة` |
+| `false` | `خطأ` |  | |
+
+- An Arabic keyword matches with or without hamza (`أرجع`, `ارجع`), as `فى`
+  or `داله`, and ignoring harakat, shadda and tatweel (`نفّذ`).
+- A program starts in `main`, or in `رئيسية` when it has no `main`.
+- `elomar fmt --keywords ar` writes every keyword in a file in Arabic, and
+  `--keywords en` in English.
+- Type names (`Int`, `String`), built-in functions (`print`) and modules
+  (`std.json`) stay in English.
+
 ## Built-in functions
 
 | Function | What it does |
@@ -159,7 +188,7 @@ permission in `elomar.toml` ([lesson 7](07-data.html)).
 | `elomar run file.elo` | Check and run a program |
 | `elomar check file.elo` | Only check |
 | `elomar repl` | Type code and see the result at once |
-| `elomar fmt` | Format in the standard style |
+| `elomar fmt` | Format in the standard style; `--keywords ar` or `en` writes every keyword in one language |
 | `elomar test` | Run a project's tests |
 | `elomar new name` | Create a project |
 | `elomar new name --ai PROVIDER` | Create a project that calls a model: `mock`, `ollama`, `openai` or `anthropic` |

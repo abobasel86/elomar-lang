@@ -1,4 +1,24 @@
 {
+  "main (Arabic)": {
+    "prefix": "رئيسية",
+    "body": ["دالة رئيسية() {", "\t$0", "}"],
+    "description": "Program entry point, with Arabic keywords (fn main)"
+  },
+  "function (Arabic)": {
+    "prefix": "دالة",
+    "body": ["دالة ${1:الاسم}(${2:س}: ${3:Int}) -> ${4:Int} {", "\t$0", "}"],
+    "description": "Function, with Arabic keywords (fn)"
+  },
+  "if (Arabic)": {
+    "prefix": "إذا",
+    "body": ["إذا ${1:الشرط} {", "\t$2", "} وإلا {", "\t$0", "}"],
+    "description": "if / else, with Arabic keywords"
+  },
+  "for (Arabic)": {
+    "prefix": "لكل",
+    "body": ["لكل ${1:ع} في ${2:القائمة} {", "\t$0", "}"],
+    "description": "for loop, with Arabic keywords"
+  },
   "main": {
     "prefix": "main",
     "body": ["fn main() {", "\t$0", "}"],

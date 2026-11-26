@@ -86,6 +86,27 @@ elomar run hello.elo
 Every program starts at `fn main()`. `print` writes its values and a line
 break.
 
+### With Arabic keywords
+
+Every keyword also has an Arabic spelling: `دالة` is `fn`, `ليكن` is `let`,
+`إذا` is `if` and `وإلا` is `else`. A program may start in `رئيسية` instead
+of `main`:
+
+```elomar
+دالة رئيسية() {
+    ليكن الاسم = "لينا"
+    إذا الاسم.length > 3 {
+        print("مرحبًا يا {الاسم}")
+    } وإلا {
+        print("أهلًا")
+    }
+}
+```
+
+Write in English, in Arabic, or both: it is the same program. The lessons
+use the English keywords; all the Arabic ones are in the
+[table of keywords](12-reference.html#keywords).
+
 ## Try things at the prompt
 
 `elomar repl` opens a prompt: type a line and see its result at once,

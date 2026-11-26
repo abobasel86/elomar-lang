@@ -13,6 +13,9 @@
 //! - runs of blank lines become one, trailing spaces are removed, and the
 //!   file ends with exactly one newline.
 //!
+//! Keywords keep the spelling they were written in (`fn` or `دالة`), unless
+//! [`format_with`] is asked to write them all in one language.
+//!
 //! Every result is checked: if the formatted code would not produce the same
 //! tokens as the input, nothing is changed and [`FormatError::Unsafe`] is
 //! returned.
@@ -30,13 +33,26 @@ pub enum FormatError {
 
 const INDENT: &str = "    ";
 
+/// The language to write every keyword in (`elomar fmt --keywords ar`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Keywords {
+    English,
+    Arabic,
+}
+
 /// Formats a whole file.
 pub fn format(src: &str) -> Result<String, FormatError> {
+    format_with(src, None)
+}
+
+/// Formats a whole file, writing every keyword in `keywords` when given
+/// (`fn` becomes `دالة`, or the other way round).
+pub fn format_with(src: &str, keywords: Option<Keywords>) -> Result<String, FormatError> {
     let (tokens, diags) = elomar_lexer::tokens_with_comments(src);
     if !diags.is_empty() {
         return Err(FormatError::Lex(diags));
     }
-    let out = Printer::new(src).print(&tokens);
+    let out = Printer { src, keywords }.print(&tokens);
     if same_program(src, &out) {
         Ok(out)
     } else {
@@ -155,14 +171,19 @@ fn starts_operand(prev: Option<&TokenKind>) -> bool {
 
 struct Printer<'a> {
     src: &'a str,
+    keywords: Option<Keywords>,
 }
 
 impl<'a> Printer<'a> {
-    fn new(src: &'a str) -> Self {
-        Printer { src }
-    }
-
     fn text(&self, tok: &Token) -> &'a str {
+        if let Some(lang) = self.keywords
+            && let Some((en, ar)) = elomar_lexer::keyword_spellings(&tok.kind)
+        {
+            return match lang {
+                Keywords::English => en,
+                Keywords::Arabic => ar,
+            };
+        }
         let s = &self.src[tok.span.start as usize..tok.span.end as usize];
         if tok.kind == TokenKind::Comment && s.starts_with("//") {
             s.trim_end()
@@ -583,6 +604,50 @@ let m: Map<String, fn(Int, Int) -> Bool> = [:]
             ),
             "fn التقدير(الدرجة: Int) -> String {\n    return match الدرجة >= 90 {\n        true => \"ممتاز\"\n        false => \"جيد\"\n    }\n}\n"
         );
+    }
+
+    #[test]
+    fn arabic_keywords_keep_their_spelling_or_switch() {
+        let mixed = "دالة   ف(س:Int)->Bool{
+return س>0
+}
+fn g() {
+    ليكن ب = 1
+}
+";
+        assert_eq!(
+            fmt(mixed),
+            "دالة ف(س: Int) -> Bool {
+    return س > 0
+}
+fn g() {
+    ليكن ب = 1
+}
+"
+        );
+        let ar = format_with(mixed, Some(Keywords::Arabic)).unwrap();
+        assert_eq!(
+            ar,
+            "دالة ف(س: Int) -> Bool {
+    أرجع س > 0
+}
+دالة g() {
+    ليكن ب = 1
+}
+"
+        );
+        let en = format_with(&ar, Some(Keywords::English)).unwrap();
+        assert_eq!(
+            en,
+            "fn ف(س: Int) -> Bool {
+    return س > 0
+}
+fn g() {
+    let ب = 1
+}
+"
+        );
+        assert_eq!(format_with(&en, Some(Keywords::Arabic)).unwrap(), ar);
     }
 
     #[test]

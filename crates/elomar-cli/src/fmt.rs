@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use elomar_diagnostics::{SourceFile, SourceMap};
-use elomar_fmt::FormatError;
+use elomar_fmt::{FormatError, Keywords};
 
 use crate::Reporter;
 
 /// Formats `src`, keeping Windows line endings if the file uses them.
-fn format_text(src: &str) -> Result<String, FormatError> {
+fn format_text(src: &str, keywords: Option<Keywords>) -> Result<String, FormatError> {
     let crlf = src.contains("\r\n");
-    let out = elomar_fmt::format(&src.replace("\r\n", "\n"))?;
+    let out = elomar_fmt::format_with(&src.replace("\r\n", "\n"), keywords)?;
     Ok(if crlf { out.replace('\n', "\r\n") } else { out })
 }
 
@@ -74,6 +74,7 @@ pub(crate) fn run_fmt(
     paths: &[PathBuf],
     check: bool,
     stdin: bool,
+    keywords: Option<Keywords>,
     reporter: &Reporter,
 ) -> ExitCode {
     if stdin {
@@ -85,7 +86,7 @@ pub(crate) fn run_fmt(
             );
             return ExitCode::from(2);
         }
-        return match format_text(&src) {
+        return match format_text(&src, keywords) {
             Ok(out) => {
                 print!("{out}");
                 ExitCode::SUCCESS
@@ -112,7 +113,7 @@ pub(crate) fn run_fmt(
                 continue;
             }
         };
-        match format_text(&src) {
+        match format_text(&src, keywords) {
             Ok(out) if out == src => {}
             Ok(out) => {
                 if !check && let Err(e) = std::fs::write(file, out) {

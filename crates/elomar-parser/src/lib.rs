@@ -130,6 +130,16 @@ impl Parser {
             let name = name.clone();
             let span = self.bump().span;
             Ok(Ident { name, span })
+        } else if let Some((en, ar)) = elomar_lexer::keyword_spellings(self.peek()) {
+            // `نوع` and `type` are the same keyword, so neither can be a name.
+            Err(self.unexpected("a name", "اسم").with_hint(Text::new(
+                format!(
+                    "`{en}` (in Arabic `{ar}`) is a keyword, so it cannot be a name; choose another, such as `{ar}_` or `{en}_`"
+                ),
+                format!(
+                    "`{ar}` (بالإنجليزية `{en}`) كلمة محجوزة، فلا تصلح اسمًا؛ اختر اسمًا آخر مثل `{ar}_` أو `{en}_`"
+                ),
+            )))
         } else {
             Err(self.unexpected("a name", "اسم"))
         }

@@ -156,7 +156,7 @@ pub fn check_exercise(source: &str, lang: Lang, mode: &str, cases: &[Value]) -> 
         if program
             .items
             .iter()
-            .any(|item| matches!(item, Item::Fn(f) if f.name.name == "main"))
+            .any(|item| matches!(item, Item::Fn(f) if f.name.name == "main" || f.name.name == elomar_ast::MAIN_AR))
         {
             return fail(String::new(), "main");
         }

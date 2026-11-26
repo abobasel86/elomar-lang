@@ -185,7 +185,10 @@ impl TokenKind {
             TokenKind::Str(_) | TokenKind::Template(_) => "نص حرفي".into(),
             TokenKind::Newline => "نهاية السطر".into(),
             TokenKind::Eof => "نهاية الملف".into(),
-            other => other.describe(),
+            other => match keyword_spellings(other) {
+                Some((en, ar)) => format!("`{ar}` (`{en}`)"),
+                None => other.describe(),
+            },
         }
     }
 
@@ -232,36 +235,72 @@ pub fn lex_at(src: &str, base: usize) -> (Vec<Token>, Vec<Diagnostic>) {
     (apply_newline_rules(raw), diags)
 }
 
-fn keyword(s: &str) -> Option<TokenKind> {
-    use TokenKind::*;
-    Some(match s {
-        "let" => Let,
-        "var" => Var,
-        "fn" => Fn,
-        "return" => Return,
-        "if" => If,
-        "else" => Else,
-        "while" => While,
-        "for" => For,
-        "in" => In,
-        "break" => Break,
-        "continue" => Continue,
-        "true" => True,
-        "false" => False,
-        "type" => Type,
-        "enum" => Enum,
-        "match" => Match,
-        "use" => Use,
-        "pub" => Pub,
-        "async" => Async,
-        "await" => Await,
-        "trait" => Trait,
-        "impl" => Impl,
-        "self" => SelfKw,
-        "as" => As,
-        "div" => Div,
-        _ => return None,
-    })
+/// Every keyword: its kind, its English spelling and its Arabic spelling.
+/// Either spelling may be used anywhere, even in the same file.
+pub const KEYWORDS: &[(TokenKind, &str, &str)] = &[
+    (TokenKind::Let, "let", "ليكن"),
+    (TokenKind::Var, "var", "متغير"),
+    (TokenKind::Fn, "fn", "دالة"),
+    (TokenKind::Return, "return", "أرجع"),
+    (TokenKind::If, "if", "إذا"),
+    (TokenKind::Else, "else", "وإلا"),
+    (TokenKind::While, "while", "طالما"),
+    (TokenKind::For, "for", "لكل"),
+    (TokenKind::In, "in", "في"),
+    (TokenKind::Break, "break", "توقف"),
+    (TokenKind::Continue, "continue", "تابع"),
+    (TokenKind::True, "true", "صح"),
+    (TokenKind::False, "false", "خطأ"),
+    (TokenKind::Type, "type", "نوع"),
+    (TokenKind::Enum, "enum", "تعداد"),
+    (TokenKind::Match, "match", "طابق"),
+    (TokenKind::Use, "use", "استخدم"),
+    (TokenKind::Pub, "pub", "عام"),
+    (TokenKind::Async, "async", "غير_متزامن"),
+    (TokenKind::Await, "await", "انتظر"),
+    (TokenKind::Trait, "trait", "سمة"),
+    (TokenKind::Impl, "impl", "نفذ"),
+    (TokenKind::SelfKw, "self", "هذا"),
+    (TokenKind::As, "as", "بصفة"),
+    (TokenKind::Div, "div", "قسمة"),
+];
+
+/// The keyword a word spells, in English or Arabic. Arabic words match
+/// with or without hamza on alef (`أرجع`, `ارجع`), with `ى` for final `ي`
+/// and `ه` for `ة`, and ignoring harakat, shadda and tatweel (`نفّذ`).
+pub fn keyword(s: &str) -> Option<TokenKind> {
+    if s.is_ascii() {
+        return KEYWORDS
+            .iter()
+            .find(|(_, en, _)| *en == s)
+            .map(|(k, _, _)| k.clone());
+    }
+    let word = arabic_key(s);
+    KEYWORDS
+        .iter()
+        .find(|(_, _, ar)| arabic_key(ar) == word)
+        .map(|(k, _, _)| k.clone())
+}
+
+/// The English and Arabic spellings of a keyword token.
+pub fn keyword_spellings(kind: &TokenKind) -> Option<(&'static str, &'static str)> {
+    KEYWORDS
+        .iter()
+        .find(|(k, _, _)| k == kind)
+        .map(|(_, en, ar)| (*en, *ar))
+}
+
+/// `s` with the differences [`keyword`] ignores removed.
+fn arabic_key(s: &str) -> String {
+    s.nfc()
+        .filter(|c| !matches!(c, '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{0640}'))
+        .map(|c| match c {
+            'أ' | 'إ' | 'آ' | 'ٱ' => 'ا',
+            'ى' => 'ي',
+            'ة' => 'ه',
+            c => c,
+        })
+        .collect()
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -1032,6 +1071,60 @@ mod tests {
             kinds("let اسم = \"مرحبا\\n\""),
             vec![Let, Ident("اسم".into()), Eq, Str("مرحبا\n".into()), Eof]
         );
+    }
+
+    #[test]
+    fn arabic_keywords() {
+        assert_eq!(
+            kinds("دالة ف() { ليكن س = صح\nإذا س { أرجع 1 } وإلا { أرجع 2 } }"),
+            vec![
+                Fn,
+                Ident("ف".into()),
+                LParen,
+                RParen,
+                LBrace,
+                Let,
+                Ident("س".into()),
+                Eq,
+                True,
+                Newline,
+                If,
+                Ident("س".into()),
+                LBrace,
+                Return,
+                Int(1),
+                RBrace,
+                Else,
+                LBrace,
+                Return,
+                Int(2),
+                RBrace,
+                RBrace,
+                Eof
+            ]
+        );
+        // Every keyword, in both spellings.
+        for (kind, en, ar) in KEYWORDS {
+            assert_eq!(kinds(en), vec![kind.clone(), Eof], "{en}");
+            assert_eq!(kinds(ar), vec![kind.clone(), Eof], "{ar}");
+        }
+        // Hamza, ى, ة, harakat, shadda and tatweel do not matter.
+        for word in [
+            "ارجع",
+            "اذا",
+            "والا",
+            "خطا",
+            "فى",
+            "داله",
+            "نفّذ",
+            "دالـــة",
+            "لِكُلِّ",
+        ] {
+            assert!(keyword(word).is_some(), "{word}");
+        }
+        // Longer words are names.
+        assert_eq!(kinds("دالتي"), vec![Ident("دالتي".into()), Eof]);
+        assert_eq!(kinds("في_المخزن"), vec![Ident("في_المخزن".into()), Eof]);
     }
 
     #[test]

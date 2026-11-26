@@ -9,6 +9,7 @@
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#effects" },
+    { "include": "#arabic-keywords" },
     { "include": "#use" },
     { "include": "#declarations" },
     { "include": "#keywords" },
@@ -18,6 +19,76 @@
     { "include": "#operators" }
   ],
   "repository": {
+    "arabic-keywords": {
+      "comment": "Arabic keywords (دالة is fn, ليكن is let, ...), with or without hamza, harakat or tatweel",
+      "patterns": [
+        {
+          "match": "((?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*س[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*خ[\\p{Mn}ـ]*د[\\p{Mn}ـ]*م[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_]))\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.import.elomar"
+            },
+            "2": {
+              "name": "entity.name.namespace.elomar"
+            }
+          }
+        },
+        {
+          "match": "((?<![\\p{L}\\p{N}\\p{M}_])(?:د[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_]))\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.elomar"
+            },
+            "2": {
+              "name": "entity.name.function.elomar"
+            }
+          }
+        },
+        {
+          "match": "((?<![\\p{L}\\p{N}\\p{M}_])(?:ن[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*د[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*|س[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_]))\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.elomar"
+            },
+            "2": {
+              "name": "entity.name.type.elomar"
+            }
+          }
+        },
+        {
+          "name": "keyword.control.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*ذ[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*|و[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*|ط[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*|ل[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*|ف[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ب[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*ج[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*|ط[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ب[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ن[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*ظ[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "storage.type.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ك[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*غ[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*|د[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*د[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*|س[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*ذ[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "storage.modifier.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ع[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*م[\\p{Mn}ـ]*|غ[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*_م[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*ز[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*م[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "keyword.other.import.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*س[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*خ[\\p{Mn}ـ]*د[\\p{Mn}ـ]*م[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "keyword.operator.word.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ق[\\p{Mn}ـ]*س[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "variable.language.self.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[ةه][\\p{Mn}ـ]*ذ[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "keyword.other.reserved.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ب[\\p{Mn}ـ]*ص[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        },
+        {
+          "name": "constant.language.boolean.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ص[\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|خ[\\p{Mn}ـ]*ط[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {

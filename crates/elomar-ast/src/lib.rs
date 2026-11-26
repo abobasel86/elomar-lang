@@ -19,6 +19,27 @@ pub struct Program {
     pub packages: Vec<String>,
 }
 
+/// The Arabic name of the function a program starts in, used when there is
+/// no `main`: `دالة رئيسية() { ... }`.
+pub const MAIN_AR: &str = "رئيسية";
+
+impl Program {
+    /// The function the program starts in: `main`, or `رئيسية` when only
+    /// that one is defined.
+    pub fn entry(&self) -> &'static str {
+        let defines = |name: &str| {
+            self.items
+                .iter()
+                .any(|item| matches!(item, Item::Fn(f) if f.name.name == name))
+        };
+        if !defines("main") && defines(MAIN_AR) {
+            MAIN_AR
+        } else {
+            "main"
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
     Use(UseDecl),

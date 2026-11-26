@@ -191,7 +191,7 @@ pub fn run_with(
     ai: &mut AiRuntime,
     fs: FsPolicy,
 ) -> Result<(), RuntimeError> {
-    run_function(program, "main", host, ai, fs).map(|_| ())
+    run_function(program, program.entry(), host, ai, fs).map(|_| ())
 }
 
 /// Evaluates file-level constants, then calls the parameterless function
@@ -217,7 +217,7 @@ pub fn run_limited(
     fs: FsPolicy,
     limit_ms: i64,
 ) -> Result<(), RuntimeError> {
-    run_function_with(program, "main", host, ai, fs, None, Some(limit_ms)).map(|_| ())
+    run_function_with(program, program.entry(), host, ai, fs, None, Some(limit_ms)).map(|_| ())
 }
 
 /// Like [`run_with`], reporting each statement and runtime error to
@@ -229,7 +229,7 @@ pub fn run_debug(
     fs: FsPolicy,
     debugger: Box<dyn Debugger>,
 ) -> Result<(), RuntimeError> {
-    run_function_with(program, "main", host, ai, fs, Some(debugger), None).map(|_| ())
+    run_function_with(program, program.entry(), host, ai, fs, Some(debugger), None).map(|_| ())
 }
 
 fn run_function_with(

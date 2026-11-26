@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 elomar-diagnostics.workspace = true
 elomar-ast.workspace = true
+elomar-lexer.workspace = true
 elomar-parser.workspace = true
 elomar-loader.workspace = true
 elomar-pkg.workspace = true

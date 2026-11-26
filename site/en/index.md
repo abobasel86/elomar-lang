@@ -17,6 +17,10 @@ No time to install yet? The [playground](playground.html) runs programs in
 your browser, and its [gallery](playground.html#ex-hello) has short ones
 that run with one click.
 
+The lessons write keywords in English (`fn`, `let`, `if`). Each one also
+has an Arabic spelling (`دالة`, `ليكن`, `إذا`), so a whole program can be
+written in Arabic; see the [table of keywords](12-reference.html#keywords).
+
 {% for l in site.data.lessons -%}
 {{ forloop.index }}. [{{ l.en }}]({{ l.slug }}.html)
 {% endfor %}

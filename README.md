@@ -73,6 +73,12 @@ by the compiler when they are not declared.
 
 - Static types with local inference; no `null` (`Option<T>`), explicit errors (`Result<T, E>`).
 - No semicolons needed; `/` always returns a `Float`, `div` is integer division.
+- **Arabic keywords:** every keyword also has an Arabic spelling (`دالة` is
+  `fn`, `ليكن` is `let`, `إذا` is `if`, `لكل … في` is `for … in`), and a
+  program may start in `رئيسية`. Mix them freely; `elomar fmt --keywords ar`
+  (or `en`) rewrites a file in one language. See
+  [`examples/arabic-keywords`](examples/arabic-keywords) and the
+  [table](https://abobasel86.github.io/elomar-lang/en/12-reference.html#keywords).
 - Structural records and value semantics (no surprising aliasing).
 - `match` with exhaustiveness checking.
 - Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`
@@ -491,10 +497,25 @@ dual licensed as above, without any additional terms or conditions.
 جرّبها دون تثبيت في [صفحة التجربة](https://abobasel86.github.io/elomar-lang/ar/playground.html)،
 وفيها معرض برامج قصيرة تعمل بنقرة واحدة.
 
+**اكتب بكلمات عربية:** لكل كلمة محجوزة كتابة عربية (`دالة` هي `fn`، و`ليكن` هي `let`،
+و`إذا` هي `if`)، ويجوز المزج بين اللغتين، و`elomar fmt --keywords ar` يحوّل الملف كله إلى العربية:
+
+```elomar
+دالة رئيسية() {
+    لكل ع في 1..=3 {
+        إذا ع == 2 { تابع }
+        print("العدد", ع)
+    }
+}
+```
+
+الجدول الكامل في [المرجع](https://abobasel86.github.io/elomar-lang/ar/12-reference.html#keywords).
+
 لتشغيل مثال بالعربية من نسخة المصدر:
 
 ```bash
 cargo run -p elomar-cli -- --lang ar run examples/arabic/main.elo
+cargo run -p elomar-cli -- --lang ar run examples/arabic-keywords/main.elo
 ```
 
 **ادعم المشروع:** Elomar-Lang مجانية ومفتوحة المصدر. إن كانت مفيدة لك أو لمؤسستك،

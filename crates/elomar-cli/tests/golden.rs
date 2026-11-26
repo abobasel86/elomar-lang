@@ -112,6 +112,80 @@ fn engines_agree() {
     }
 }
 
+fn copy_dir(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let path = entry.unwrap().path();
+        let dest = to.join(path.file_name().unwrap());
+        if path.is_dir() {
+            copy_dir(&path, &dest);
+        } else {
+            std::fs::copy(&path, &dest).unwrap();
+        }
+    }
+}
+
+/// Every example, rewritten by `elomar fmt --keywords ar` (`دالة`, `ليكن`,
+/// …), prints the same, and `--keywords en` brings back the formatted original.
+#[test]
+fn examples_run_with_arabic_keywords() {
+    use std::io::Write as _;
+    let fmt = |src: &str, keywords: &str| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_elomar"))
+            .args(["fmt", "--stdin", "--keywords", keywords])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(src.as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(out.status.success());
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let work = std::env::temp_dir().join(format!("elomar-arabic-kw-{}", std::process::id()));
+    let mut count = 0;
+    for entry in std::fs::read_dir(root().join("examples")).unwrap() {
+        let dir = entry.unwrap().path();
+        let Some(rel) = ["main.elo", "src/main.elo"]
+            .into_iter()
+            .find(|r| dir.join(r).exists())
+        else {
+            continue;
+        };
+        if !dir.join("expected.out").exists() {
+            continue;
+        }
+        let copy = work.join(dir.file_name().unwrap());
+        copy_dir(&dir, &copy);
+        let src = lines(&std::fs::read_to_string(dir.join(rel)).unwrap());
+        let arabic = fmt(&src, "ar");
+        assert!(arabic.contains("دالة"), "{}", dir.display());
+        assert_eq!(fmt(&arabic, "en"), fmt(&src, "en"), "{}", dir.display());
+        std::fs::write(copy.join(rel), &arabic).unwrap();
+        let out = elomar(&["run", copy.join(rel).to_str().unwrap()]);
+        assert!(
+            out.status.success(),
+            "{}:\n{}",
+            dir.display(),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert_eq!(
+            lines(&String::from_utf8_lossy(&out.stdout)),
+            lines(&std::fs::read_to_string(dir.join("expected.out")).unwrap()),
+            "output of {} with Arabic keywords",
+            dir.display()
+        );
+        count += 1;
+    }
+    let _ = std::fs::remove_dir_all(&work);
+    assert!(count >= 10, "only {count} examples");
+}
+
 #[test]
 fn failing_programs_report_expected_codes() {
     let mut count = 0;

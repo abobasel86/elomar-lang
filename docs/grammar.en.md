@@ -25,8 +25,36 @@ with 1.0 keeps working with every 1.x release.
 | Strings | `"..."` on one line. Escapes: `\n \t \r \0 \" \\ \{ \} \u{XXXX}` |
 | Raw strings | `r"\d+"` and `r#"قال "نعم""#`: no escapes and no interpolation, so every character stays as written. Useful for regular expressions and Windows paths. With `#` the string can contain `"` |
 | Interpolation | `"مرحبا {name}، عمرك {age + 1}"`: any expression between `{` and `}` is evaluated and shown as `print` shows it. The result is a `String`. For a literal brace write `\{` (for example JSON: `"\{\"a\": 1}"`). Strings and brackets can be used inside the expression (`"{m["k"]}"`). A `match` pattern cannot be a string with interpolation |
-| Reserved words | `let var fn return if else while for in break continue true false type enum match use pub async await trait impl self as div` |
+| Reserved words | `let var fn return if else while for in break continue true false type enum match use pub async await trait impl self as div`, and each one's Arabic spelling (§1.0.1) |
 | Prelude names | `Some None Ok Err` and the functions in section 7. They are not reserved words, but they cannot be redefined |
+
+### 1.0.1 Arabic Keywords (since 1.13)
+
+Every reserved word also has an Arabic spelling. Both spellings are the same
+token, may be mixed in one file, and are reserved: neither can be a name.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `let` | `ليكن` | `type` | `نوع` |
+| `var` | `متغير` | `enum` | `تعداد` |
+| `fn` | `دالة` | `match` | `طابق` |
+| `return` | `أرجع` | `use` | `استخدم` |
+| `if` | `إذا` | `pub` | `عام` |
+| `else` | `وإلا` | `async` | `غير_متزامن` |
+| `while` | `طالما` | `await` | `انتظر` |
+| `for` | `لكل` | `trait` | `سمة` |
+| `in` | `في` | `impl` | `نفذ` |
+| `break` | `توقف` | `self` | `هذا` |
+| `continue` | `تابع` | `as` | `بصفة` |
+| `true` | `صح` | `div` | `قسمة` |
+| `false` | `خطأ` |  | |
+
+An Arabic keyword matches with or without hamza on alef (`أرجع` or `ارجع`,
+`إذا` or `اذا`), with `ى` for final `ي` (`فى`), with `ه` for `ة` (`داله`),
+and ignoring harakat, shadda and tatweel (`نفّذ`, `دالـــة`). The program may
+start in `رئيسية` instead of `main` when it has no `main`.
+`elomar fmt --keywords ar` writes every keyword in Arabic, and
+`--keywords en` in English; without the option each keeps its spelling.
 
 ### 1.1 Line Ends
 

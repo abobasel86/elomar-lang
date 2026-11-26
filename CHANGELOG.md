@@ -8,6 +8,27 @@ change the language.
 
 ### Added
 
+- **Arabic keywords.** Every keyword also has an Arabic spelling: `دالة`
+  (`fn`), `ليكن` (`let`), `متغير` (`var`), `أرجع` (`return`), `إذا` (`if`),
+  `وإلا` (`else`), `طالما` (`while`), `لكل` (`for`), `في` (`in`), `توقف`
+  (`break`), `تابع` (`continue`), `صح` (`true`), `خطأ` (`false`), `نوع`
+  (`type`), `تعداد` (`enum`), `طابق` (`match`), `استخدم` (`use`), `عام`
+  (`pub`), `غير_متزامن` (`async`), `انتظر` (`await`), `سمة` (`trait`),
+  `نفذ` (`impl`), `هذا` (`self`), `بصفة` (`as`) and `قسمة` (`div`). Both
+  spellings are the same token and can be mixed. Arabic keywords match with
+  or without hamza, as `ى`/`ه` for `ي`/`ة`, and ignoring harakat, shadda and
+  tatweel. Both spellings are reserved, so a name such as `نوع` now needs
+  another name (the error says so).
+- A program may start in `رئيسية` (`دالة رئيسية() { ... }`) when it has no
+  `main`.
+- `elomar fmt --keywords ar` (or `en`) writes every keyword in one language;
+  without it, each keyword keeps its spelling.
+- The editor completes, highlights and has snippets for Arabic keywords; the
+  REPL accepts them; Arabic error messages show a keyword in both spellings
+  (`` `دالة` (`fn`) ``).
+- `examples/arabic-keywords`, a playground gallery program, and a test that
+  runs every example rewritten with Arabic keywords in both engines.
+
 - Links to the website show a preview when shared (X, LinkedIn, WhatsApp
   and others): every page has Open Graph and Twitter card tags with its
   title, a description in its language, and the project's image.

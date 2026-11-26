@@ -38,6 +38,9 @@ fn main() {
 
 - **Easy to read.** Plain syntax, clear error messages in English or Arabic,
   and Arabic names for your own variables and functions if you like.
+- **Keywords in Arabic, too.** `دالة` is `fn`, `ليكن` is `let`, `إذا` is
+  `if`: write a whole program in Arabic, in English, or mix them
+  ([all keywords](en/12-reference.html#keywords), [بالعربية](ar/12-reference.html#keywords)).
 - **Safe by default.** Static types, no `null`, errors as values, and
   programs may only touch the files, hosts, ports and programs you allow.
 - **AI as part of the language.** `ai.infer<T>` returns a checked value of

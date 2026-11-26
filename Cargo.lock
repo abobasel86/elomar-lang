@@ -302,6 +302,7 @@ dependencies = [
  "elomar-diagnostics",
  "elomar-fmt",
  "elomar-interpreter",
+ "elomar-lexer",
  "elomar-loader",
  "elomar-parser",
  "elomar-pkg",

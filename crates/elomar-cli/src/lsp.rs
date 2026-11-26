@@ -41,12 +41,6 @@ struct Server {
     out: std::io::Stdout,
 }
 
-const KEYWORDS: &[&str] = &[
-    "fn", "let", "var", "if", "else", "while", "for", "in", "return", "break", "continue", "match",
-    "type", "enum", "trait", "impl", "use", "pub", "async", "await", "true", "false", "self",
-    "div",
-];
-
 pub(crate) fn serve(lang: Lang) -> ExitCode {
     let mut server = Server {
         lang,
@@ -687,8 +681,16 @@ impl Server {
             }
             return Value::Array(items);
         }
-        for k in KEYWORDS {
-            add(k, 14, None);
+        // Keywords in the language the editor shows messages in first, then
+        // in the other (`دالة` and `fn` are the same keyword).
+        for &(_, en, ar) in elomar_lexer::KEYWORDS {
+            let (first, second) = if self.lang == Lang::Ar {
+                (ar, en)
+            } else {
+                (en, ar)
+            };
+            add(first, 14, Some(second));
+            add(second, 14, Some(first));
         }
         for f in elomar_types::BUILTIN_FUNCTIONS {
             add(f, 3, Some("built-in"));

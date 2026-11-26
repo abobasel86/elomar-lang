@@ -360,11 +360,21 @@ fn defines_names(stmts: &[&Stmt]) -> bool {
 /// `Some(name)` if `input` is a declaration (`fn`, `type`, `enum`, `trait`,
 /// `impl`, `use`), with the name it defines when it defines one.
 fn declaration_name(input: &str) -> Option<Option<String>> {
+    use elomar_lexer::TokenKind as K;
+    // Arabic keywords (`دالة`, `نوع`, …) count as their English spelling.
+    let kind = |w: &str| elomar_lexer::keyword(w);
     let mut words = input.split_whitespace().peekable();
-    while matches!(words.peek(), Some(&"pub") | Some(&"async")) {
+    while words
+        .peek()
+        .is_some_and(|w| matches!(kind(w), Some(K::Pub | K::Async)))
+    {
         words.next();
     }
-    let keyword = words.next()?;
+    let word = words.next()?;
+    let keyword = match kind(word) {
+        Some(k) => elomar_lexer::keyword_spellings(&k).map_or(word, |(en, _)| en),
+        None => word,
+    };
     match keyword {
         "fn" | "type" | "enum" | "trait" => {
             let name: String = words

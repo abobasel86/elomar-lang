@@ -221,15 +221,19 @@ impl Checker {
             self.inferred_effects = effects;
         }
 
-        match self.fns.get("main").cloned() {
+        let entry = match self.fns.contains_key("main") {
+            false if self.fns.contains_key(elomar_ast::MAIN_AR) => elomar_ast::MAIN_AR,
+            _ => "main",
+        };
+        match self.fns.get(entry).cloned() {
             Some(main) => {
                 if !main.params.is_empty() || !matches!(main.ret, Ty::Unit | Ty::Error) {
                     self.error(
                         "E2011",
                         main.name_span,
                         Text::new(
-                            "`main` must take no parameters and return nothing",
-                            "يجب ألا تأخذ `main` معاملات وألا تُرجع قيمة",
+                            format!("`{entry}` must take no parameters and return nothing"),
+                            format!("يجب ألا تأخذ `{entry}` معاملات وألا تُرجع قيمة"),
                         ),
                     );
                 }
@@ -243,8 +247,8 @@ impl Checker {
                 );
                 if let Some(d) = self.diags.last_mut() {
                     d.hint = Some(Text::new(
-                        "add `fn main() { ... }`; the program starts there",
-                        "أضف `fn main() { ... }`؛ يبدأ تنفيذ البرنامج منها",
+                        "add `fn main() { ... }` (or `دالة رئيسية() { ... }`); the program starts there",
+                        "أضف `دالة رئيسية() { ... }` (أو `fn main() { ... }`)؛ يبدأ تنفيذ البرنامج منها",
                     ));
                 }
             }

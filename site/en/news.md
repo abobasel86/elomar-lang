@@ -7,6 +7,20 @@ other: ar/news.html
 
 # What's new
 
+## Arabic keywords
+
+- **Write the whole program in Arabic**: `دالة` is `fn`, `ليكن` is `let`,
+  `إذا` is `if`, `لكل … في` is `for … in`, and so on for every keyword. A
+  program may start in `رئيسية` instead of `main`. Mix the two languages
+  freely. All of them are in the [table of keywords](12-reference.html#keywords),
+  and the [gallery](playground.html#example=keywords) has a program to run.
+- `elomar fmt --keywords ar` rewrites a file with Arabic keywords, and
+  `--keywords en` with English ones.
+- Hamza, harakat and tatweel do not matter: `ارجع` and `أرجع`, `نفّذ` and
+  `نفذ` are the same keyword.
+- Since Arabic keywords are reserved, a variable named `نوع` or `في` needs
+  another name; the error message tells you which.
+
 ## Scoop and Homebrew, a gallery, and a demo
 
 - **Install with Scoop or Homebrew**:
