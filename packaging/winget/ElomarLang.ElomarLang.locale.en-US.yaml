@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.9.0.schema.json
 PackageIdentifier: ElomarLang.ElomarLang
-PackageVersion: 1.13.0
+PackageVersion: 1.13.1
 PackageLocale: en-US
 Publisher: Elomar-Lang
 PublisherUrl: https://github.com/abobasel86
@@ -21,6 +21,6 @@ Tags:
 - ai
 - compiler
 - interpreter
-ReleaseNotesUrl: https://github.com/abobasel86/elomar-lang/releases/tag/v1.13.0
+ReleaseNotesUrl: https://github.com/abobasel86/elomar-lang/releases/tag/v1.13.1
 ManifestType: defaultLocale
 ManifestVersion: 1.9.0
