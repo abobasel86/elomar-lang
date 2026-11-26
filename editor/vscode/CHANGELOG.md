@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.14.0
+
+Works with Elomar-Lang 1.14.0: highlighting and completion for the Arabic names
+of built-in functions and types (`اطبع`, `نص`, `قائمة`, `قيمة`, …).
+
 ## 1.13.1
 
 Works with Elomar-Lang 1.13.1 (`elomar fmt --keywords` also inside strings).
