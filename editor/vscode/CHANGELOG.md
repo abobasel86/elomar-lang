@@ -5,6 +5,10 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.13.1
+
+Works with Elomar-Lang 1.13.1 (`elomar fmt --keywords` also inside strings).
+
 ## 1.13.0
 
 Works with Elomar-Lang 1.13.0: highlighting and snippets for Arabic keywords

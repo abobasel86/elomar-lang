@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## Arabic keywords on every lesson page
+## 1.13.1: Arabic keywords on every lesson page
 
 - Above every lesson, **«fn let if» / «دالة ليكن إذا»** switches all the
   examples between English and Arabic keywords; the choice is remembered
@@ -226,7 +226,7 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.13** | Arabic keywords (`دالة`, `ليكن`, `إذا`, …); `elomar fmt --keywords`; Scoop and Homebrew; the playground gallery |
+| **1.13** | Arabic keywords (`دالة`, `ليكن`, `إذا`, …); `elomar fmt --keywords`; Scoop and Homebrew; the playground gallery; the keyword switch on lessons (1.13.1) |
 | 1.12 | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project; ARM builds (1.12.1) |
 | 1.11 | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |
 | 1.10 | Local models (Ollama) without a key; an embedding cache |
