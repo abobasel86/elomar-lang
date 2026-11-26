@@ -135,6 +135,8 @@ jobs:
         shell: pwsh
         run: |
           Invoke-Expression "& {$(Invoke-RestMethod get.scoop.sh)} -RunAsAdmin"
-          scoop install bucket/elomar.json
+          # A full path: Scoop reads "bucket/elomar.json" as bucket "bucket", app "elomar.json".
+          scoop install "$PWD\bucket\elomar.json"
+          if (-not (Test-Path "$env:USERPROFILE\scoop\shims\elomar.exe")) { exit 1 }
           & "$env:USERPROFILE\scoop\shims\elomar.exe" --version
           & "$env:USERPROFILE\scoop\shims\elomar.exe" run examples/hello/main.elo
