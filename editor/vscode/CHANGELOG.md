@@ -5,6 +5,12 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.17.0
+
+Works with Elomar-Lang 1.17.0: highlighting and completion for the Arabic names
+of standard modules and effects (`استخدم std.ملفات`, `ملفات.اقرأ_نص`,
+`!{ملفات}`), and highlighting for the `mcp` and `process` effects.
+
 ## 1.16.0
 
 Works with Elomar-Lang 1.16.0 (`elomar fmt --keywords` also converts built-in

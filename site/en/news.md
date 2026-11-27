@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## Arabic names for standard modules
+## 1.17: Arabic names for standard modules
 
 - **`استخدم std.ملفات` is `use std.fs`**, and `ملفات.اقرأ_نص` is
   `fs.read_text`: all 18 modules, their functions and the effects
@@ -264,7 +264,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.16** | The Arabic switch and `fmt --keywords` convert built-in names and methods too |
+| **1.17** | Arabic names for standard modules and effects (`استخدم std.ملفات`, `!{ملفات}`) |
+| 1.16 | The Arabic switch and `fmt --keywords` convert built-in names and methods too |
 | 1.15 | Arabic names for methods (`.طول`, `.أضف`, `.حول`, …) |
 | 1.14 | Arabic names for built-in functions and types (`اطبع`, `نص`, `قائمة`, …) |
 | 1.13 | Arabic keywords (`دالة`, `ليكن`, `إذا`, …); `elomar fmt --keywords`; Scoop and Homebrew; the playground gallery; the keyword switch on lessons (1.13.1) |
