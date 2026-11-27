@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## The last English names
+## 1.18: The last English names
 
 - **`استخدم قياسي.ملفات`**: `std` is `قياسي`.
 - Errors: `خطأ_ملفات.غير_موجود(رسالة)` is `FsError.NotFound(message)`.
@@ -274,7 +274,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.17** | Arabic names for standard modules and effects (`استخدم std.ملفات`, `!{ملفات}`) |
+| **1.18** | Arabic names for `std`, the remaining types, error variants and module record fields (`خطأ_ملفات.غير_موجود`, `الرد.الحالة`) |
+| 1.17 | Arabic names for standard modules and effects (`استخدم std.ملفات`, `!{ملفات}`) |
 | 1.16 | The Arabic switch and `fmt --keywords` convert built-in names and methods too |
 | 1.15 | Arabic names for methods (`.طول`, `.أضف`, `.حول`, …) |
 | 1.14 | Arabic names for built-in functions and types (`اطبع`, `نص`, `قائمة`, …) |
