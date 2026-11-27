@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## The Arabic switch converts everything
+## 1.16: The Arabic switch converts everything
 
 - **«دالة ليكن إذا»** on the lessons and **fn ⇄ دالة** in the playground now
   write the whole program in Arabic: `print` becomes `اطبع`, `List<Int>`
@@ -256,7 +256,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.15** | Arabic names for methods (`.طول`, `.أضف`, `.حول`, …) |
+| **1.16** | The Arabic switch and `fmt --keywords` convert built-in names and methods too |
+| 1.15 | Arabic names for methods (`.طول`, `.أضف`, `.حول`, …) |
 | 1.14 | Arabic names for built-in functions and types (`اطبع`, `نص`, `قائمة`, …) |
 | 1.13 | Arabic keywords (`دالة`, `ليكن`, `إذا`, …); `elomar fmt --keywords`; Scoop and Homebrew; the playground gallery; the keyword switch on lessons (1.13.1) |
 | 1.12 | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project; ARM builds (1.12.1) |
