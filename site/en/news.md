@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## Arabic names for methods
+## 1.15: Arabic names for methods
 
 - **`.طول` is `.length`, `.حول` is `.map`**: every method of the built-in
   types has an Arabic name, so a program can now be written wholly in
@@ -247,7 +247,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.14** | Arabic names for built-in functions and types (`اطبع`, `نص`, `قائمة`, …) |
+| **1.15** | Arabic names for methods (`.طول`, `.أضف`, `.حول`, …) |
+| 1.14 | Arabic names for built-in functions and types (`اطبع`, `نص`, `قائمة`, …) |
 | 1.13 | Arabic keywords (`دالة`, `ليكن`, `إذا`, …); `elomar fmt --keywords`; Scoop and Homebrew; the playground gallery; the keyword switch on lessons (1.13.1) |
 | 1.12 | One-line installers; `elomar upgrade`; `elomar doctor` for the whole project; ARM builds (1.12.1) |
 | 1.11 | `elomar new --ai`; `elomar doctor`; exercises for the AI lesson |

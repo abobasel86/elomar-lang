@@ -4,7 +4,7 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
-## [Unreleased]
+## [1.15.0] - 2026-11-27
 
 ### Added
 
