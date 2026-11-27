@@ -520,12 +520,23 @@ impl Checker {
                 self.check_map_key(&k, span);
                 Ty::map(k, v)
             }
-            ExprKind::Field { target, name } => {
-                let name = name.clone();
+            ExprKind::Field {
+                target,
+                name: field,
+            } => {
+                let mut name = field.clone();
                 if let Some(ty) = self.try_module_constant(target, &name) {
                     return ty;
                 }
                 let t = self.check_expr(target, None);
+                // `.طول` is `.length` (a record's own field of that name wins).
+                let resolved = self.subst.shallow(&t);
+                if !matches!(resolved, Ty::Record(_))
+                    && crate::builtins::arabic_member(&resolved, &name.name) == Some("length")
+                {
+                    name.name = "length".into();
+                    field.name = name.name.clone();
+                }
                 let ty = self.field_type(&t, &name);
                 self.note_typed(name.span, format!("{}: ", name.name), &ty);
                 ty
@@ -877,6 +888,19 @@ impl Checker {
                 }
                 let ExprKind::Field { target, name } = &mut callee.kind else {
                     unreachable!()
+                };
+                // `.أضف(x)` is `.push(x)` on a list: the engines see English.
+                let resolved = self.subst.shallow(&recv_ty);
+                let own_field = matches!(&resolved, Ty::Record(fs) if fs.iter().any(|(n, _)| *n == method.name));
+                let method = match crate::builtins::arabic_member(&resolved, &method.name) {
+                    Some(en) if !own_field => {
+                        name.name = en.to_string();
+                        Ident {
+                            name: en.to_string(),
+                            span: method.span,
+                        }
+                    }
+                    _ => method,
                 };
                 let ty = self.check_method(target, &recv_ty, &method, args, span);
                 // An empty list's sum must still be a Float when the list is

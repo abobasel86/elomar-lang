@@ -82,6 +82,8 @@ by the compiler when they are not declared.
 - **Arabic names for built-ins:** `اطبع` is `print`, `نص` is `String`,
   `قائمة<صحيح>` is `List<Int>`, `قيمة(x)` is `Some(x)`. Not reserved: a
   program's own name hides them. See [`examples/arabic-names`](examples/arabic-names).
+- **Arabic names for methods:** `.طول` is `.length`, `.حول(...)` is
+  `.map(...)`, `.أضف(x)` is `.push(x)` on a list and `.add(x)` on a set.
 - Structural records and value semantics (no surprising aliasing).
 - `match` with exhaustiveness checking.
 - Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`

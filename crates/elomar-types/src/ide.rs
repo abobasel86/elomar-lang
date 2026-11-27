@@ -139,14 +139,20 @@ impl Checker {
         let mut out: Vec<String> = Vec::new();
         match ty {
             Ty::Record(fields) => out.extend(fields.iter().map(|(n, _)| n.clone())),
-            Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_) => out.push("length".into()),
+            Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_) => {
+                out.extend(["length".into(), "طول".into()])
+            }
             _ => {}
         }
         if !matches!(ty, Ty::Var(_) | Ty::Error | Ty::Param(_)) {
+            let methods = crate::builtins::methods_of(ty);
+            out.extend(methods.iter().map(|m| m.to_string()));
+            // And their Arabic names (`.أضف` for `.push`).
             out.extend(
-                crate::builtins::methods_of(ty)
+                methods
                     .iter()
-                    .map(|m| m.to_string()),
+                    .filter_map(|m| elomar_ast::arabic::method_arabic(m))
+                    .map(str::to_string),
             );
         }
         for m in &self.methods {

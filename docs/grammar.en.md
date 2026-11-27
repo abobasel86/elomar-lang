@@ -87,6 +87,17 @@ not matter). Messages show the English names.
 | `String` | `نص` | `Result` | `نتيجة` |
 | `List` | `قائمة` | `Duration` | `مدة` |
 
+### 1.0.3 Arabic Names for Methods (since 1.15)
+
+The methods of the built-in types and the `length` property have Arabic
+names too (`.طول` is `.length`, `.أضف` is `.push` on a list and `.add` on a
+set); the full table is in the
+[reference](https://abobasel86.github.io/elomar-lang/en/12-reference.html#arabic-methods).
+They are not reserved. The type checker resolves them from the type of the
+value: a record's own field and a method from an `impl` with that name come
+first; otherwise the Arabic name becomes the English method of that type.
+They match like the Arabic keywords. Messages show the English names.
+
 ### 1.1 Line Ends
 
 The lexer keeps a line end as a **statement separator** only if all three conditions hold:

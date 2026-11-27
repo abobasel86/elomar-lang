@@ -41,8 +41,8 @@ can be mixed in one file, and neither can be a name.
   `--keywords en` in English.
 - **«دالة ليكن إذا»** above every lesson shows its examples with Arabic
   keywords; **fn ⇄ دالة** in the playground rewrites your program.
-- Modules (`std.json`) and the methods of each type (`.length`, `.map`)
-  stay in English.
+- The methods of each type have Arabic names too
+  ([below](#arabic-methods)); modules (`std.json`) stay in English.
 
 ## Arabic names for built-ins {#arabic-names}
 
@@ -72,6 +72,100 @@ function or type), that one is used where it is visible.
 | `String` | `نص` | `Result` | `نتيجة` |
 | `List` | `قائمة` | `Duration` | `مدة` |
 
+## Arabic names for methods {#arabic-methods}
+
+The methods of the built-in types and `length` have Arabic names as well:
+`الطلاب.طول` is `students.length`, `xs.حول(|x| x * 2)` is
+`xs.map(|x| x * 2)`. The checker picks the English method from the type of
+the value, so `.أضف` is `push` on a list and `add` on a set. A record's own
+field or a method from your `impl` with the same name wins. `to_string` is
+`إلى_نص` on every type, and each parallel method `par_X` is `X_بالتوازي`
+(`par_map` is `حول_بالتوازي`). Names match as the keywords do (hamza, `ى`,
+`ة`, harakat and tatweel do not matter); messages show the English names.
+
+**List**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `length` | `طول` | `sum` | `مجموع` | `min` | `أصغر` |
+| `push` | `أضف` | `slice` | `اقتطع` | `max` | `أكبر` |
+| `pop` | `أخرج` | `map` | `حول` | `enumerate` | `مرقمة` |
+| `insert` | `أدرج` | `filter` | `رشح` | `chunks` | `قطع` |
+| `remove` | `احذف` | `any` | `أي` | `flat_map` | `حول_وادمج` |
+| `contains` | `يحتوي` | `all` | `الكل` | `group_by` | `جمع_حسب` |
+| `index_of` | `موقع` | `find` | `ابحث` | `zip` | `زاوج` |
+| `is_empty` | `فارغ` | `count` | `عد` | `windows` | `نوافذ` |
+| `first` | `الأول` | `fold` | `اطو` | `sum_by` | `مجموع_حسب` |
+| `last` | `الأخير` | `sort_by` | `رتب_حسب` | `min_by` | `أصغر_حسب` |
+| `reverse` | `اعكس` | `take` | `خذ` | `max_by` | `أكبر_حسب` |
+| `sorted` | `مرتبة` | `skip` | `تخط` |  |  |
+| `join` | `اربط` | `unique` | `فريدة` |  |  |
+
+**String**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `length` | `طول` | `chars` | `حروف` | `lines` | `أسطر` |
+| `upper` | `أحرف_كبيرة` | `replace` | `استبدل` | `words` | `كلمات` |
+| `lower` | `أحرف_صغيرة` | `repeat` | `كرر` | `trim_start` | `شذب_البداية` |
+| `trim` | `شذب` | `parse_int` | `حلل_صحيح` | `trim_end` | `شذب_النهاية` |
+| `contains` | `يحتوي` | `parse_float` | `حلل_عشري` | `pad_start` | `املأ_البداية` |
+| `starts_with` | `يبدأ_ب` | `is_empty` | `فارغ` | `pad_end` | `املأ_النهاية` |
+| `ends_with` | `ينتهي_ب` | `index_of` | `موقع` | `reverse` | `اعكس` |
+| `split` | `قسم` | `slice` | `اقتطع` |  |  |
+
+**Int, Float**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `to_float` | `إلى_عشري` | `to_int` | `إلى_صحيح` | `sqrt` | `جذر` |
+| `abs` | `مطلق` | `round` | `قرب` | `round_to` | `قرب_إلى` |
+| `pow` | `أس` | `floor` | `قرب_لأسفل` | `to_fixed` | `بخانات` |
+| `clamp` | `حصر` | `ceil` | `قرب_لأعلى` |  |  |
+
+**Option**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `is_some` | `فيه_قيمة` | `map` | `حول` | `ok_or` | `أو_فشل` |
+| `is_none` | `بلا_قيمة` | `and_then` | `ثم` | `is_some_and` | `قيمة_تحقق` |
+| `unwrap_or` | `القيمة_أو` | `filter` | `رشح` |  |  |
+| `unwrap_or_else` | `القيمة_أو_احسب` | `or` | `أو` |  |  |
+
+**Result**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `is_ok` | `ناجحة` | `unwrap_or_else` | `القيمة_أو_احسب` | `and_then` | `ثم` |
+| `is_err` | `فاشلة` | `map` | `حول` | `ok` | `النجاح` |
+| `unwrap_or` | `القيمة_أو` | `map_err` | `حول_الفشل` | `err` | `الفشل` |
+
+**Map**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `length` | `طول` | `remove` | `احذف` | `map_values` | `حول_القيم` |
+| `get` | `اجلب` | `keys` | `المفاتيح` | `any` | `أي` |
+| `get_or` | `اجلب_أو` | `values` | `القيم` | `all` | `الكل` |
+| `entries` | `المدخلات` | `is_empty` | `فارغ` | `count` | `عد` |
+| `contains_key` | `فيه_مفتاح` | `filter` | `رشح` |  |  |
+
+**Set**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `length` | `طول` | `to_list` | `إلى_قائمة` | `filter` | `رشح` |
+| `contains` | `يحتوي` | `union` | `اتحاد` | `map` | `حول` |
+| `add` | `أضف` | `intersection` | `تقاطع` | `any` | `أي` |
+| `remove` | `احذف` | `difference` | `فرق` | `all` | `الكل` |
+| `is_empty` | `فارغ` | `is_subset` | `جزء_من` | `count` | `عد` |
+
+**Duration, errors**
+
+| English | Arabic | English | Arabic | English | Arabic |
+|---|---|---|---|---|---|
+| `millis` | `بالمللي` | `kind` | `النوع` |  |  |
+| `seconds` | `بالثواني` | `message` | `الرسالة` |  |  |
 ## Built-in functions
 
 | Function | What it does |

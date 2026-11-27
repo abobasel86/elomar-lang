@@ -4,6 +4,20 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Arabic names for the methods of the built-in types** and for `length`:
+  `.طول` (`length`), `.أضف` (`push` on a list, `add` on a set), `.حول`
+  (`map`), `.رشح` (`filter`), `.يحتوي` (`contains`), `.اجلب` (`get`),
+  `.شذب` (`trim`), `.قسم` (`split`) and every other one; `par_X` is
+  `X_بالتوازي`. Not reserved: the type checker resolves them from the type
+  of the value, after a record's own field and the program's `impl`
+  methods, so no program changes meaning. A misspelt Arabic method gets
+  Arabic suggestions, and the editor completes them.
+  Table: `elomar_ast::arabic::METHOD_NAMES`.
+
 ## [1.14.0] - 2026-11-26
 
 ### Added

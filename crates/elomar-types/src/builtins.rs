@@ -249,6 +249,15 @@ pub(crate) fn has_method(ty: &Ty, name: &str) -> bool {
     methods_of(ty).contains(&name)
 }
 
+/// The English name of `name`, a method or the `length` property written in
+/// Arabic, on a value of type `ty` (already resolved).
+pub(crate) fn arabic_member(ty: &Ty, name: &str) -> Option<&'static str> {
+    elomar_ast::arabic::method_names(name).find(|en| {
+        has_method(ty, en)
+            || (*en == "length" && matches!(ty, Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_)))
+    })
+}
+
 impl Checker {
     /// Checks the argument count; on mismatch reports `E2002`.
     pub(crate) fn arity(
@@ -539,7 +548,14 @@ impl Checker {
             return Ty::Error;
         }
         let shown = self.subst.show(&r);
-        let available: Vec<String> = methods_of(&r).iter().map(|s| s.to_string()).collect();
+        // A name written in Arabic gets the Arabic names in the hint.
+        let available: Vec<String> = methods_of(&r)
+            .iter()
+            .map(|en| match elomar_ast::arabic::method_arabic(en) {
+                Some(ar) if !m.is_ascii() => ar.to_string(),
+                _ => en.to_string(),
+            })
+            .collect();
         let mut diag = Diagnostic::error(
             "E1008",
             name.span,

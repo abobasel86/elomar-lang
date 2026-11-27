@@ -7,6 +7,15 @@ other: ar/news.html
 
 # What's new
 
+## Arabic names for methods
+
+- **`.طول` is `.length`, `.حول` is `.map`**: every method of the built-in
+  types has an Arabic name, so a program can now be written wholly in
+  Arabic, as the [gallery](playground.html#example=keywords) one is.
+- `.أضف` is `push` on a list and `add` on a set: the type of the value
+  decides. A record field with the same name still wins.
+- All of them are in the [reference](12-reference.html#arabic-methods).
+
 ## 1.14: Arabic names for built-ins
 
 - **`اطبع` is `print`, `نص` is `String`**: the built-in functions, `قيمة` /

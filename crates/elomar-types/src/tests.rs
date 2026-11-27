@@ -1219,3 +1219,45 @@ fn unknown_type_in_ai_infer_is_an_error_not_a_crash() {
     );
     assert!(!codes.is_empty(), "{codes:?}");
 }
+
+#[test]
+fn every_builtin_method_has_one_arabic_name() {
+    use elomar_ast::arabic::{METHOD_NAMES, method_arabic, method_names};
+    for (ty, methods) in crate::builtins::TYPE_METHODS {
+        for m in methods {
+            let ar = method_arabic(m).unwrap_or_else(|| panic!("{ty}.{m} has no Arabic name"));
+            // No other method of the same type has that Arabic name.
+            let same: Vec<&str> = method_names(ar).filter(|en| methods.contains(en)).collect();
+            assert_eq!(same, vec![*m], "{ty}: `{ar}` is ambiguous");
+        }
+    }
+    for (_, en) in METHOD_NAMES {
+        assert_eq!(
+            METHOD_NAMES.iter().filter(|(_, e)| e == en).count(),
+            1,
+            "{en}"
+        );
+    }
+}
+
+#[test]
+fn arabic_method_names() {
+    ok(
+        "fn main() {\n  var xs = [3, 1]\n  xs.أضف(2)\n  print(xs.طول, xs.مرتبة(), \"أ\".يحتوي(\"أ\"))\n}",
+    );
+    // On a set, `أضف` is `add`, not `push`.
+    ok("fn main() {\n  var s = set([1])\n  s.اضف(2)\n  print(s.طول)\n}");
+    // A record's own field of that name wins.
+    ok(
+        "type R = { طول: String }\nfn main() {\n  let r: R = { طول: \"x\" }\n  print(r.طول.upper())\n}",
+    );
+    // A list has no `مفاتيح`; mutating needs `var`.
+    assert_eq!(
+        codes("fn main() {\n  print([1].المفاتيح())\n}"),
+        vec!["E1008"]
+    );
+    assert_eq!(
+        codes("fn main() {\n  let xs = [1]\n  xs.أضف(2)\n}"),
+        vec!["E1003"]
+    );
+}
