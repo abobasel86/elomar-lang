@@ -4,28 +4,28 @@
 class Elomar < Formula
   desc "Typed programming language with AI built in, in English and Arabic"
   homepage "https://abobasel86.github.io/elomar-lang/"
-  version "1.14.0"
+  version "1.15.0"
   license any_of: ["MIT", "Apache-2.0"]
 
   on_macos do
     on_arm do
-      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.14.0/elomar-1.14.0-aarch64-apple-darwin.tar.gz"
-      sha256 "e4d2c37493a92a24a38466541f58f55fe63ae37726c7aaf71e0c372218da12d3"
+      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.15.0/elomar-1.15.0-aarch64-apple-darwin.tar.gz"
+      sha256 "27c0d3267265848fba2c75fcdeafc7f4d166f2e5df782fbbc7f66307f9760836"
     end
     on_intel do
-      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.14.0/elomar-1.14.0-x86_64-apple-darwin.tar.gz"
-      sha256 "b91ab5d1f175fbe975c158518999161bd896bee5cebabb212900751601fb821b"
+      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.15.0/elomar-1.15.0-x86_64-apple-darwin.tar.gz"
+      sha256 "8ecf5a7b07222701c19f72c8df3cd7a6d1b765c5bd5ad94151cc0843a643d875"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.14.0/elomar-1.14.0-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "2c9a63ed27c49f17ee63538bac483e1c2f96f7407901016833e47271f4793584"
+      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.15.0/elomar-1.15.0-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "d816e407babe23dbd107e7e86c519ed85a88a3ff9e0143a9d25ed3fa5ce2d1eb"
     end
     on_intel do
-      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.14.0/elomar-1.14.0-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "bd83dd79f5c24b611f6e7c99a98550041541166a2f2b48d3bcba79545285cec8"
+      url "https://github.com/abobasel86/elomar-lang/releases/download/v1.15.0/elomar-1.15.0-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "20dcf653f0da29dcefb7f6da62abd84b507e23b7fed4103e9c123d161002edcf"
     end
   end
 
