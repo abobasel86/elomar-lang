@@ -103,8 +103,9 @@ of `main`:
 }
 ```
 
-`اطبع` is `print` and `.طول` is `.length`: the built-in functions, types
-and methods have Arabic names too ([all of them](12-reference.html#arabic-names)). Write in English, in Arabic,
+`اطبع` is `print`, `.طول` is `.length` and `استخدم std.ملفات` is `use std.fs`:
+the built-in functions, types, methods and modules have Arabic names too
+([all of them](12-reference.html#arabic-names)). Write in English, in Arabic,
 or both: it is the same program. The lessons
 use the English keywords; all the Arabic ones are in the
 [table of keywords](12-reference.html#keywords). Above every lesson,

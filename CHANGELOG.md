@@ -4,6 +4,20 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Arabic names for the standard modules, their functions and the
+  effects**: `use std.ملفات` (`std.fs`), `ملفات.اقرأ_نص` (`fs.read_text`),
+  `رياضيات.جذر` (`math.sqrt`), `رياضيات.باي` (`math.pi`), `وقت.الآن`
+  (`time.now`), `!{ملفات, شبكة}` (`!{fs, net}`) and every other one (table:
+  `elomar_ast::arabic::MODULE_NAMES`, `MODULE_FUNCTIONS`, `EFFECT_NAMES`).
+  After a `use` in either language both spellings name the module; a
+  program's own name hides it. `fmt --keywords`, the lesson switch and the
+  playground convert them, and the editor completes and highlights them.
+- The editor highlights the `mcp` and `process` effects.
+
 ## [1.16.0] - 2026-11-27
 
 ### Added

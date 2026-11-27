@@ -7,6 +7,14 @@ other: ar/news.html
 
 # What's new
 
+## Arabic names for standard modules
+
+- **`استخدم std.ملفات` is `use std.fs`**, and `ملفات.اقرأ_نص` is
+  `fs.read_text`: all 18 modules, their functions and the effects
+  (`!{ملفات}`) have Arabic names. Nothing in a program has to be English now.
+- The switch on the lessons converts them too.
+- All of them are in the [reference](12-reference.html#arabic-modules).
+
 ## 1.16: The Arabic switch converts everything
 
 - **«دالة ليكن إذا»** on the lessons and **fn ⇄ دالة** in the playground now

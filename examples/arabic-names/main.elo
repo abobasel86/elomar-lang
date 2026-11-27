@@ -1,6 +1,10 @@
 // Built-in functions and types with Arabic names: `اطبع` is `print`,
 // `نص` is `String`, `قيمة(x)` is `Some(x)`, and so on. They are not
-// reserved: a program may use these names for its own things.
+// reserved: a program may use these names for its own things. Standard
+// modules too: `استخدم std.رياضيات` is `use std.math`.
+استخدم std.رياضيات
+استخدم std.جيسون
+
 نوع طالب = { الاسم: نص, الدرجة: صحيح }
 
 دالة الأعلى(الطلاب: قائمة<طالب>) -> اختياري<طالب> {
@@ -40,6 +44,7 @@
     ليكن م: مجموعة<صحيح> = مجموعة([1, 2, 2, 3])
     اطبع("عناصر المجموعة:", م.طول, م.يحتوي(2))
     اطبع(الطلاب.حول(|ط| ط.الاسم).اربط("، "))
+    اطبع(رياضيات.جذر(81.0), جيسون.إلى_نص(الطلاب[0]))
     ليكن الأسعار: قاموس<نص, عشري> = ["قهوة": 1.5]
     اطبع(الأسعار)
     ليكن المهلة: مدة = 2s

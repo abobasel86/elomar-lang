@@ -44,7 +44,8 @@ can be mixed in one file, and neither can be a name.
 - **«دالة ليكن إذا»** above every lesson shows its examples in Arabic;
   **fn ⇄ دالة** in the playground rewrites your program.
 - The methods of each type have Arabic names too
-  ([below](#arabic-methods)); modules (`std.json`) stay in English.
+  ([below](#arabic-methods)), and so do the standard modules
+  ([table](#arabic-modules)).
 
 ## Arabic names for built-ins {#arabic-names}
 
@@ -168,6 +169,40 @@ field or a method from your `impl` with the same name wins. `to_string` is
 |---|---|---|---|---|---|
 | `millis` | `بالمللي` | `kind` | `النوع` |  |  |
 | `seconds` | `بالثواني` | `message` | `الرسالة` |  |  |
+## Arabic names for standard modules {#arabic-modules}
+
+The standard modules and their functions have Arabic names too (since
+1.17): `استخدم std.ملفات` is `use std.fs`, and `ملفات.اقرأ_نص(path)` is
+`fs.read_text(path)`. Once a module is imported, in either spelling, both
+of its names work. They are not reserved: a variable named `وقت` hides the
+module `time` where it is visible. Each cell gives the English name, then
+the Arabic one.
+
+| Module | Functions |
+|---|---|
+| `ai` `ذكاء` | `infer` `استنتج` · `run` `شغل` · `embed` `ضمن` · `similarity` `تشابه` · `search` `ابحث` · `stream` `بث` |
+| `agent` `وكيل` | `run` `شغل` |
+| `fs` `ملفات` | `read_text` `اقرأ_نص` · `write_text` `اكتب_نص` · `append_text` `ألحق_نص` · `exists` `موجود` · `list_dir` `محتويات` · `is_dir` `هل_مجلد` · `size` `حجم` · `create_dir` `أنشئ_مجلد` · `remove` `احذف` · `remove_dir` `احذف_مجلد` · `rename` `أعد_تسمية` · `copy` `انسخ` |
+| `json` `جيسون` | `parse` `حلل` · `stringify` `إلى_نص` · `pretty` `منسق` |
+| `http` `ويب` | `get` `اجلب` · `post` `أرسل` |
+| `db` `بيانات` | `open` `افتح` · `execute` `شغل` · `query` `استعلم` · `query_one` `استعلم_واحدا` |
+| `py` `بايثون` | `call` `استدع` |
+| `mcp` `أدوات` | `tools` `الأدوات` · `call` `استدع` |
+| `math` `رياضيات` | `sqrt` `جذر` · `cbrt` `جذر_تكعيبي` · `pow` `أس` · `exp` `أسي` · `ln` `لو_طبيعي` · `log10` `لو10` · `log2` `لو2` · `sin` `جا` · `cos` `جتا` · `tan` `ظا` · `asin` `جا_عكسي` · `acos` `جتا_عكسي` · `atan` `ظا_عكسي` · `atan2` `ظا_عكسي2` · `hypot` `وتر` · `is_nan` `ليس_عددا` · `pi` `باي` · `e` `هـ` · `tau` `تاو` · `inf` `لانهاية` |
+| `random` `عشوائي` | `int` `صحيح` · `float` `عشري` · `bool` `منطقي` · `choice` `اختر` · `shuffle` `اخلط` · `seed` `بذرة` |
+| `time` `وقت` | `now` `الآن` · `sleep` `نم` · `format` `نسق` · `parse` `حلل` · `today` `اليوم` · `date` `تاريخ` · `make` `اصنع` · `add_days` `أضف_أياما` · `add_months` `أضف_أشهرا` · `days_between` `أيام_بين` · `format_as` `نسق_بصيغة` |
+| `os` `نظام` | `args` `المعطيات` · `env` `بيئة` · `platform` `المنصة` · `exit` `اخرج` |
+| `regex` `أنماط` | `is_match` `يطابق` · `find` `ابحث` · `find_all` `ابحث_الكل` · `captures` `التقط` · `replace` `استبدل` · `split` `قسم` |
+| `encoding` `ترميز` | `base64_encode` `إلى_قاعدة64` · `base64_decode` `من_قاعدة64` · `hex_encode` `إلى_ست_عشري` · `hex_decode` `من_ست_عشري` · `url_encode` `ترميز_رابط` · `url_decode` `فك_رابط` |
+| `crypto` `تشفير` | `sha256` `بصمة` · `hmac_sha256` `توقيع` · `uuid` `معرف_فريد` · `token` `رمز_سري` |
+| `server` `خادم` | `serve` `شغل` · `text` `نص` · `html` `صفحة` · `json` `جيسون` · `redirect` `حول` |
+| `process` `عملية` | `run` `شغل` |
+| `csv` `جدول` | `parse` `حلل` · `parse_records` `حلل_سجلات` · `stringify` `إلى_نص` |
+
+Effects in `!{...}`: `io` `إدخال_إخراج` · `fs` `ملفات` · `net` `شبكة` · `ai` `ذكاء` · `db` `بيانات` · `py` `بايثون` · `mcp` `أدوات` · `process` `عملية`. For example `fn save(s: String) !{ملفات}`.
+Record fields that modules return (`status`, `body`, `year`) and error
+kinds (`FsError`) stay in English.
+
 ## Built-in functions
 
 | Function | What it does |

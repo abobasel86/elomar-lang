@@ -101,6 +101,17 @@ value: a record's own field and a method from an `impl` with that name come
 first; otherwise the Arabic name becomes the English method of that type.
 They match like the Arabic keywords. Messages show the English names.
 
+### 1.0.4 Arabic Names for Standard Modules (since 1.17)
+
+The standard modules, their functions and constants, and the effects have
+Arabic names (`use std.ملفات` is `use std.fs`, `ملفات.اقرأ_نص` is
+`fs.read_text`, `!{ملفات}` is `!{fs}`); the full table is in the
+[reference](https://abobasel86.github.io/elomar-lang/en/12-reference.html#arabic-modules).
+The parser resolves them: a `use std.X` with `X` in either language imports
+the module, after which either spelling names it (unless the program's own
+name hides it), and a function after an imported module's name is looked up
+in that module's table. They match like the Arabic keywords.
+
 ### 1.1 Line Ends
 
 The lexer keeps a line end as a **statement separator** only if all three conditions hold:

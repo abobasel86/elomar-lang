@@ -85,6 +85,9 @@ by the compiler when they are not declared.
   program's own name hides them. See [`examples/arabic-names`](examples/arabic-names).
 - **Arabic names for methods:** `.طول` is `.length`, `.حول(...)` is
   `.map(...)`, `.أضف(x)` is `.push(x)` on a list and `.add(x)` on a set.
+- **Arabic names for standard modules:** `استخدم std.ملفات` is
+  `use std.fs`, `ملفات.اقرأ_نص(path)` is `fs.read_text(path)`, `!{ملفات}` is
+  `!{fs}`.
 - Structural records and value semantics (no surprising aliasing).
 - `match` with exhaustiveness checking.
 - Enums with payloads (`Shape.Circle(1.0)`), maps (`["a": 1]`), and the `?`

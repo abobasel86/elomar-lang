@@ -1261,3 +1261,57 @@ fn arabic_method_names() {
         vec!["E1003"]
     );
 }
+
+#[test]
+fn every_std_function_has_one_arabic_name() {
+    use elomar_ast::arabic::{MODULE_FUNCTIONS, MODULE_NAMES, module_function, module_name};
+    // A name that is not a keyword can name a variable.
+    let not_keyword = |ar: &str| {
+        let (_, d) = elomar_parser::parse(&format!(
+            "fn main() {{
+  let {ar} = 1
+}}"
+        ));
+        d.is_empty()
+    };
+    for &(ar, en) in MODULE_NAMES {
+        assert!(crate::STD_MODULES.contains(&en), "{en}");
+        assert_eq!(module_name(ar), Some(en));
+        assert!(not_keyword(ar), "{ar} is a keyword");
+    }
+    for m in crate::STD_MODULES {
+        assert!(
+            MODULE_NAMES.iter().any(|&(_, en)| en == m),
+            "{m} has no Arabic name"
+        );
+        let mut all: Vec<&str> = crate::module_functions(m).to_vec();
+        if m == "math" {
+            all.extend(crate::stdextra::MATH_CONSTANTS);
+        }
+        for &f in &all {
+            let ar = MODULE_FUNCTIONS
+                .iter()
+                .find(|&&(md, _, en)| md == m && en == f)
+                .map(|&(_, ar, _)| ar)
+                .unwrap_or_else(|| panic!("{m}.{f} has no Arabic name"));
+            assert_eq!(module_function(m, ar), Some(f), "{m}.{ar}");
+            assert!(not_keyword(ar), "{ar} is a keyword");
+        }
+        let count = MODULE_FUNCTIONS
+            .iter()
+            .filter(|&&(md, _, _)| md == m)
+            .count();
+        assert_eq!(count, all.len(), "{m}: extra names");
+    }
+}
+
+#[test]
+fn arabic_std_modules() {
+    ok("use std.رياضيات\nfn main() {\n  print(رياضيات.جذر(4.0), math.pi, رياضيات.باي)\n}");
+    ok("use std.ملفات\nfn save() !{ملفات} {\n  ملفات.اكتب_نص(\"a\", \"b\")\n}");
+    // Without `use`, the Arabic name is unknown, as the English one is.
+    assert_eq!(
+        codes("fn main() {\n  print(رياضيات.جذر(4.0))\n}"),
+        vec!["E1001"]
+    );
+}

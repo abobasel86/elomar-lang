@@ -9,9 +9,9 @@
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#effects" },
+    { "include": "#use" },
     { "include": "#arabic-keywords" },
     { "include": "#arabic-builtins" },
-    { "include": "#use" },
     { "include": "#declarations" },
     { "include": "#keywords" },
     { "include": "#constants" },
@@ -21,7 +21,7 @@
   ],
   "repository": {
     "arabic-builtins": {
-      "comment": "Arabic names of built-in functions, constructors and types (اطبع is print, نص is String)",
+      "comment": "Arabic names of built-in functions, constructors, types and standard modules (اطبع is print, نص is String, ملفات is fs)",
       "patterns": [
         {
           "name": "support.function.builtin.elomar",
@@ -38,6 +38,10 @@
         {
           "name": "support.type.builtin.elomar",
           "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*خ[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ج[\\p{Mn}ـ]*م[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ع[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*ط[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|ق[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ئ[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ق[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*م[\\p{Mn}ـ]*و[\\p{Mn}ـ]*س[\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ج[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ص[\\p{Mn}ـ]*ح[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ح[\\p{Mn}ـ]*|ع[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*د[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ص[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])(?=\\s*(?:<|>|,|\\)|=|\\{|$))"
+        },
+        {
+          "name": "entity.name.namespace.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:ر[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ض[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|ب[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ن[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|ب[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ث[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*|ع[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*و[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ئ[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|ج[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*س[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*و[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*ن[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ط[\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*م[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ز[\\p{Mn}ـ]*|ت[\\p{Mn}ـ]*ش[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ر[\\p{Mn}ـ]*|ع[\\p{Mn}ـ]*م[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ذ[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ء[\\p{Mn}ـ]*|و[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*|ن[\\p{Mn}ـ]*ظ[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*م[\\p{Mn}ـ]*|خ[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*م[\\p{Mn}ـ]*|ج[\\p{Mn}ـ]*د[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*|و[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ب[\\p{Mn}ـ]*|و[\\p{Mn}ـ]*ق[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])(?=\\s*\\.)"
         }
       ]
     },
@@ -189,7 +193,11 @@
       "patterns": [
         {
           "name": "storage.modifier.effect.elomar",
-          "match": "\\b(?:io|fs|net|ai|db|py)\\b"
+          "match": "\\b(?:io|fs|net|ai|db|py|mcp|process)\\b"
+        },
+        {
+          "name": "storage.modifier.effect.elomar",
+          "match": "(?<![\\p{L}\\p{N}\\p{M}_])(?:[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*خ[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ل[\\p{Mn}ـ]*_[اأإآٱ][\\p{Mn}ـ]*خ[\\p{Mn}ـ]*ر[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ج[\\p{Mn}ـ]*|ب[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ن[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|ب[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*ث[\\p{Mn}ـ]*و[\\p{Mn}ـ]*ن[\\p{Mn}ـ]*|م[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*ف[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|[اأإآٱ][\\p{Mn}ـ]*د[\\p{Mn}ـ]*و[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ت[\\p{Mn}ـ]*|ع[\\p{Mn}ـ]*م[\\p{Mn}ـ]*ل[\\p{Mn}ـ]*[يى][\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ش[\\p{Mn}ـ]*ب[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*[ةه][\\p{Mn}ـ]*|ذ[\\p{Mn}ـ]*ك[\\p{Mn}ـ]*[اأإآٱ][\\p{Mn}ـ]*ء[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_])"
         },
         {
           "name": "invalid.illegal.effect.elomar",
@@ -198,10 +206,11 @@
       ]
     },
     "use": {
-      "match": "\\b(use)\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)*)",
+      "match": "(?:\\b(use)|(?<![\\p{L}\\p{N}\\p{M}_])([اأإآٱ][\\p{Mn}ـ]*س[\\p{Mn}ـ]*ت[\\p{Mn}ـ]*خ[\\p{Mn}ـ]*د[\\p{Mn}ـ]*م[\\p{Mn}ـ]*)(?![\\p{L}\\p{N}\\p{M}_]))\\s+([\\p{L}_][\\p{L}\\p{N}\\p{M}_]*(?:\\.[\\p{L}_][\\p{L}\\p{N}\\p{M}_]*)*)",
       "captures": {
         "1": { "name": "keyword.other.import.elomar" },
-        "2": { "name": "entity.name.namespace.elomar" }
+        "2": { "name": "keyword.other.import.elomar" },
+        "3": { "name": "entity.name.namespace.elomar" }
       }
     },
     "declarations": {

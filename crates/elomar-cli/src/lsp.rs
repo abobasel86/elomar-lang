@@ -659,8 +659,24 @@ impl Server {
                 .last()
                 .map_or(receiver_end, |(i, _)| i);
             let receiver = &head[receiver_start..receiver_end];
-            for f in elomar_types::module_functions(receiver) {
+            // `use std.`: the modules, in both languages.
+            if receiver == "std" {
+                for m in elomar_types::STD_MODULES {
+                    add(m, 9, None);
+                }
+                for &(ar, en) in elomar_ast::arabic::MODULE_NAMES {
+                    add(ar, 9, Some(en));
+                }
+            }
+            // `fs.` or `ملفات.`: the module's functions in both languages.
+            let module = elomar_ast::arabic::module_name(receiver).unwrap_or(receiver);
+            for f in elomar_types::module_functions(module) {
                 add(f, 3, None);
+            }
+            for &(m, ar, en) in elomar_ast::arabic::MODULE_FUNCTIONS {
+                if m == module {
+                    add(ar, 3, Some(en));
+                }
             }
             if let Some(a) = &doc.analysis {
                 // The latest analyzed use of that name before the cursor.
@@ -701,6 +717,10 @@ impl Server {
         }
         for &(ar, en) in elomar_ast::arabic::TYPE_NAMES {
             add(ar, 22, Some(en));
+        }
+        // Standard modules (`ملفات` is `fs`).
+        for &(ar, en) in elomar_ast::arabic::MODULE_NAMES {
+            add(ar, 9, Some(en));
         }
         if let Some(a) = &doc.analysis {
             for h in &a.info.hovers {
