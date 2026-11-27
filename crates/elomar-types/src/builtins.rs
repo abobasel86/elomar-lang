@@ -249,6 +249,33 @@ pub(crate) fn has_method(ty: &Ty, name: &str) -> bool {
     methods_of(ty).contains(&name)
 }
 
+impl Checker {
+    /// Whether a method from an `impl` named `name` applies to `ty`.
+    fn user_method_named(&self, ty: &Ty, name: &str) -> bool {
+        self.methods
+            .iter()
+            .any(|e| e.name == name && self.ty_matches(&e.target, ty))
+    }
+
+    /// Records that `name` (in either language) calls the built-in method
+    /// `english` of `ty`; `fields` are the record's fields, if any.
+    pub(crate) fn note_member(&mut self, ty: &Ty, english: &'static str, name: &Ident) {
+        let free = |c: &Self, n: &str| {
+            !c.user_method_named(ty, n)
+                && !matches!(ty, Ty::Record(fs) if fs.iter().any(|(f, _)| f == n))
+        };
+        let arabic_free =
+            elomar_ast::arabic::method_arabic(english).is_some_and(|ar| free(self, ar));
+        self.members.push(elomar_ast::arabic::BuiltinUse {
+            span: name.span,
+            kind: elomar_ast::arabic::BuiltinKind::Member,
+            english,
+            english_free: free(self, english),
+            arabic_free,
+        });
+    }
+}
+
 /// The English name of `name`, a method or the `length` property written in
 /// Arabic, on a value of type `ty` (already resolved).
 pub(crate) fn arabic_member(ty: &Ty, name: &str) -> Option<&'static str> {

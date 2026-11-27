@@ -12,3 +12,5 @@ repository.workspace = true
 elomar-ast.workspace = true
 elomar-diagnostics.workspace = true
 elomar-lexer.workspace = true
+elomar-parser.workspace = true
+elomar-types.workspace = true

@@ -55,6 +55,9 @@ and ignoring harakat, shadda and tatweel (`نفّذ`, `دالـــة`). The pro
 start in `رئيسية` instead of `main` when it has no `main`.
 `elomar fmt --keywords ar` writes every keyword in Arabic, and
 `--keywords en` in English; without the option each keeps its spelling.
+Since 1.16 it also writes the built-in names of §1.0.2 and §1.0.3 in that
+language, except where the other spelling would mean something else (the
+program's own name hides it there).
 
 ### 1.0.2 Arabic Names for Built-ins (since 1.14)
 

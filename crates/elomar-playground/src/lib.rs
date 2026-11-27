@@ -221,7 +221,7 @@ pub fn run_json(request: &str) -> String {
             .as_array()
             .map(|a| {
                 a.iter()
-                    .map(|s| json!(elomar_fmt::convert_keywords(s.as_str().unwrap_or(""), to)))
+                    .map(|s| json!(elomar_fmt::convert(s.as_str().unwrap_or(""), to)))
                     .collect()
             })
             .unwrap_or_default();

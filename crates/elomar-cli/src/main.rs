@@ -82,8 +82,9 @@ enum Command {
         /// Format standard input and print the result (for editors)
         #[arg(long)]
         stdin: bool,
-        /// Write every keyword in one language: `ar` (`دالة`, `ليكن`, …)
-        /// or `en` (`fn`, `let`, …). Without it, each keeps its spelling.
+        /// Write every keyword and built-in name in one language: `ar`
+        /// (`دالة`, `ليكن`, `اطبع`, `.طول`, …) or `en` (`fn`, `let`, `print`,
+        /// `.length`, …). Without it, each keeps its spelling.
         #[arg(long, value_name = "ar|en", value_parser = ["ar", "en"])]
         keywords: Option<String>,
     },

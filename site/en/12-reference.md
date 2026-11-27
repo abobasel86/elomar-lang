@@ -38,9 +38,11 @@ can be mixed in one file, and neither can be a name.
   or `داله`, and ignoring harakat, shadda and tatweel (`نفّذ`).
 - A program starts in `main`, or in `رئيسية` when it has no `main`.
 - `elomar fmt --keywords ar` writes every keyword in a file in Arabic, and
-  `--keywords en` in English.
-- **«دالة ليكن إذا»** above every lesson shows its examples with Arabic
-  keywords; **fn ⇄ دالة** in the playground rewrites your program.
+  `--keywords en` in English; the built-in functions, types and methods too
+  (`print` becomes `اطبع`, `.length` becomes `.طول`), except where your
+  program has its own thing with that name.
+- **«دالة ليكن إذا»** above every lesson shows its examples in Arabic;
+  **fn ⇄ دالة** in the playground rewrites your program.
 - The methods of each type have Arabic names too
   ([below](#arabic-methods)); modules (`std.json`) stay in English.
 
@@ -312,7 +314,7 @@ permission in `elomar.toml` ([lesson 7](07-data.html)).
 | `elomar run file.elo` | Check and run a program |
 | `elomar check file.elo` | Only check |
 | `elomar repl` | Type code and see the result at once |
-| `elomar fmt` | Format in the standard style; `--keywords ar` or `en` writes every keyword in one language |
+| `elomar fmt` | Format in the standard style; `--keywords ar` or `en` writes every keyword and built-in name in one language |
 | `elomar test` | Run a project's tests |
 | `elomar new name` | Create a project |
 | `elomar new name --ai PROVIDER` | Create a project that calls a model: `mock`, `ollama`, `openai` or `anthropic` |

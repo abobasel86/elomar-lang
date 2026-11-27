@@ -50,6 +50,21 @@ pub fn check(program: &mut Program, opts: CheckOptions) -> Vec<Diagnostic> {
     checker.diags
 }
 
+/// Like [`check`], also returning where the program uses a method of a
+/// built-in type or `length`, in English or in Arabic, in source order (for
+/// `elomar fmt --keywords`).
+pub fn check_recording(
+    program: &mut Program,
+    opts: CheckOptions,
+) -> (Vec<Diagnostic>, Vec<elomar_ast::arabic::BuiltinUse>) {
+    let mut checker = Checker::default();
+    checker.run(program, opts);
+    let mut members = std::mem::take(&mut checker.members);
+    members.sort_by_key(|u| u.span.start);
+    members.dedup_by_key(|u| u.span);
+    (checker.diags, members)
+}
+
 /// Functions of a standard module by its short name (`fs`, `json`, ...),
 /// for editors' completion.
 pub fn module_functions(short: &str) -> &'static [&'static str] {
@@ -152,6 +167,8 @@ struct Checker {
     bounds: Vec<(String, String)>,
     /// Editor information, when recording (see `ide.rs`).
     ide: Option<ide::Recorder>,
+    /// Where built-in methods and `length` are used (see [`check_recording`]).
+    members: Vec<elomar_ast::arabic::BuiltinUse>,
     /// Effects of every function, once inferred.
     inferred_effects: HashMap<String, BTreeSet<String>>,
     /// Bounds of all functions, for completing methods on `T`.

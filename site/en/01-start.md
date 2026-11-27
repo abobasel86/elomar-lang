@@ -108,7 +108,8 @@ and methods have Arabic names too ([all of them](12-reference.html#arabic-names)
 or both: it is the same program. The lessons
 use the English keywords; all the Arabic ones are in the
 [table of keywords](12-reference.html#keywords). Above every lesson,
-**«دالة ليكن إذا»** shows all the examples with Arabic keywords, and the
+**«دالة ليكن إذا»** shows all the examples in Arabic (keywords, built-in
+functions, types and methods), and the
 [playground](playground.html) has a **fn ⇄ دالة** button for your program.
 
 ## Try things at the prompt

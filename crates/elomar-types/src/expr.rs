@@ -531,9 +531,11 @@ impl Checker {
                 let t = self.check_expr(target, None);
                 // `.طول` is `.length` (a record's own field of that name wins).
                 let resolved = self.subst.shallow(&t);
-                if !matches!(resolved, Ty::Record(_))
-                    && crate::builtins::arabic_member(&resolved, &name.name) == Some("length")
+                if matches!(resolved, Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_))
+                    && (name.name == "length"
+                        || crate::builtins::arabic_member(&resolved, &name.name) == Some("length"))
                 {
+                    self.note_member(&resolved, "length", &name);
                     name.name = "length".into();
                     field.name = name.name.clone();
                 }
@@ -892,6 +894,19 @@ impl Checker {
                 // `.أضف(x)` is `.push(x)` on a list: the engines see English.
                 let resolved = self.subst.shallow(&recv_ty);
                 let own_field = matches!(&resolved, Ty::Record(fs) if fs.iter().any(|(n, _)| *n == method.name));
+                let english = if own_field {
+                    None
+                } else if method.name.is_ascii() {
+                    crate::builtins::methods_of(&resolved)
+                        .iter()
+                        .find(|m| **m == method.name)
+                        .copied()
+                } else {
+                    crate::builtins::arabic_member(&resolved, &method.name)
+                };
+                if let Some(en) = english {
+                    self.note_member(&resolved, en, &method);
+                }
                 let method = match crate::builtins::arabic_member(&resolved, &method.name) {
                     Some(en) if !own_field => {
                         name.name = en.to_string();

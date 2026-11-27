@@ -4,6 +4,23 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **`elomar fmt --keywords ar|en` also converts the built-in names**:
+  functions and constructors (`print` ⇄ `اطبع`, `Some` ⇄ `قيمة`), types
+  (`List<Int>` ⇄ `قائمة<صحيح>`) and methods (`.length` ⇄ `.طول`,
+  `.push` ⇄ `.أضف`), the methods by the type of the value. A name stays as
+  written where the other spelling would mean something else (the
+  program's own `نص`, a record field `طول`, an `impl` method), and the
+  result is checked to name the same built-ins in the same order. Code
+  that does not parse gets its keywords converted only.
+- The lesson pages' switch (**«دالة ليكن إذا»**) and the playground's
+  **fn ⇄ دالة** button use it, so examples turn wholly Arabic.
+- `elomar_parser::parse_recording`, `elomar_types::check_recording` and
+  `elomar_fmt::convert`.
+
 ## [1.15.0] - 2026-11-27
 
 ### Added

@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use crate::{
     ArmBody, Block, Else, Expr, ExprKind, FnDecl, InterpPart, Item, Pattern, PatternKind, Program,
-    Stmt, StmtKind, TypeExpr, TypeExprKind,
+    Span, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 
 /// Built-in functions and value constructors: (Arabic, English).
@@ -218,12 +218,77 @@ pub fn method_arabic(english: &str) -> Option<&'static str> {
         .map(|(ar, _)| *ar)
 }
 
+/// The Arabic name of the built-in function or constructor `english`.
+pub fn value_arabic(english: &str) -> Option<&'static str> {
+    VALUE_NAMES
+        .iter()
+        .find(|(_, en)| *en == english)
+        .map(|(ar, _)| *ar)
+}
+
+/// The Arabic name of the built-in type `english`.
+pub fn type_arabic(english: &str) -> Option<&'static str> {
+    TYPE_NAMES
+        .iter()
+        .find(|(_, en)| *en == english)
+        .map(|(ar, _)| *ar)
+}
+
+/// What a built-in name stands for, for [`BuiltinUse`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuiltinKind {
+    /// A function or constructor ([`VALUE_NAMES`]).
+    Value,
+    /// A type ([`TYPE_NAMES`]).
+    Type,
+    /// A method or `length` ([`METHOD_NAMES`]).
+    Member,
+}
+
+/// One place where a program names a built-in, in either language: what
+/// `elomar fmt --keywords` needs to write it in the other one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuiltinUse {
+    pub span: Span,
+    pub kind: BuiltinKind,
+    /// The English name (`print`).
+    pub english: &'static str,
+    /// Whether the English name, written here, would still mean the
+    /// built-in (no name of the program hides it).
+    pub english_free: bool,
+    /// The same for the Arabic name.
+    pub arabic_free: bool,
+}
+
+impl BuiltinUse {
+    /// The name in `arabic` or English, if writing it here keeps the meaning.
+    pub fn spelling(&self, arabic: bool) -> Option<&'static str> {
+        if arabic {
+            let ar = match self.kind {
+                BuiltinKind::Value => value_arabic(self.english),
+                BuiltinKind::Type => type_arabic(self.english),
+                BuiltinKind::Member => method_arabic(self.english),
+            };
+            ar.filter(|_| self.arabic_free)
+        } else {
+            self.english_free.then_some(self.english)
+        }
+    }
+}
+
 /// Rewrites the Arabic built-in names in `program` to English, except where
 /// the program's own names hide them.
 pub fn resolve(program: &mut Program) {
+    resolve_recording(program);
+}
+
+/// Like [`resolve`], also returning every place that names a built-in
+/// function, constructor or type (in English or in Arabic), in source order.
+pub fn resolve_recording(program: &mut Program) -> Vec<BuiltinUse> {
     let mut r = Resolver {
         values: vec![HashSet::new()],
         types: vec![HashSet::new()],
+        uses: Vec::new(),
     };
     for item in &program.items {
         match item {
@@ -246,11 +311,14 @@ pub fn resolve(program: &mut Program) {
     for item in &mut program.items {
         r.item(item);
     }
+    r.uses.sort_by_key(|u| u.span.start);
+    r.uses
 }
 
 struct Resolver {
     values: Vec<HashSet<String>>,
     types: Vec<HashSet<String>>,
+    uses: Vec<BuiltinUse>,
 }
 
 impl Resolver {
@@ -281,8 +349,47 @@ impl Resolver {
         self.types.iter().any(|s| s.contains(name))
     }
 
-    fn value_alias(&self, name: &str) -> Option<&'static str> {
-        value_name(name).filter(|_| !self.hides_value(name))
+    /// The English name of `name` when it means a built-in function or
+    /// constructor here, recording the use.
+    fn value_use(&mut self, name: &str, span: Span) -> Option<&'static str> {
+        if self.hides_value(name) {
+            return None;
+        }
+        let (en, english_free, arabic_free) = if let Some(en) = value_name(name) {
+            (en, !self.hides_value(en), true)
+        } else {
+            let (ar, en) = VALUE_NAMES.iter().find(|(_, en)| *en == name)?;
+            (*en, true, !self.hides_value(ar))
+        };
+        self.uses.push(BuiltinUse {
+            span,
+            kind: BuiltinKind::Value,
+            english: en,
+            english_free,
+            arabic_free,
+        });
+        Some(en)
+    }
+
+    /// The same for a type.
+    fn type_use(&mut self, name: &str, span: Span) -> Option<&'static str> {
+        if self.hides_type(name) {
+            return None;
+        }
+        let (en, english_free, arabic_free) = if let Some(en) = type_name(name) {
+            (en, !self.hides_type(en), true)
+        } else {
+            let (ar, en) = TYPE_NAMES.iter().find(|(_, en)| *en == name)?;
+            (*en, true, !self.hides_type(ar))
+        };
+        self.uses.push(BuiltinUse {
+            span,
+            kind: BuiltinKind::Type,
+            english: en,
+            english_free,
+            arabic_free,
+        });
+        Some(en)
     }
 
     fn item(&mut self, item: &mut Item) {
@@ -364,7 +471,7 @@ impl Resolver {
     fn ty(&mut self, t: &mut TypeExpr) {
         match &mut t.kind {
             TypeExprKind::Named { name, args } => {
-                if let Some(en) = type_name(&name.name).filter(|_| !self.hides_type(&name.name)) {
+                if let Some(en) = self.type_use(&name.name, name.span) {
                     name.name = en.to_string();
                 }
                 for a in args {
@@ -454,7 +561,7 @@ impl Resolver {
     fn expr(&mut self, e: &mut Expr) {
         match &mut e.kind {
             ExprKind::Name(n) => {
-                if let Some(en) = self.value_alias(n) {
+                if let Some(en) = self.value_use(n, e.span) {
                     *n = en.to_string();
                 }
             }
@@ -553,12 +660,18 @@ impl Resolver {
     /// Resolves constructors in a pattern and adds the names it binds.
     fn pattern(&mut self, p: &mut Pattern) {
         match &mut p.kind {
-            PatternKind::Name(n) => match self.value_alias(n) {
-                Some("None") => *n = "None".to_string(),
-                _ => self.value(&n.clone()),
-            },
+            PatternKind::Name(n) => {
+                let is_none = value_name(n) == Some("None") || n == "None";
+                match is_none
+                    .then(|| self.value_use(&n.clone(), p.span))
+                    .flatten()
+                {
+                    Some(en) => *n = en.to_string(),
+                    None => self.value(&n.clone()),
+                }
+            }
             PatternKind::Ctor { name, args } => {
-                if let Some(en) = self.value_alias(&name.name) {
+                if let Some(en) = self.value_use(&name.name, name.span) {
                     name.name = en.to_string();
                 }
                 for a in args {

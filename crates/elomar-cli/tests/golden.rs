@@ -182,8 +182,38 @@ fn examples_run_with_arabic_keywords() {
         );
         count += 1;
     }
+    // The engine tests too, which hide built-in names in many ways: the
+    // Arabic version prints the same and ends the same way.
+    std::fs::create_dir_all(&work).unwrap();
+    for entry in std::fs::read_dir(root().join("tests/engines")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|e| e != "elo") {
+            continue;
+        }
+        let src = lines(&std::fs::read_to_string(&path).unwrap());
+        let arabic = fmt(&src, "ar");
+        assert_eq!(fmt(&arabic, "en"), fmt(&src, "en"), "{}", path.display());
+        let copy = work.join(path.file_name().unwrap());
+        std::fs::write(&copy, &arabic).unwrap();
+        let before = elomar(&["run", path.to_str().unwrap()]);
+        let after = elomar(&["run", copy.to_str().unwrap()]);
+        assert_eq!(
+            before.status.code(),
+            after.status.code(),
+            "{}",
+            path.display()
+        );
+        assert_eq!(
+            lines(&String::from_utf8_lossy(&before.stdout)),
+            lines(&String::from_utf8_lossy(&after.stdout)),
+            "output of {} in Arabic:
+{arabic}",
+            path.display()
+        );
+        count += 1;
+    }
     let _ = std::fs::remove_dir_all(&work);
-    assert!(count >= 10, "only {count} examples");
+    assert!(count >= 40, "only {count} programs");
 }
 
 #[test]

@@ -1,6 +1,7 @@
 // The keyword switch on lesson pages: shows every code example with English
-// keywords (fn, let, if) or Arabic ones (دالة, ليكن, إذا). The conversion is
-// done by Elomar-Lang itself (elomar_fmt::convert_keywords, in the same
+// keywords and built-in names (fn, let, print, .length) or Arabic ones (دالة,
+// ليكن, اطبع, .طول). The conversion is
+// done by Elomar-Lang itself (elomar_fmt::convert, in the same
 // WebAssembly module and Web Worker as the playground), so strings and
 // comments stay as they are. The choice is remembered on this device.
 (function () {

@@ -14,7 +14,9 @@
 //!   file ends with exactly one newline.
 //!
 //! Keywords keep the spelling they were written in (`fn` or `دالة`), unless
-//! [`format_with`] is asked to write them all in one language.
+//! [`format_with`] is asked to write them all in one language; it then also
+//! writes the built-in functions, types and methods in that language
+//! (`print` or `اطبع`, `.length` or `.طول`) wherever that keeps the meaning.
 //!
 //! Every result is checked: if the formatted code would not produce the same
 //! tokens as the input, nothing is changed and [`FormatError::Unsafe`] is
@@ -55,11 +57,88 @@ pub fn format_with(src: &str, keywords: Option<Keywords>) -> Result<String, Form
         return Err(FormatError::Lex(diags));
     }
     let out = Printer { src, keywords }.print(&tokens);
-    if same_program(src, &out) {
-        Ok(out)
-    } else {
-        Err(FormatError::Unsafe)
+    if !same_program(src, &out) {
+        return Err(FormatError::Unsafe);
     }
+    Ok(match keywords {
+        Some(lang) => convert_names(&out, lang).unwrap_or(out),
+        None => out,
+    })
+}
+
+/// `src` with every keyword and every built-in name written in `lang`, and
+/// nothing else changed (see [`convert_keywords`]). A built-in name stays as
+/// it is where the other spelling would mean something else (the program
+/// has its own `نص`), or when the code does not parse. The website's
+/// switch and the playground use it.
+pub fn convert(src: &str, lang: Keywords) -> String {
+    let kw = convert_keywords(src, lang);
+    convert_names(&kw, lang).unwrap_or(kw)
+}
+
+/// Where `src` names built-in functions, constructors, types and methods;
+/// `None` when it does not parse.
+fn builtin_uses(src: &str) -> Option<Vec<elomar_ast::arabic::BuiltinUse>> {
+    let (mut program, diags, mut uses) = elomar_parser::parse_recording(src);
+    if diags
+        .iter()
+        .any(|d| d.severity == elomar_diagnostics::Severity::Error)
+    {
+        return None;
+    }
+    let opts = elomar_types::CheckOptions {
+        require_main: false,
+        ..Default::default()
+    };
+    let (_, members) = elomar_types::check_recording(&mut program, opts);
+    uses.extend(members);
+    uses.sort_by_key(|u| u.span.start);
+    Some(uses)
+}
+
+/// `src` with its built-in names written in `lang`. `None` if the code does
+/// not parse, or if the result would not name the same built-ins.
+fn convert_names(src: &str, lang: Keywords) -> Option<String> {
+    let uses = builtin_uses(src)?;
+    let mut out = String::new();
+    let mut at = 0;
+    for u in &uses {
+        let (start, end) = (u.span.start as usize, u.span.end as usize);
+        let Some(written) = src.get(start..end) else {
+            continue;
+        };
+        let is_name = matches!(
+            elomar_lexer::lex(written).0.as_slice(),
+            [
+                Token {
+                    kind: TokenKind::Ident(_),
+                    ..
+                },
+                Token {
+                    kind: TokenKind::Eof,
+                    ..
+                }
+            ]
+        );
+        let Some(name) = u.spelling(lang == Keywords::Arabic) else {
+            continue;
+        };
+        if start < at || !is_name || written == name {
+            continue;
+        }
+        out.push_str(&src[at..start]);
+        out.push_str(name);
+        at = end;
+    }
+    out.push_str(&src[at..]);
+    // The same built-ins, in the same order, must still be named.
+    let after = builtin_uses(&out)?;
+    let same = after.len() == uses.len()
+        && after
+            .iter()
+            .zip(&uses)
+            .all(|(a, b)| a.kind == b.kind && a.english == b.english);
+    same.then_some(out)
 }
 
 /// Splits tokens into source lines (a multi-line block comment stays one
@@ -684,6 +763,46 @@ let m: Map<String, fn(Int, Int) -> Bool> = [:]
     }
 
     #[test]
+    fn built_in_names_switch_where_the_meaning_stays() {
+        let src = "type R = { length: Int }
+fn max(a: Int) -> Int {
+    return a
+}
+fn main() {
+    var xs: List<Int> = [1]
+    xs.push(2)
+    let r: R = { length: 3 }
+    print(xs.length, r.length, max(5), Some(1), \"{xs.length}\")
+    let مطلق = 4
+    print(abs(-1) + مطلق)
+}
+";
+        let ar = convert(src, Keywords::Arabic);
+        assert_eq!(
+            ar,
+            "نوع R = { length: صحيح }
+دالة max(a: صحيح) -> صحيح {
+    أرجع a
+}
+دالة main() {
+    متغير xs: قائمة<صحيح> = [1]
+    xs.أضف(2)
+    ليكن r: R = { length: 3 }
+    اطبع(xs.طول, r.length, max(5), قيمة(1), \"{xs.طول}\")
+    ليكن مطلق = 4
+    اطبع(abs(-1) + مطلق)
+}
+"
+        );
+        assert_eq!(convert(&ar, Keywords::English), src);
+        // Code that does not parse: only the keywords change.
+        assert_eq!(
+            convert("fn f( { print(1)", Keywords::Arabic),
+            "دالة f( { print(1)"
+        );
+    }
+
+    #[test]
     fn arabic_keywords_keep_their_spelling_or_switch() {
         let mixed = "دالة   ف(س:Int)->Bool{
 return س>0
@@ -705,7 +824,7 @@ fn g() {
         let ar = format_with(mixed, Some(Keywords::Arabic)).unwrap();
         assert_eq!(
             ar,
-            "دالة ف(س: Int) -> Bool {
+            "دالة ف(س: صحيح) -> منطقي {
     أرجع س > 0
 }
 دالة g() {

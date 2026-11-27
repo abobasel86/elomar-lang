@@ -26,6 +26,33 @@ pub fn parse_at(src: &str, base: usize) -> (Program, Vec<Diagnostic>) {
 }
 
 pub fn parse_tokens(tokens: Vec<Token>) -> (Program, Vec<Diagnostic>) {
+    let (program, diags, _) = parse_tokens_recording(tokens);
+    (program, diags)
+}
+
+/// Like [`parse`], also returning where the program names a built-in
+/// function, constructor or type, in English or in Arabic (for
+/// `elomar fmt --keywords`).
+pub fn parse_recording(
+    src: &str,
+) -> (
+    Program,
+    Vec<Diagnostic>,
+    Vec<elomar_ast::arabic::BuiltinUse>,
+) {
+    let (tokens, mut diags) = elomar_lexer::lex(src);
+    let (program, parse_diags, uses) = parse_tokens_recording(tokens);
+    diags.extend(parse_diags);
+    (program, diags, uses)
+}
+
+fn parse_tokens_recording(
+    tokens: Vec<Token>,
+) -> (
+    Program,
+    Vec<Diagnostic>,
+    Vec<elomar_ast::arabic::BuiltinUse>,
+) {
     let mut p = Parser {
         tokens,
         pos: 0,
@@ -34,8 +61,8 @@ pub fn parse_tokens(tokens: Vec<Token>) -> (Program, Vec<Diagnostic>) {
     };
     let mut program = p.program();
     // `اطبع` is `print`, `نص` is `String`, ... (unless the program hides them).
-    elomar_ast::arabic::resolve(&mut program);
-    (program, p.diags)
+    let uses = elomar_ast::arabic::resolve_recording(&mut program);
+    (program, p.diags, uses)
 }
 
 type PResult<T> = Result<T, Diagnostic>;

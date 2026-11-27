@@ -326,6 +326,8 @@ dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
  "elomar-lexer",
+ "elomar-parser",
+ "elomar-types",
 ]
 
 [[package]]

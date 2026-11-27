@@ -7,6 +7,15 @@ other: ar/news.html
 
 # What's new
 
+## The Arabic switch converts everything
+
+- **«دالة ليكن إذا»** on the lessons and **fn ⇄ دالة** in the playground now
+  write the whole program in Arabic: `print` becomes `اطبع`, `List<Int>`
+  becomes `قائمة<صحيح>`, `.length` becomes `.طول`. And back.
+- `elomar fmt --keywords ar` (or `en`) does the same to your files.
+- A name stays as written where your program has its own thing with that
+  name, so the program always means the same.
+
 ## 1.15: Arabic names for methods
 
 - **`.طول` is `.length`, `.حول` is `.map`**: every method of the built-in

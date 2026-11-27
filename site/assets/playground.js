@@ -161,8 +161,9 @@
     }
   });
 
-  // fn ⇄ دالة: writes every keyword of the program in Arabic, or, when it
-  // already is, in English (elomar_fmt::convert_keywords in the worker).
+  // fn ⇄ دالة: writes every keyword and built-in name of the program in
+  // Arabic (print is اطبع, .length is .طول), or, when it
+  // already is, in English (elomar_fmt::convert in the worker).
   let keywordsTo = null;
   function askKeywords(to) {
     keywordsTo = to;

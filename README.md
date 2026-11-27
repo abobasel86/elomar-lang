@@ -76,7 +76,8 @@ by the compiler when they are not declared.
 - **Arabic keywords:** every keyword also has an Arabic spelling (`دالة` is
   `fn`, `ليكن` is `let`, `إذا` is `if`, `لكل … في` is `for … in`), and a
   program may start in `رئيسية`. Mix them freely; `elomar fmt --keywords ar`
-  (or `en`) rewrites a file in one language. See
+  (or `en`) rewrites a file in one language, built-in names and methods
+  included. See
   [`examples/arabic-keywords`](examples/arabic-keywords) and the
   [table](https://abobasel86.github.io/elomar-lang/en/12-reference.html#keywords).
 - **Arabic names for built-ins:** `اطبع` is `print`, `نص` is `String`,
