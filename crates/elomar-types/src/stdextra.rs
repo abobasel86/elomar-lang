@@ -378,6 +378,15 @@ impl Checker {
 pub(crate) const SERVER_FUNCTIONS: [&str; 5] = ["serve", "text", "html", "json", "redirect"];
 
 /// `HttpRequest`: what a `server.serve` handler receives.
+/// What `process.run` gives on success.
+pub(crate) fn process_output_ty() -> Ty {
+    Ty::record(vec![
+        ("status".into(), Ty::Int),
+        ("stdout".into(), Ty::Str),
+        ("stderr".into(), Ty::Str),
+    ])
+}
+
 pub(crate) fn http_request_ty() -> Ty {
     let text_map = Ty::map(Ty::Str, Ty::Str);
     Ty::record(vec![
@@ -473,11 +482,7 @@ impl Checker {
                 self.check_expr_against(&mut t.value, &Ty::Duration);
             }
         }
-        let output = Ty::record(vec![
-            ("status".into(), Ty::Int),
-            ("stdout".into(), Ty::Str),
-            ("stderr".into(), Ty::Str),
-        ]);
+        let output = process_output_ty();
         Ty::result(
             output,
             Ty::Enum(crate::enums::PROCESS_ERROR.into(), Vec::new()),

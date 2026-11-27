@@ -49,6 +49,20 @@ pub const TYPE_NAMES: &[(&str, &str)] = &[
     ("اختياري", "Option"),
     ("نتيجة", "Result"),
     ("مدة", "Duration"),
+    ("طلب_ويب", "HttpRequest"),
+    ("رد_ويب", "HttpResponse"),
+    ("قاعدة_بيانات", "Db"),
+    ("مدى", "Range"),
+    ("مستقبل", "Future"),
+    ("فراغ", "Unit"),
+    ("خطأ_ذكاء", "AIError"),
+    ("خطأ_ملفات", "FsError"),
+    ("خطأ_جيسون", "JsonError"),
+    ("خطأ_ويب", "HttpError"),
+    ("خطأ_بيانات", "DbError"),
+    ("خطأ_بايثون", "PyError"),
+    ("خطأ_أدوات", "McpError"),
+    ("خطأ_عملية", "ProcessError"),
 ];
 
 /// Methods and the `length` property of the built-in types: (Arabic,
@@ -291,6 +305,71 @@ pub const MODULE_FUNCTIONS: &[(&str, &str, &str)] = &[
     ("csv", "إلى_نص", "stringify"),
 ];
 
+/// `std` in `use std.ملفات`.
+pub const STD_ARABIC: &str = "قياسي";
+
+/// Variants of the built-in error enums (`خطأ_ملفات.غير_موجود` is
+/// `FsError.NotFound`): (Arabic, English).
+pub const ERROR_VARIANTS: &[(&str, &str)] = &[
+    ("غير_موجود", "NotFound"),
+    ("لا_صلاحية", "PermissionDenied"),
+    ("ممنوع", "PolicyDenied"),
+    ("بيانات_غير_صالحة", "InvalidData"),
+    ("آخر", "Other"),
+    ("جيسون_غير_صالح", "InvalidJson"),
+    ("نوع_غير_مطابق", "TypeMismatch"),
+    ("رابط_غير_صالح", "InvalidUrl"),
+    ("انتهت_المهلة", "Timeout"),
+    ("الشبكة", "Network"),
+    ("كبير_جدا", "TooLarge"),
+    ("تجاوز_الحد", "RateLimited"),
+    ("تجاوز_الميزانية", "BudgetExceeded"),
+    ("تجاوز_السياق", "ContextLimitExceeded"),
+    ("الفتح", "Open"),
+    ("استعلام", "Sql"),
+    ("قيد", "Constraint"),
+    ("غير_متاح", "Unavailable"),
+    ("استثناء", "Exception"),
+    ("غير_مهيأ", "NotConfigured"),
+    ("البروتوكول", "Protocol"),
+    ("فشلت_الأداة", "ToolFailed"),
+    ("فشلت", "Failed"),
+    ("المصادقة", "Authentication"),
+    ("المزود_غير_متاح", "ProviderUnavailable"),
+    ("قدرة_غير_مدعومة", "UnsupportedCapability"),
+    ("مخرجات_غير_صالحة", "InvalidStructuredOutput"),
+    ("ألغي", "Cancelled"),
+];
+
+/// Fields of the records the standard modules give (an HTTP response's
+/// `status`, a date's `year`): (Arabic, English). The checker resolves
+/// them, on those records only.
+pub const FIELD_NAMES: &[(&str, &str)] = &[
+    ("الحالة", "status"),
+    ("المحتوى", "body"),
+    ("الطريقة", "method"),
+    ("المسار", "path"),
+    ("الاستعلام", "query"),
+    ("الترويسات", "headers"),
+    ("السنة", "year"),
+    ("الشهر", "month"),
+    ("اليوم", "day"),
+    ("الساعة", "hour"),
+    ("الدقيقة", "minute"),
+    ("الثانية", "second"),
+    ("يوم_الأسبوع", "weekday"),
+    ("الاسم", "name"),
+    ("الوصف", "description"),
+    ("النص", "text"),
+    ("الدرجة", "score"),
+    ("الأداة", "tool"),
+    ("المعطيات", "arguments"),
+    ("النتيجة", "result"),
+    ("موافق_عليه", "approved"),
+    ("المخرجات", "stdout"),
+    ("الأخطاء", "stderr"),
+];
+
 /// Effects in `!{...}`: (Arabic, English).
 pub const EFFECT_NAMES: &[(&str, &str)] = &[
     ("إدخال_إخراج", "io"),
@@ -395,6 +474,47 @@ pub fn module_function(module: &str, name: &str) -> Option<&'static str> {
         .map(|(_, _, en)| *en)
 }
 
+/// The English name of a field of a standard module's record, written in
+/// Arabic.
+pub fn field_name(name: &str) -> Option<&'static str> {
+    lookup(FIELD_NAMES, name)
+}
+
+/// The Arabic name of the field `english` of a standard module's record.
+pub fn field_arabic(english: &str) -> Option<&'static str> {
+    arabic_of(FIELD_NAMES, english)
+}
+
+/// The built-in error enums.
+const ERROR_ENUMS: [&str; 8] = [
+    "AIError",
+    "FsError",
+    "JsonError",
+    "HttpError",
+    "DbError",
+    "PyError",
+    "McpError",
+    "ProcessError",
+];
+
+/// The English name of a built-in error enum written in either language.
+fn error_enum(name: &str) -> Option<&'static str> {
+    ERROR_ENUMS
+        .iter()
+        .find(|e| **e == name)
+        .copied()
+        .or_else(|| type_name(name).filter(|en| ERROR_ENUMS.contains(en)))
+}
+
+/// The English name of an error variant written in either language.
+fn error_variant(name: &str) -> Option<&'static str> {
+    ERROR_VARIANTS
+        .iter()
+        .find(|(_, en)| *en == name)
+        .map(|(_, en)| *en)
+        .or_else(|| lookup(ERROR_VARIANTS, name))
+}
+
 /// The English name of an effect written in Arabic.
 pub fn effect_name(name: &str) -> Option<&'static str> {
     lookup(EFFECT_NAMES, name)
@@ -423,6 +543,12 @@ pub enum BuiltinKind {
     ModuleFunction { module: &'static str },
     /// An effect in `!{...}` ([`EFFECT_NAMES`]).
     Effect,
+    /// `std` in a `use` ([`STD_ARABIC`]).
+    Std,
+    /// A variant of a built-in error enum ([`ERROR_VARIANTS`]).
+    Variant,
+    /// A field of a standard module's record ([`FIELD_NAMES`]).
+    Field,
 }
 
 /// One place where a program names a built-in, in either language: what
@@ -454,6 +580,9 @@ impl BuiltinUse {
                     .find(|(m, _, en)| *m == module && *en == self.english)
                     .map(|(_, ar, _)| *ar),
                 BuiltinKind::Effect => arabic_of(EFFECT_NAMES, self.english),
+                BuiltinKind::Std => Some(STD_ARABIC),
+                BuiltinKind::Variant => arabic_of(ERROR_VARIANTS, self.english),
+                BuiltinKind::Field => field_arabic(self.english),
             };
             ar.filter(|_| self.arabic_free)
         } else {
@@ -480,6 +609,20 @@ pub fn resolve_recording(program: &mut Program) -> Vec<BuiltinUse> {
     // `use std.ملفات` is `use std.fs`; either spelling of an imported module
     // then names it (`ملفات.اقرأ_نص` and `fs.read_text`).
     for item in &mut program.items {
+        if let Item::Use(u) = item
+            && let Some(first) = u.path.first_mut()
+            && (first.name == "std"
+                || (!first.name.is_ascii() && key(&first.name) == key(STD_ARABIC)))
+        {
+            r.uses.push(BuiltinUse {
+                span: first.span,
+                kind: BuiltinKind::Std,
+                english: "std",
+                english_free: true,
+                arabic_free: true,
+            });
+            first.name = "std".to_string();
+        }
         if let Item::Use(u) = item
             && u.names.is_empty()
             && u.path.len() == 2
@@ -598,6 +741,20 @@ impl Resolver {
             arabic_free: !self.hides_value(ar),
         });
         Some(en)
+    }
+
+    /// A variant of a built-in error enum: English, recording the use.
+    fn variant_use(&mut self, variant: &mut String, span: Span) {
+        if let Some(en) = error_variant(variant) {
+            self.uses.push(BuiltinUse {
+                span,
+                kind: BuiltinKind::Variant,
+                english: en,
+                english_free: true,
+                arabic_free: true,
+            });
+            *variant = en.to_string();
+        }
     }
 
     /// Effects in `!{...}` written in Arabic become English.
@@ -818,6 +975,20 @@ impl Resolver {
                     *n = en.to_string();
                 }
             }
+            // `خطأ_ملفات.غير_موجود`: a variant of a built-in error enum.
+            ExprKind::Field { target, name }
+                if matches!(&target.kind, ExprKind::Name(n)
+                    if error_enum(n).is_some() && !self.hides_type(n) && !self.hides_value(n)) =>
+            {
+                let ExprKind::Name(n) = &mut target.kind else {
+                    unreachable!()
+                };
+                let span = target.span;
+                if let Some(en) = self.type_use(&n.clone(), span) {
+                    *n = en.to_string();
+                }
+                self.variant_use(&mut name.name, name.span);
+            }
             // `ملفات.اقرأ_نص`: a function of a standard module.
             ExprKind::Field { target, name }
                 if matches!(&target.kind, ExprKind::Name(m)
@@ -959,7 +1130,23 @@ impl Resolver {
                     self.pattern(a);
                 }
             }
-            PatternKind::Variant { args, .. } | PatternKind::Tuple(args) => {
+            PatternKind::Variant {
+                enum_name,
+                variant,
+                args,
+            } => {
+                if error_enum(&enum_name.name).is_some()
+                    && !self.hides_type(&enum_name.name)
+                    && let Some(en) = self.type_use(&enum_name.name.clone(), enum_name.span)
+                {
+                    enum_name.name = en.to_string();
+                    self.variant_use(&mut variant.name, variant.span);
+                }
+                for a in args {
+                    self.pattern(a);
+                }
+            }
+            PatternKind::Tuple(args) => {
                 for a in args {
                     self.pattern(a);
                 }

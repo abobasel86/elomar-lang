@@ -449,6 +449,10 @@ impl Checker {
                 };
                 let mut out: Vec<(String, Ty)> = Vec::new();
                 for field in fields {
+                    // `{ الحالة: 200 }` for an `HttpResponse`.
+                    if !hint_fields.is_empty() {
+                        self.std_field(&hint_fields, &mut field.name);
+                    }
                     if out.iter().any(|(n, _)| n == &field.name.name) {
                         self.error(
                             "E1002",
@@ -531,6 +535,11 @@ impl Checker {
                 let t = self.check_expr(target, None);
                 // `.طول` is `.length` (a record's own field of that name wins).
                 let resolved = self.subst.shallow(&t);
+                // `الرد.الحالة` is `response.status` on a module's record.
+                if let Ty::Record(fs) = &resolved {
+                    self.std_field(fs, &mut name);
+                    field.name = name.name.clone();
+                }
                 if matches!(resolved, Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_))
                     && (name.name == "length"
                         || crate::builtins::arabic_member(&resolved, &name.name) == Some("length"))

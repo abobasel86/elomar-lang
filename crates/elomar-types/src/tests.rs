@@ -1315,3 +1315,65 @@ fn arabic_std_modules() {
         vec!["E1001"]
     );
 }
+
+#[test]
+fn every_builtin_type_variant_and_module_field_has_an_arabic_name() {
+    use elomar_ast::arabic::{ERROR_VARIANTS, FIELD_NAMES, TYPE_NAMES, field_name, type_name};
+    let not_keyword = |ar: &str| {
+        let (_, d) = elomar_parser::parse(&format!("fn main() {{\n  let {ar} = 1\n}}"));
+        d.is_empty()
+    };
+    for t in crate::builtins::BUILTIN_TYPES {
+        let ar = TYPE_NAMES
+            .iter()
+            .find(|&&(_, en)| en == t)
+            .map(|&(ar, _)| ar)
+            .unwrap_or_else(|| panic!("{t} has no Arabic name"));
+        // `مجموعة` is both `set` and `Set`; every other name is one type.
+        assert_eq!(type_name(ar), Some(t));
+        assert!(not_keyword(ar), "{ar}");
+    }
+    let kinds = [
+        &crate::enums::FS_ERROR_KINDS[..],
+        &crate::enums::JSON_ERROR_KINDS[..],
+        &crate::enums::HTTP_ERROR_KINDS[..],
+        &crate::enums::DB_ERROR_KINDS[..],
+        &crate::enums::PY_ERROR_KINDS[..],
+        &crate::enums::MCP_ERROR_KINDS[..],
+        &crate::enums::PROCESS_ERROR_KINDS[..],
+        &crate::enums::AI_ERROR_KINDS[..],
+    ];
+    for v in kinds.iter().flat_map(|k| k.iter()) {
+        let ar = ERROR_VARIANTS
+            .iter()
+            .find(|&&(_, en)| en == *v)
+            .map(|&(ar, _)| ar)
+            .unwrap_or_else(|| panic!("{v} has no Arabic name"));
+        assert!(not_keyword(ar), "{ar}");
+    }
+    let records = [
+        crate::stdlib::http_response_ty(),
+        crate::stdlib::mcp_tool_ty(),
+        crate::stdextra::date_ty(),
+        crate::stdextra::http_request_ty(),
+        crate::stdextra::http_reply_ty(),
+        crate::stdextra::process_output_ty(),
+        crate::ai::search_hit_ty(),
+        crate::ai::tool_request_ty(),
+        crate::ai::agent_step_ty(),
+    ];
+    for r in records {
+        let Ty::Record(fields) = r else { panic!() };
+        for (f, _) in &fields {
+            let ar = FIELD_NAMES
+                .iter()
+                .find(|&&(_, en)| en == f)
+                .map(|&(ar, _)| ar)
+                .unwrap_or_else(|| panic!("field {f} has no Arabic name"));
+            assert_eq!(field_name(ar), Some(f.as_str()));
+            assert!(not_keyword(ar), "{ar}");
+            // No record has a field that is another field's Arabic name.
+            assert!(!fields.iter().any(|(n, _)| n == ar));
+        }
+    }
+}

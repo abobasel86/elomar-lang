@@ -138,7 +138,18 @@ impl Checker {
     fn members(&self, ty: &Ty) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
         match ty {
-            Ty::Record(fields) => out.extend(fields.iter().map(|(n, _)| n.clone())),
+            Ty::Record(fields) => {
+                out.extend(fields.iter().map(|(n, _)| n.clone()));
+                // A module's record: its fields' Arabic names too.
+                if crate::builtins::is_std_record(fields) {
+                    out.extend(
+                        fields
+                            .iter()
+                            .filter_map(|(n, _)| elomar_ast::arabic::field_arabic(n))
+                            .map(str::to_string),
+                    );
+                }
+            }
             Ty::List(_) | Ty::Str | Ty::Map(..) | Ty::Set(_) => {
                 out.extend(["length".into(), "طول".into()])
             }

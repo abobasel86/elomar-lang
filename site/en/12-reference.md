@@ -74,6 +74,13 @@ function or type), that one is used where it is visible.
 | `Bool` | `منطقي` | `Option` | `اختياري` |
 | `String` | `نص` | `Result` | `نتيجة` |
 | `List` | `قائمة` | `Duration` | `مدة` |
+| `HttpRequest` | `طلب_ويب` | `HttpResponse` | `رد_ويب` |
+| `Db` | `قاعدة_بيانات` | `Range` | `مدى` |
+| `Future` | `مستقبل` | `Unit` | `فراغ` |
+| `AIError` | `خطأ_ذكاء` | `FsError` | `خطأ_ملفات` |
+| `JsonError` | `خطأ_جيسون` | `HttpError` | `خطأ_ويب` |
+| `DbError` | `خطأ_بيانات` | `PyError` | `خطأ_بايثون` |
+| `McpError` | `خطأ_أدوات` | `ProcessError` | `خطأ_عملية` |
 
 ## Arabic names for methods {#arabic-methods}
 
@@ -200,8 +207,55 @@ the Arabic one.
 | `csv` `جدول` | `parse` `حلل` · `parse_records` `حلل_سجلات` · `stringify` `إلى_نص` |
 
 Effects in `!{...}`: `io` `إدخال_إخراج` · `fs` `ملفات` · `net` `شبكة` · `ai` `ذكاء` · `db` `بيانات` · `py` `بايثون` · `mcp` `أدوات` · `process` `عملية`. For example `fn save(s: String) !{ملفات}`.
-Record fields that modules return (`status`, `body`, `year`) and error
-kinds (`FsError`) stay in English.
+
+`std` is `قياسي` (since 1.18): `استخدم قياسي.ملفات`.
+
+### Errors and module records {#arabic-errors}
+
+The variants of the built-in errors have Arabic names (since 1.18), after
+the error type's name: `خطأ_ملفات.غير_موجود(رسالة)` is
+`FsError.NotFound(message)`.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `NotFound` | `غير_موجود` | `Open` | `الفتح` |
+| `PermissionDenied` | `لا_صلاحية` | `Sql` | `استعلام` |
+| `PolicyDenied` | `ممنوع` | `Constraint` | `قيد` |
+| `InvalidData` | `بيانات_غير_صالحة` | `Unavailable` | `غير_متاح` |
+| `Other` | `آخر` | `Exception` | `استثناء` |
+| `InvalidJson` | `جيسون_غير_صالح` | `NotConfigured` | `غير_مهيأ` |
+| `TypeMismatch` | `نوع_غير_مطابق` | `Protocol` | `البروتوكول` |
+| `InvalidUrl` | `رابط_غير_صالح` | `ToolFailed` | `فشلت_الأداة` |
+| `Timeout` | `انتهت_المهلة` | `Failed` | `فشلت` |
+| `Network` | `الشبكة` | `Authentication` | `المصادقة` |
+| `TooLarge` | `كبير_جدا` | `ProviderUnavailable` | `المزود_غير_متاح` |
+| `RateLimited` | `تجاوز_الحد` | `UnsupportedCapability` | `قدرة_غير_مدعومة` |
+| `BudgetExceeded` | `تجاوز_الميزانية` | `InvalidStructuredOutput` | `مخرجات_غير_صالحة` |
+| `ContextLimitExceeded` | `تجاوز_السياق` | `Cancelled` | `ألغي` |
+
+The fields of the records modules give (a web response or request, a
+date, a process's output, an MCP tool, a search hit, an agent's step) have
+Arabic names too: `الرد.الحالة` is `response.status`, and an `HttpResponse`
+can be written `{ الحالة: 200, الترويسات: [:], المحتوى: "..." }`. Only
+on those records: your own records keep exactly the fields you gave them.
+
+| English | Arabic | English | Arabic |
+|---|---|---|---|
+| `status` | `الحالة` | `weekday` | `يوم_الأسبوع` |
+| `body` | `المحتوى` | `name` | `الاسم` |
+| `method` | `الطريقة` | `description` | `الوصف` |
+| `path` | `المسار` | `text` | `النص` |
+| `query` | `الاستعلام` | `score` | `الدرجة` |
+| `headers` | `الترويسات` | `tool` | `الأداة` |
+| `year` | `السنة` | `arguments` | `المعطيات` |
+| `month` | `الشهر` | `result` | `النتيجة` |
+| `day` | `اليوم` | `approved` | `موافق_عليه` |
+| `hour` | `الساعة` | `stdout` | `المخرجات` |
+| `minute` | `الدقيقة` | `stderr` | `الأخطاء` |
+| `second` | `الثانية` |  | |
+
+What a program prints stays as it was: `e.kind()` gives `"NotFound"`, and a
+printed error shows `FsError.NotFound(...)`.
 
 ## Built-in functions
 

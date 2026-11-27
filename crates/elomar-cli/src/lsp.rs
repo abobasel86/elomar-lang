@@ -660,7 +660,7 @@ impl Server {
                 .map_or(receiver_end, |(i, _)| i);
             let receiver = &head[receiver_start..receiver_end];
             // `use std.`: the modules, in both languages.
-            if receiver == "std" {
+            if receiver == "std" || receiver == elomar_ast::arabic::STD_ARABIC {
                 for m in elomar_types::STD_MODULES {
                     add(m, 9, None);
                 }
@@ -718,10 +718,11 @@ impl Server {
         for &(ar, en) in elomar_ast::arabic::TYPE_NAMES {
             add(ar, 22, Some(en));
         }
-        // Standard modules (`ملفات` is `fs`).
+        // Standard modules (`ملفات` is `fs`), and `قياسي` for `std`.
         for &(ar, en) in elomar_ast::arabic::MODULE_NAMES {
             add(ar, 9, Some(en));
         }
+        add(elomar_ast::arabic::STD_ARABIC, 9, Some("std"));
         if let Some(a) = &doc.analysis {
             for h in &a.info.hovers {
                 let (s, e) = (h.span.start as usize, h.span.end as usize);

@@ -249,7 +249,66 @@ pub(crate) fn has_method(ty: &Ty, name: &str) -> bool {
     methods_of(ty).contains(&name)
 }
 
+/// Whether `fields` are those of a record a standard module gives (an HTTP
+/// response, a date, ...), whose fields have Arabic names.
+pub(crate) fn is_std_record(fields: &[(String, Ty)]) -> bool {
+    let names = |t: Ty| match t {
+        Ty::Record(fs) => {
+            let mut n: Vec<String> = fs.into_iter().map(|(n, _)| n).collect();
+            n.sort();
+            n
+        }
+        _ => Vec::new(),
+    };
+    let mut mine: Vec<String> = fields.iter().map(|(n, _)| n.clone()).collect();
+    mine.sort();
+    [
+        crate::stdlib::http_response_ty(),
+        crate::stdlib::mcp_tool_ty(),
+        crate::stdextra::date_ty(),
+        crate::stdextra::http_request_ty(),
+        crate::stdextra::http_reply_ty(),
+        crate::stdextra::process_output_ty(),
+        crate::ai::search_hit_ty(),
+        crate::ai::tool_request_ty(),
+        crate::ai::agent_step_ty(),
+    ]
+    .into_iter()
+    .any(|t| names(t) == mine)
+}
+
 impl Checker {
+    /// `name`, a field of a record with `fields`: on a standard module's
+    /// record, `الحالة` becomes `status`, and the use is recorded.
+    pub(crate) fn std_field(&mut self, fields: &[(String, Ty)], name: &mut Ident) {
+        if !is_std_record(fields) {
+            return;
+        }
+        let en = if name.name.is_ascii() {
+            elomar_ast::arabic::field_arabic(&name.name).map(|_| name.name.clone())
+        } else {
+            elomar_ast::arabic::field_name(&name.name).map(str::to_string)
+        };
+        let Some(en) = en.filter(|en| fields.iter().any(|(n, _)| n == en)) else {
+            return;
+        };
+        let Some(english) = elomar_ast::arabic::FIELD_NAMES
+            .iter()
+            .find(|(_, e)| *e == en)
+            .map(|(_, e)| *e)
+        else {
+            return;
+        };
+        self.members.push(elomar_ast::arabic::BuiltinUse {
+            span: name.span,
+            kind: elomar_ast::arabic::BuiltinKind::Field,
+            english,
+            english_free: true,
+            arabic_free: true,
+        });
+        name.name = en;
+    }
+
     /// Whether a method from an `impl` named `name` applies to `ty`.
     fn user_method_named(&self, ty: &Ty, name: &str) -> bool {
         self.methods

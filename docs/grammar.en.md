@@ -89,6 +89,13 @@ not matter). Messages show the English names.
 | `Bool` | `منطقي` | `Option` | `اختياري` |
 | `String` | `نص` | `Result` | `نتيجة` |
 | `List` | `قائمة` | `Duration` | `مدة` |
+| `HttpRequest` | `طلب_ويب` | `HttpResponse` | `رد_ويب` |
+| `Db` | `قاعدة_بيانات` | `Range` | `مدى` |
+| `Future` | `مستقبل` | `Unit` | `فراغ` |
+| `AIError` | `خطأ_ذكاء` | `FsError` | `خطأ_ملفات` |
+| `JsonError` | `خطأ_جيسون` | `HttpError` | `خطأ_ويب` |
+| `DbError` | `خطأ_بيانات` | `PyError` | `خطأ_بايثون` |
+| `McpError` | `خطأ_أدوات` | `ProcessError` | `خطأ_عملية` |
 
 ### 1.0.3 Arabic Names for Methods (since 1.15)
 
@@ -111,6 +118,16 @@ The parser resolves them: a `use std.X` with `X` in either language imports
 the module, after which either spelling names it (unless the program's own
 name hides it), and a function after an imported module's name is looked up
 in that module's table. They match like the Arabic keywords.
+
+### 1.0.5 `std`, Errors and Module Records (since 1.18)
+
+`std` may be written `قياسي`. The remaining built-in types have Arabic names
+(listed in §1.0.2), and so do the variants of the built-in error enums
+(`خطأ_ملفات.غير_موجود` is `FsError.NotFound`), resolved by the parser after
+an error type's name. The fields of the records the standard modules give
+have Arabic names, resolved by the checker on those records only (by their
+fields), in field access and in a record literal of such a type. Tables:
+[reference](https://abobasel86.github.io/elomar-lang/en/12-reference.html#arabic-errors).
 
 ### 1.1 Line Ends
 

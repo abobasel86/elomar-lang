@@ -7,6 +7,16 @@ other: ar/news.html
 
 # What's new
 
+## The last English names
+
+- **`استخدم قياسي.ملفات`**: `std` is `قياسي`.
+- Errors: `خطأ_ملفات.غير_موجود(رسالة)` is `FsError.NotFound(message)`.
+- The fields of what modules give: `الرد.الحالة` is `response.status`,
+  `التاريخ.السنة` is `date.year`; a web handler can return
+  `{ الحالة: 200, الترويسات: [:], المحتوى: "..." }`. Your own records are
+  not touched.
+- All of them are in the [reference](12-reference.html#arabic-errors).
+
 ## 1.17: Arabic names for standard modules
 
 - **`استخدم std.ملفات` is `use std.fs`**, and `ملفات.اقرأ_نص` is

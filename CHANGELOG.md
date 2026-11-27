@@ -4,6 +4,21 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **The last English names get Arabic ones**: `std` is `قياسي`
+  (`استخدم قياسي.ملفات`); the types `طلب_ويب`, `رد_ويب`, `قاعدة_بيانات`,
+  `مدى`, `مستقبل`, `فراغ` and the error types `خطأ_ملفات`, `خطأ_جيسون`,
+  `خطأ_ويب`, `خطأ_بيانات`, `خطأ_بايثون`, `خطأ_أدوات`, `خطأ_عملية`,
+  `خطأ_ذكاء`; their variants (`خطأ_ملفات.غير_موجود` is
+  `FsError.NotFound`); and the fields of the records modules give
+  (`الرد.الحالة` is `response.status`, `التاريخ.السنة` is `date.year`),
+  on those records only, also in a record literal (`رد_ويب`). Tables:
+  `elomar_ast::arabic::ERROR_VARIANTS`, `FIELD_NAMES`. Conversion and the
+  editor know them.
+
 ## [1.17.0] - 2026-11-27
 
 ### Added
