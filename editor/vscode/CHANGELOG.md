@@ -5,6 +5,12 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.20.0
+
+Works with Elomar-Lang 1.20.0: completion for `server.form`, `server.cookies`
+and `server.with_cookie` (`خادم.نموذج`, `خادم.ملفات_ارتباط`,
+`خادم.مع_ملف_ارتباط`).
+
 ## 1.19.0
 
 Works with Elomar-Lang 1.19.0: completion for `crypto.hash_password` and

@@ -7,7 +7,7 @@ other: en/news.html
 
 # الجديد
 
-## تسجيل الدخول
+## 1.20: تسجيل الدخول
 
 - **`server.form(req)`** تقرأ نموذج HTML، و**`server.cookies(req)`** ملفات الارتباط التي أرسلها المتصفح،
   و**`server.with_cookie(reply, name, value)`** تضع ملف ارتباط آمنًا افتراضيًا (HttpOnly وSameSite=Lax). وبالعربية:
@@ -225,7 +225,8 @@ other: en/news.html
 
 | الإصدار | ما جاء به |
 |---|---|
-| **1.19** | حفظ كلمات المرور: `crypto.hash_password` و`crypto.verify_password` (Argon2id) |
+| **1.20** | تسجيل الدخول: `server.form` و`server.cookies` و`server.with_cookie`؛ و`examples/login` موقع بحسابات بالعربية |
+| 1.19 | حفظ كلمات المرور: `crypto.hash_password` و`crypto.verify_password` (Argon2id) |
 | 1.18 | أسماء عربية لـ`std` وبقية الأنواع وحالات الأخطاء وحقول سجلات الوحدات (`خطأ_ملفات.غير_موجود`، `الرد.الحالة`) |
 | 1.17 | أسماء عربية للوحدات القياسية والصلاحيات (`استخدم std.ملفات`، `!{ملفات}`) |
 | 1.16 | زر العربية و`fmt --keywords` يحوّلان الأسماء المدمجة والدوال التابعة أيضًا |

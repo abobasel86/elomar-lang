@@ -7,7 +7,7 @@ other: ar/news.html
 
 # What's new
 
-## Logging in
+## 1.20: Logging in
 
 - **`server.form(req)`** reads an HTML form, **`server.cookies(req)`** the
   cookies a browser sent, and **`server.with_cookie(reply, name, value)`**
@@ -294,7 +294,8 @@ There are thirteen of them now: `par_map`, `par_filter`, `par_fold`,
 
 | Version | What it brought |
 |---|---|
-| **1.19** | Storing passwords: `crypto.hash_password` and `crypto.verify_password` (Argon2id) |
+| **1.20** | Logging in: `server.form`, `server.cookies`, `server.with_cookie`; `examples/login`, a site with accounts in Arabic |
+| 1.19 | Storing passwords: `crypto.hash_password` and `crypto.verify_password` (Argon2id) |
 | 1.18 | Arabic names for `std`, the remaining types, error variants and module record fields (`خطأ_ملفات.غير_موجود`, `الرد.الحالة`) |
 | 1.17 | Arabic names for standard modules and effects (`استخدم std.ملفات`, `!{ملفات}`) |
 | 1.16 | The Arabic switch and `fmt --keywords` convert built-in names and methods too |
