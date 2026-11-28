@@ -1,0 +1,21 @@
+// Forms and cookies, without a network: the request is a plain record.
+استخدم قياسي.خادم
+
+دالة main() {
+    ليكن ط: طلب_ويب = {
+        الطريقة: "POST", المسار: "/دخول", الاستعلام: [:],
+        الترويسات: ["cookie": "session=abc123; lang=%D8%B9%D8%B1%D8%A8%D9%8A; empty="],
+        المحتوى: "name=%D9%84%D9%8A%D9%86%D8%A7&password=a+b%26c&name2=",
+    }
+    ليكن ن = خادم.نموذج(ط)
+    اطبع(ن["name"], ن["password"], ن.get("name2"), ن.get("missing"))
+    ليكن ك = خادم.ملفات_ارتباط(ط)
+    اطبع(ك["session"], ك["lang"], ك.get("empty"))
+
+    ليكن رد = خادم.نص(200, "أهلًا")
+    ليكن رد2 = خادم.مع_ملف_ارتباط(رد, "session", "x y;z")
+    اطبع(رد2.الترويسات["Set-Cookie"])
+    ليكن رد3 = server.with_cookie(server.with_cookie(رد, "a", "عربي"), "b", "")
+    اطبع(رد3.headers["Set-Cookie"].split("\n"))
+    اطبع(رد3.الحالة, رد3.المحتوى, خادم.ملفات_ارتباط({ method: "GET", path: "/", query: [:], headers: [:], body: "" }).length)
+}

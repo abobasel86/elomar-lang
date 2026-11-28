@@ -388,7 +388,16 @@ impl Checker {
     }
 }
 
-pub(crate) const SERVER_FUNCTIONS: [&str; 5] = ["serve", "text", "html", "json", "redirect"];
+pub(crate) const SERVER_FUNCTIONS: [&str; 8] = [
+    "serve",
+    "text",
+    "html",
+    "json",
+    "redirect",
+    "form",
+    "cookies",
+    "with_cookie",
+];
 
 /// `HttpRequest`: what a `server.serve` handler receives.
 /// What `process.run` gives on success.
@@ -455,6 +464,14 @@ impl Checker {
             }
             "text" | "html" => {
                 self.typed_args(&what, args, &[Ty::Int, Ty::Str], span);
+                http_reply_ty()
+            }
+            "form" | "cookies" => {
+                self.typed_args(&what, args, &[http_request_ty()], span);
+                Ty::map(Ty::Str, Ty::Str)
+            }
+            "with_cookie" => {
+                self.typed_args(&what, args, &[http_reply_ty(), Ty::Str, Ty::Str], span);
                 http_reply_ty()
             }
             "json" => {

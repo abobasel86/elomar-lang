@@ -1039,13 +1039,14 @@ fn handle(req: HttpRequest) -> HttpResponse {{
     "/item" => server.json(201, {{ name: req.body, qty: 2 }})
     "/page" => server.html(200, "<h1>{{req.method}}</h1>")
     "/go" => server.redirect("/hello")
+    "/login" => server.with_cookie(server.with_cookie(server.redirect("/"), "s", "1 2"), "old", "")
     "/boom" => server.text(200, "{{10 div ([0].length - 1)}}")
     _ => ({{ status: 404, headers: ["X-Note": "custom", "Bad\nName": "x"], body: "no {{req.path}}" }})
   }}
 }}
 fn main() {{
   print(server.serve("127.0.0.1:1", handle, 1))
-  print(server.serve("127.0.0.1:{port}", handle, 7))
+  print(server.serve("127.0.0.1:{port}", handle, 8))
   print("stopped")
 }}"#
     );
@@ -1070,6 +1071,7 @@ fn main() {{
             get("/nothing%20here"),
             get("/boom"),
             "POST /item HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n".into(),
+            get("/login"),
         ],
     );
     let permissions = elomar_ai_core::Permissions {
@@ -1121,12 +1123,32 @@ fn main() {{
     assert_eq!(body(&responses[4]), "no /nothing here");
     assert!(responses[5].starts_with("HTTP/1.1 500 Internal Server Error\r\n"));
     assert!(responses[6].starts_with("HTTP/1.1 411 Length Required\r\n"));
+    // Two cookies: two `Set-Cookie` lines.
+    assert!(responses[7].starts_with("HTTP/1.1 303 See Other\r\n"));
+    assert!(
+        responses[7].contains(
+            "Set-Cookie: s=1%202; Path=/; HttpOnly; SameSite=Lax\r\n\
+             Set-Cookie: old=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0\r\n"
+        ),
+        "{}",
+        responses[7]
+    );
     assert_eq!(
         output,
         "Err(HttpError.PolicyDenied(\"listening on `127.0.0.1:1` is not permitted; add \\\"127.0.0.1:1\\\" to `listen` under `[permissions]` in elomar.toml\"))\n\
          error while handling GET /boom: division by zero\n\
          Ok(())\n\
          stopped\n"
+    );
+}
+
+#[test]
+fn cookie_names_are_checked() {
+    assert_eq!(
+        err_code(
+            "use std.server\nfn main() {\n  print(server.with_cookie(server.text(200, \"\"), \"a b\", \"1\"))\n}"
+        ),
+        "R0006"
     );
 }
 

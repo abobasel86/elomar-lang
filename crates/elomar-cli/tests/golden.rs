@@ -867,6 +867,19 @@ fn example_project_tests_pass() {
     assert!(stdout.contains("4 passed; 0 failed"), "{stdout}");
 }
 
+#[test]
+fn login_example_tests_pass() {
+    let out = elomar(&["test", root().join("examples/login").to_str().unwrap()]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{stdout}");
+    // Tests named in Arabic (`اختبار_...`) are found like `test_...`.
+    assert!(
+        stdout.contains("test اختبار_التسجيل_والخروج_والدخول ... ok"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("6 passed; 0 failed"), "{stdout}");
+}
+
 // ----- elomar fmt -------------------------------------------------------------
 
 #[test]

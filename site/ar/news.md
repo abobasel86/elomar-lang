@@ -7,6 +7,16 @@ other: en/news.html
 
 # الجديد
 
+## تسجيل الدخول
+
+- **`server.form(req)`** تقرأ نموذج HTML، و**`server.cookies(req)`** ملفات الارتباط التي أرسلها المتصفح،
+  و**`server.with_cookie(reply, name, value)`** تضع ملف ارتباط آمنًا افتراضيًا (HttpOnly وSameSite=Lax). وبالعربية:
+  `خادم.نموذج` و`خادم.ملفات_ارتباط` و`خادم.مع_ملف_ارتباط`.
+- موقع كامل بحسابات مكتوب بالعربية كاملًا:
+  [`examples/login`](https://github.com/abobasel86/elomar-lang/tree/main/examples/login). انظر
+  [درس الويب](08-web.html#login).
+- `elomar test` تجد أيضًا الاختبارات التي تبدأ أسماؤها بـ `اختبار_`.
+
 ## 1.19: حفظ كلمات المرور
 
 - **`crypto.hash_password(كلمة)`** ترجع نصًا تحفظه بدل كلمة المرور، و**`crypto.verify_password(كلمة, المخزن)`**

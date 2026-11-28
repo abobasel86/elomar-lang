@@ -1,0 +1,11 @@
+# A website with accounts: sign up, log in, a private page, log out.
+# Not part of the automated example run, because it serves until stopped;
+# `elomar test` in this folder tests the site without a network.
+[package]
+name = "login"
+version = "0.1.0"
+entry = "src/main.elo"
+
+# Default deny: `server.serve` may listen only on addresses listed here.
+[permissions]
+listen = ["127.0.0.1:8080"]

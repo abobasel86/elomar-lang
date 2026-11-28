@@ -103,6 +103,10 @@ by the compiler when they are not declared.
 - SQLite databases: `db.query<Student>(conn, "SELECT ... WHERE grade > :min", { min: 60 })`
   returns typed rows; named parameters (no SQL injection), the `db` effect,
   and file databases need `filesystem_write`. See [`examples/database`](examples/database).
+- Websites with accounts: `server.form(req)`, `server.cookies(req)` and
+  `server.with_cookie(reply, name, value)` (HttpOnly, SameSite=Lax), with
+  `crypto.hash_password`. See [`examples/login`](examples/login), written
+  all in Arabic.
 - Generics: `fn first<T>(xs: List<T>) -> Option<T>`, `type Pair<A, B>`,
   `enum Tree<T>`. See [`examples/generics`](examples/generics).
 - Traits and methods: `trait Describe`, `impl Describe for Student`,

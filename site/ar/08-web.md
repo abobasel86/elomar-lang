@@ -79,6 +79,34 @@ fn main() {
 server.serve("127.0.0.1:8080", |req| handle(conn, req))
 ```
 
+## تسجيل الدخول {#login}
+
+تحتاج صفحة الدخول ثلاثة أشياء يرسلها المتصفح أو يحفظها (منذ 1.20):
+
+- `server.form(req)` تقرأ ما أرسله نموذج HTML ‏`<form method="post">` خريطةً: `name=لينا&password=...` تصير
+  `["name": "لينا", ...]`.
+- `server.cookies(req)` تقرأ ملفات الارتباط (cookies) التي أعادها المتصفح.
+- `server.with_cookie(reply, name, value)` تضيف ملف ارتباط إلى الرد. وهو `HttpOnly` (لا تقرؤه سكربتات الصفحة)
+  و`SameSite=Lax` (لا ترسله المواقع الأخرى مع نماذجها). والقيمة الفارغة تحذفه، وبها يكون الخروج.
+
+```elomar
+use std.server
+
+fn main() {
+    let req = { method: "POST", path: "/login", query: [:], headers: ["cookie": "theme=dark"], body: "name=Lina&password=secret+123" }
+    let form = server.form(req)
+    print(form["name"], form["password"])
+    print(server.cookies(req)["theme"])
+    let reply = server.with_cookie(server.redirect("/"), "session", "abc")
+    print(reply.headers["Set-Cookie"])
+}
+```
+
+ومع `crypto.hash_password` (انظر [درس صندوق الأدوات](10-toolbox.html#passwords)) وقاعدة بيانات يكتمل موقع
+بحسابات. وفي المستودع واحد مكتوب بالعربية كاملًا:
+[`examples/login`](https://github.com/abobasel86/elomar-lang/tree/main/examples/login) فيه حساب جديد ودخول وصفحة
+خاصة وخروج، واختباراته (`elomar test` في مجلده) تستدعي الموقع بطلبات تُبنى في الاختبار، دون شبكة.
+
 ## الاتصال بخوادم أخرى
 
 ```elomar

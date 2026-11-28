@@ -4,6 +4,21 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Logging in**: `server.form(req)` reads an HTML form, `server.cookies(req)`
+  the cookies a browser sent, and `server.with_cookie(reply, name, value)`
+  adds a cookie (HttpOnly, SameSite=Lax; an empty value deletes it; several
+  cookies per reply). Arabic: `خادم.نموذج`, `خادم.ملفات_ارتباط`,
+  `خادم.مع_ملف_ارتباط`.
+- **`examples/login`**: a site with accounts, written all in Arabic (sign
+  up, log in, a private page, log out), with passwords hashed by
+  `crypto.hash_password` and sessions in SQLite, and tests that call it
+  without a network.
+- `elomar test` also finds tests named `اختبار_...`.
+
 ## [1.19.0] - 2026-11-28
 
 ### Added

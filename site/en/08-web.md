@@ -83,6 +83,39 @@ database into the handler with a closure:
 server.serve("127.0.0.1:8080", |req| handle(conn, req))
 ```
 
+## Logging in {#login}
+
+A login page needs three things the browser sends or keeps (since 1.20):
+
+- `server.form(req)` reads what an HTML `<form method="post">` sent, as a
+  map: `name=Lina&password=...` becomes `["name": "Lina", ...]`.
+- `server.cookies(req)` reads the cookies the browser sent back.
+- `server.with_cookie(reply, name, value)` adds a cookie to a reply. It is
+  `HttpOnly` (page scripts cannot read it) and `SameSite=Lax` (other sites
+  cannot send it with their forms). An empty value deletes the cookie,
+  which is how you log out.
+
+```elomar
+use std.server
+
+fn main() {
+    let req = { method: "POST", path: "/login", query: [:], headers: ["cookie": "theme=dark"], body: "name=Lina&password=secret+123" }
+    let form = server.form(req)
+    print(form["name"], form["password"])
+    print(server.cookies(req)["theme"])
+    let reply = server.with_cookie(server.redirect("/"), "session", "abc")
+    print(reply.headers["Set-Cookie"])
+}
+```
+
+Together with `crypto.hash_password` (see the
+[toolbox lesson](10-toolbox.html#passwords)) and a database, that is a
+whole site with accounts. The repository has one, written all in Arabic:
+[`examples/login`](https://github.com/abobasel86/elomar-lang/tree/main/examples/login)
+signs up, logs in, shows a private page and logs out, and its tests
+(`elomar test` in that folder) call the site with requests built in the
+test, without a network.
+
 ## Calling other servers
 
 ```elomar

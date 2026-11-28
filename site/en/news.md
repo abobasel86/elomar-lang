@@ -7,6 +7,17 @@ other: ar/news.html
 
 # What's new
 
+## Logging in
+
+- **`server.form(req)`** reads an HTML form, **`server.cookies(req)`** the
+  cookies a browser sent, and **`server.with_cookie(reply, name, value)`**
+  sets one, safe by default (HttpOnly, SameSite=Lax). In Arabic:
+  `خادم.نموذج`, `خادم.ملفات_ارتباط`, `خادم.مع_ملف_ارتباط`.
+- A whole site with accounts, written all in Arabic:
+  [`examples/login`](https://github.com/abobasel86/elomar-lang/tree/main/examples/login).
+  See the [web lesson](08-web.html#login).
+- `elomar test` also finds tests named `اختبار_...`.
+
 ## 1.19: Storing passwords
 
 - **`crypto.hash_password(password)`** gives a text to store instead of the

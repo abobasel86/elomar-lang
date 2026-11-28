@@ -1343,7 +1343,7 @@ impl<'p, 'h> Interpreter<'p, 'h> {
             "std.mcp" => Ok(mcp::call(&mut self.mcp, name, &values)),
             "std.server" if name == "serve" => self.serve(values, span),
             "std.process" => Ok(process::run(self.ai.permissions(), self.fs.base(), &values)),
-            "std.server" => Ok(server::helper(name, &values)),
+            "std.server" => server::helper(name, &values, span).map_err(Flow::from),
             "std.time" if name == "sleep" && !self.deadlines.is_empty() => {
                 // Sleep no longer than the nearest `timeout` allows.
                 let ms = match values.first() {

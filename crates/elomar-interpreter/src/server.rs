@@ -16,9 +16,10 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use elomar_ast::Span;
+use elomar_diagnostics::Text;
 
 use crate::value::Function;
-use crate::{Exec, Flow, Interpreter, MapKey, Value};
+use crate::{Exec, Flow, Interpreter, MapKey, RuntimeError, Value};
 
 const MAX_HEADER_BYTES: usize = 64 * 1024;
 const MAX_HEADERS: usize = 100;
@@ -66,13 +67,111 @@ pub(crate) fn reply(status: i64, content_type: &str, body: String) -> Value {
     ])
 }
 
-/// `server.text`, `html`, `json` and `redirect`.
-pub(crate) fn helper(func: &str, args: &[Value]) -> Value {
+/// A field of a request or response record.
+fn field<'a>(v: &'a Value, name: &str) -> Option<&'a Value> {
+    match v {
+        Value::Record(fields) => fields.iter().find(|(k, _)| &**k == name).map(|(_, v)| v),
+        _ => None,
+    }
+}
+
+/// `name=value` pairs separated by `;`, as a browser sends cookies.
+fn parse_cookies(header: &str) -> Vec<(String, String)> {
+    header
+        .split(';')
+        .filter_map(|pair| {
+            let (name, value) = pair.split_once('=')?;
+            let name = name.trim();
+            let value = value.trim().trim_matches('"');
+            let value = percent_encoding::percent_decode_str(value)
+                .decode_utf8()
+                .ok()?;
+            (!name.is_empty()).then(|| (name.to_string(), value.into_owned()))
+        })
+        .collect()
+}
+
+/// Characters a cookie value may hold as they are; others are encoded.
+const COOKIE_VALUE: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b',')
+    .add(b';')
+    .add(b'\\')
+    .add(b'%');
+
+/// `server.with_cookie(reply, name, value)`: adds a `Set-Cookie` header,
+/// HttpOnly and SameSite=Lax; an empty value deletes the cookie. Several
+/// cookies on one reply are kept on separate lines of the one header.
+fn with_cookie(args: &[Value], span: Span) -> Result<Value, RuntimeError> {
+    let name = text(&args[1]);
+    let token = |c: char| c.is_ascii_alphanumeric() || "!#$&'*+-.^_`|~".contains(c);
+    if name.is_empty() || !name.chars().all(token) {
+        return Err(RuntimeError::new(
+            "R0006",
+            span,
+            Text::new(
+                format!("`{name}` is not a valid cookie name (use letters, digits, `-` and `_`)"),
+                format!(
+                    "`{name}` ليس اسمًا صالحًا لملف ارتباط (استخدم الحروف اللاتينية والأرقام و`-` و`_`)"
+                ),
+            ),
+        ));
+    }
+    let value = text(&args[2]);
+    let mut cookie = format!(
+        "{name}={}; Path=/; HttpOnly; SameSite=Lax",
+        percent_encoding::utf8_percent_encode(value, COOKIE_VALUE)
+    );
+    if value.is_empty() {
+        cookie.push_str("; Max-Age=0");
+    }
+    let Value::Record(fields) = &args[0] else {
+        unreachable!("checked reply")
+    };
+    let mut fields = (**fields).clone();
+    for (k, v) in fields.iter_mut() {
+        if &**k == "headers"
+            && let Value::Map(m) = v
+        {
+            let mut m = (**m).clone();
+            let key = MapKey::from_value(&Value::str("Set-Cookie"));
+            let line = match m.get(&key) {
+                Some(Value::Str(old)) if !old.is_empty() => format!("{old}\n{cookie}"),
+                _ => cookie.clone(),
+            };
+            m.insert(key, Value::str(line));
+            *v = Value::Map(Rc::new(m));
+        }
+    }
+    Ok(Value::Record(Rc::new(fields)))
+}
+
+/// `server.text`, `html`, `json`, `redirect`, `form`, `cookies` and
+/// `with_cookie`.
+pub(crate) fn helper(func: &str, args: &[Value], span: Span) -> Result<Value, RuntimeError> {
     let status = match args.first() {
         Some(Value::Int(n)) => *n,
         _ => 200,
     };
-    match func {
+    Ok(match func {
+        "form" => text_map(
+            url::form_urlencoded::parse(field(&args[0], "body").map_or("", text).as_bytes())
+                .into_owned()
+                .collect(),
+        ),
+        "cookies" => {
+            let header = match field(&args[0], "headers") {
+                Some(Value::Map(m)) => m
+                    .iter()
+                    .find(|(k, _)| text(&k.to_value()).eq_ignore_ascii_case("cookie"))
+                    .map(|(_, v)| text(v).to_string())
+                    .unwrap_or_default(),
+                _ => String::new(),
+            };
+            text_map(parse_cookies(&header))
+        }
+        "with_cookie" => return with_cookie(args, span),
         "text" => reply(status, "text/plain; charset=utf-8", text(&args[1]).into()),
         "html" => reply(status, "text/html; charset=utf-8", text(&args[1]).into()),
         "json" => reply(
@@ -88,7 +187,7 @@ pub(crate) fn helper(func: &str, args: &[Value]) -> Value {
             ),
             ("body", Value::str("")),
         ]),
-    }
+    })
 }
 
 struct Request {
@@ -231,11 +330,21 @@ fn write_response(
     let mut out = format!("HTTP/1.1 {status} {}\r\n", reason(status));
     let mut has_type = false;
     for (name, value) in headers {
+        let lower = name.to_ascii_lowercase();
+        // Several cookies: one `Set-Cookie` line each.
+        if lower == "set-cookie" && value.contains('\n') {
+            for line in value
+                .split('\n')
+                .filter(|l| !l.is_empty() && !l.contains('\r'))
+            {
+                out.push_str(&format!("{name}: {line}\r\n"));
+            }
+            continue;
+        }
         // Header injection: a value may not start a new line.
         if name.is_empty() || name.contains([':', '\r', '\n']) || value.contains(['\r', '\n']) {
             continue;
         }
-        let lower = name.to_ascii_lowercase();
         if lower == "content-length" || lower == "connection" {
             continue;
         }

@@ -61,7 +61,7 @@ things.
 ## Tests
 
 Every `.elo` file in `tests/` holds tests: functions whose names start with
-`test_`:
+`test_` (or `اختبار_`):
 
 ```elomar
 // tests/grading_test.elo

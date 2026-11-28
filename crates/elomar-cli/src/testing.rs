@@ -132,7 +132,7 @@ pub(crate) fn run_tests(path: &Path, filter: Option<&str>, reporter: &Reporter) 
             .iter()
             .filter_map(|item| match item {
                 Item::Fn(f)
-                    if f.name.name.starts_with("test_")
+                    if (f.name.name.starts_with("test_") || f.name.name.starts_with("اختبار_"))
                         && !f.name.name.contains('.')
                         && f.params.is_empty() =>
                 {

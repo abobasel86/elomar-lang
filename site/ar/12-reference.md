@@ -187,7 +187,7 @@ slug: 12-reference
 | `regex` `أنماط` | `is_match` `يطابق` · `find` `ابحث` · `find_all` `ابحث_الكل` · `captures` `التقط` · `replace` `استبدل` · `split` `قسم` |
 | `encoding` `ترميز` | `base64_encode` `إلى_قاعدة64` · `base64_decode` `من_قاعدة64` · `hex_encode` `إلى_ست_عشري` · `hex_decode` `من_ست_عشري` · `url_encode` `ترميز_رابط` · `url_decode` `فك_رابط` |
 | `crypto` `تشفير` | `sha256` `بصمة` · `hmac_sha256` `توقيع` · `uuid` `معرف_فريد` · `token` `رمز_سري` · `hash_password` `جزئ_كلمة_مرور` · `verify_password` `طابق_كلمة_مرور` |
-| `server` `خادم` | `serve` `شغل` · `text` `نص` · `html` `صفحة` · `json` `جيسون` · `redirect` `حول` |
+| `server` `خادم` | `serve` `شغل` · `text` `نص` · `html` `صفحة` · `json` `جيسون` · `redirect` `حول` · `form` `نموذج` · `cookies` `ملفات_ارتباط` · `with_cookie` `مع_ملف_ارتباط` |
 | `process` `عملية` | `run` `شغل` |
 | `csv` `جدول` | `parse` `حلل` · `parse_records` `حلل_سجلات` · `stringify` `إلى_نص` |
 
@@ -367,7 +367,7 @@ slug: 12-reference
 | `std.csv` | `csv.parse(text)` · `csv.parse_records(text)` · `csv.stringify(rows)` |
 | `std.db` | `db.open(path)` · `db.execute(conn, sql[, params])` · `db.query<T>(conn, sql[, params])` · `db.query_one<T>(conn, sql[, params])` (SQLite) |
 | `std.http` | `http.get(url)` · `http.post(url, body[, content_type])` |
-| `std.server` | `server.serve(address, handler[, max_requests])` · `server.text(status, body)` · `server.html(status, body)` · `server.json(status, value)` · `server.redirect(url)` |
+| `std.server` | `server.serve(address, handler[, max_requests])` · `server.text(status, body)` · `server.html(status, body)` · `server.json(status, value)` · `server.redirect(url)` · `server.form(req)` · `server.cookies(req)` · `server.with_cookie(reply, name, value)` |
 | `std.regex` | `regex.is_match` · `regex.find` · `regex.find_all` · `regex.captures` · `regex.replace` · `regex.split` (النمط أولًا ثم النص) |
 | `std.encoding` | `encoding.base64_encode` · `encoding.base64_decode` · `encoding.hex_encode` · `encoding.hex_decode` · `encoding.url_encode` · `encoding.url_decode` |
 | `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` · `crypto.hash_password(password)` · `crypto.verify_password(password, stored)` |

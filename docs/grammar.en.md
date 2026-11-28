@@ -940,12 +940,21 @@ listen = ["127.0.0.1:8080"]     # denied by default; "0.0.0.0:8080" to accept co
 | `server.text(status, body)` · `server.html(status, body)` | `HttpResponse` with the matching content type |
 | `server.json(status, value)` | `HttpResponse`. Any value is converted to JSON as in `json.stringify` |
 | `server.redirect(url)` | `HttpResponse` with status 303 and `Location` |
+| `server.form(req)` | `Map<String, String>`: the body read as an HTML form (`application/x-www-form-urlencoded`) |
+| `server.cookies(req)` | `Map<String, String>`: the cookies in the request's `cookie` header, their values percent-decoded |
+| `server.with_cookie(reply, name, value)` | `HttpResponse`: `reply` with a cookie added |
 
 - An address not listed in `[permissions] listen` gives `HttpError.PolicyDenied` without opening any port. A failure to open the port is `HttpError.Network`.
 - Requests are handled **one after another**, so the handler never runs twice at the same time. Each connection carries one request (`Connection: close`).
 - `path` is URL-decoded, `query` comes from `?a=1&b=2`, and `headers` names are lowercase. The body is UTF-8 text of at most 10 MB and needs `Content-Length` (chunked sending gets a 411 response). Headers are at most 64 KB, and the read timeout is 10 seconds.
 - A runtime error inside the handler gets a 500 response, the error is printed, and the server keeps running. Response headers that contain a new line are removed (protection against header injection), and `Content-Length` is computed automatically.
 - A `HEAD` request is passed to the handler as is, and the response is sent without a body.
+- `with_cookie` (since 1.20) adds `Set-Cookie: name=value; Path=/; HttpOnly; SameSite=Lax`; the value is
+  percent-encoded (and `cookies` decodes it), and an empty value deletes the cookie (`Max-Age=0`). Several cookies can
+  be added to one reply: they are kept as lines of its `Set-Cookie` header, and each line is sent as its own header. A
+  name that is not an HTTP token (a space, `=` or `;`, non-Latin letters) is runtime error `R0006`. `Secure` is not
+  added, because the server speaks HTTP; behind an HTTPS proxy, write the header yourself. Full example:
+  `examples/login`.
 - To keep state between requests, use a database (`std.db`) and pass the connection with a lambda: `server.serve(addr, |req| handle(conn, req))`. Full example: `examples/web-api`.
 
 ## 4.11.7 Running Programs: `std.process`
@@ -1117,7 +1126,7 @@ fn test_greets_by_name() {
 }
 ```
 
-- **Discovery:** every `.elo` file inside `tests/` (and its subfolders) is a test file. Every function in it whose name starts with `test_` and that has no parameters is a test.
+- **Discovery:** every `.elo` file inside `tests/` (and its subfolders) is a test file. Every function in it whose name starts with `test_` (or `اختبار_`, since 1.20) and that has no parameters is a test.
 - **Pass and fail:** a test fails if a runtime error occurs (such as a failed `assert` or `assert_eq`) or if it returns `Err(...)`. It may be `async`.
 - **Isolation:** each test runs in a new interpreter with a new AI budget, and its output is shown only if it fails.
 - **Access to the code:** test files use the project items marked `pub` through `use app.<module>`. The permissions and models of `elomar.toml` apply to them.
@@ -1428,7 +1437,7 @@ Every message is available in Arabic and English (`elomar --lang ar ...` or `ELO
 | `R0003` | Index out of bounds |
 | `R0004` | `assert` failed |
 | `R0005` | Too many nested calls |
-| `R0006` | Invalid argument (square root of a negative number, repeating a string a negative number of times or to more than 100 million characters, padding a string with `pad_start`/`pad_end` to more than 100 million characters, `pow` with a negative exponent, `clamp` with reversed bounds, `random.int` with reversed bounds, an invalid date in `time.make`) |
+| `R0006` | Invalid argument (square root of a negative number, repeating a string a negative number of times or to more than 100 million characters, padding a string with `pad_start`/`pad_end` to more than 100 million characters, `pow` with a negative exponent, `clamp` with reversed bounds, `random.int` with reversed bounds, an invalid date in `time.make`, an invalid cookie name in `server.with_cookie`) |
 | `R0007` | Float cannot be converted to `Int` |
 | `R0008` | Constant used before it is initialized |
 | `R0009` | Internal interpreter error (reported as a bug) |
