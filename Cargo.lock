@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-core"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-anthropic"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-tls",
@@ -292,7 +292,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-mock"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ai-core",
  "serde_json",
@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-ai-provider-openai"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-tls",
@@ -311,14 +311,14 @@ dependencies = [
 
 [[package]]
 name = "elomar-ast"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-diagnostics",
 ]
 
 [[package]]
 name = "elomar-cli"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "clap",
  "elomar-ai-core",
@@ -344,11 +344,11 @@ dependencies = [
 
 [[package]]
 name = "elomar-diagnostics"
-version = "1.18.0"
+version = "1.19.0"
 
 [[package]]
 name = "elomar-fmt"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-fuzz"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
@@ -373,7 +373,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-interpreter"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "argon2",
  "base64",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-lexer"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-diagnostics",
  "unicode-ident",
@@ -409,7 +409,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-loader"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
@@ -419,14 +419,14 @@ dependencies = [
 
 [[package]]
 name = "elomar-mcp"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "serde_json",
 ]
 
 [[package]]
 name = "elomar-parser"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",
@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-pkg"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "semver",
  "serde",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-playground"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ai-core",
  "elomar-ai-provider-mock",
@@ -460,11 +460,11 @@ dependencies = [
 
 [[package]]
 name = "elomar-policy"
-version = "1.18.0"
+version = "1.19.0"
 
 [[package]]
 name = "elomar-tls"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "rustls",
  "rustls-native-certs",
@@ -474,7 +474,7 @@ dependencies = [
 
 [[package]]
 name = "elomar-types"
-version = "1.18.0"
+version = "1.19.0"
 dependencies = [
  "elomar-ast",
  "elomar-diagnostics",

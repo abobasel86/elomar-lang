@@ -5,6 +5,11 @@ The extension's version follows Elomar-Lang's; a patch version (such as
 [changelog](https://github.com/abobasel86/elomar-lang/blob/main/CHANGELOG.md)
 for what each version adds.
 
+## 1.19.0
+
+Works with Elomar-Lang 1.19.0: completion for `crypto.hash_password` and
+`crypto.verify_password` (`تشفير.جزئ_كلمة_مرور`, `تشفير.طابق_كلمة_مرور`).
+
 ## 1.18.0
 
 Works with Elomar-Lang 1.18.0: highlighting for the remaining built-in types
