@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: ElomarLang.ElomarLang
-PackageVersion: 1.19.0
+PackageVersion: 1.20.0
 InstallerType: zip
 NestedInstallerType: portable
 Commands:
@@ -9,16 +9,16 @@ FileExtensions:
 - elo
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.19.0/elomar-1.19.0-x86_64-pc-windows-msvc.zip
-  InstallerSha256: 8961D0003226FF8DF8746DC30F7C257F001E2BB2E3F832910EFA9C7998715C55
+  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.20.0/elomar-1.20.0-x86_64-pc-windows-msvc.zip
+  InstallerSha256: 94DD1FE898B62311A90100909E108C585EAF15A76846279FF17AE9F6785A1933
   NestedInstallerFiles:
-  - RelativeFilePath: elomar-1.19.0-x86_64-pc-windows-msvc\elomar.exe
+  - RelativeFilePath: elomar-1.20.0-x86_64-pc-windows-msvc\elomar.exe
     PortableCommandAlias: elomar
 - Architecture: arm64
-  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.19.0/elomar-1.19.0-aarch64-pc-windows-msvc.zip
-  InstallerSha256: 1144045DA7CC216C247A17DB920DA55AAE2A5C27AEB0046461F60A80C8919078
+  InstallerUrl: https://github.com/abobasel86/elomar-lang/releases/download/v1.20.0/elomar-1.20.0-aarch64-pc-windows-msvc.zip
+  InstallerSha256: D5FC278AA941FC6EDAC320C9040E58E08CC298711374AA9A9EC804593E571DE9
   NestedInstallerFiles:
-  - RelativeFilePath: elomar-1.19.0-aarch64-pc-windows-msvc\elomar.exe
+  - RelativeFilePath: elomar-1.20.0-aarch64-pc-windows-msvc\elomar.exe
     PortableCommandAlias: elomar
 ManifestType: installer
 ManifestVersion: 1.9.0

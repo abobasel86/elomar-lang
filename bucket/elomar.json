@@ -1,18 +1,18 @@
 {
-    "version": "1.19.0",
+    "version": "1.20.0",
     "description": "A statically typed programming language with AI built in, in English and Arabic",
     "homepage": "https://abobasel86.github.io/elomar-lang/",
     "license": "MIT|Apache-2.0",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/abobasel86/elomar-lang/releases/download/v1.19.0/elomar-1.19.0-x86_64-pc-windows-msvc.zip",
-            "hash": "8961d0003226ff8df8746dc30f7c257f001e2bb2e3f832910efa9c7998715c55",
-            "extract_dir": "elomar-1.19.0-x86_64-pc-windows-msvc"
+            "url": "https://github.com/abobasel86/elomar-lang/releases/download/v1.20.0/elomar-1.20.0-x86_64-pc-windows-msvc.zip",
+            "hash": "94dd1fe898b62311a90100909e108c585eaf15a76846279ff17ae9f6785a1933",
+            "extract_dir": "elomar-1.20.0-x86_64-pc-windows-msvc"
         },
         "arm64": {
-            "url": "https://github.com/abobasel86/elomar-lang/releases/download/v1.19.0/elomar-1.19.0-aarch64-pc-windows-msvc.zip",
-            "hash": "1144045da7cc216c247a17db920da55aae2a5c27aeb0046461f60a80c8919078",
-            "extract_dir": "elomar-1.19.0-aarch64-pc-windows-msvc"
+            "url": "https://github.com/abobasel86/elomar-lang/releases/download/v1.20.0/elomar-1.20.0-aarch64-pc-windows-msvc.zip",
+            "hash": "d5fc278aa941fc6edac320c9040e58e08cc298711374aa9a9ec804593e571de9",
+            "extract_dir": "elomar-1.20.0-aarch64-pc-windows-msvc"
         }
     },
     "bin": "elomar.exe",
