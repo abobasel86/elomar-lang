@@ -4,6 +4,16 @@ All notable changes to Elomar-Lang. Versions follow
 [semantic versioning](https://semver.org); before 1.0, any minor version may
 change the language.
 
+## [Unreleased]
+
+### Added
+
+- **Storing passwords**: `crypto.hash_password(password) -> String` and
+  `crypto.verify_password(password, stored) -> Bool` (`تشفير.جزئ_كلمة_مرور`,
+  `تشفير.طابق_كلمة_مرور`): Argon2id with the parameters OWASP recommends and
+  a new random salt each time, in the standard PHC text form. This was the
+  last item marked "planned" in the documentation.
+
 ## [1.18.0] - 2026-11-27
 
 ### Added

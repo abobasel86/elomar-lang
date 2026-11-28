@@ -186,7 +186,7 @@ slug: 12-reference
 | `os` `نظام` | `args` `المعطيات` · `env` `بيئة` · `platform` `المنصة` · `exit` `اخرج` |
 | `regex` `أنماط` | `is_match` `يطابق` · `find` `ابحث` · `find_all` `ابحث_الكل` · `captures` `التقط` · `replace` `استبدل` · `split` `قسم` |
 | `encoding` `ترميز` | `base64_encode` `إلى_قاعدة64` · `base64_decode` `من_قاعدة64` · `hex_encode` `إلى_ست_عشري` · `hex_decode` `من_ست_عشري` · `url_encode` `ترميز_رابط` · `url_decode` `فك_رابط` |
-| `crypto` `تشفير` | `sha256` `بصمة` · `hmac_sha256` `توقيع` · `uuid` `معرف_فريد` · `token` `رمز_سري` |
+| `crypto` `تشفير` | `sha256` `بصمة` · `hmac_sha256` `توقيع` · `uuid` `معرف_فريد` · `token` `رمز_سري` · `hash_password` `جزئ_كلمة_مرور` · `verify_password` `طابق_كلمة_مرور` |
 | `server` `خادم` | `serve` `شغل` · `text` `نص` · `html` `صفحة` · `json` `جيسون` · `redirect` `حول` |
 | `process` `عملية` | `run` `شغل` |
 | `csv` `جدول` | `parse` `حلل` · `parse_records` `حلل_سجلات` · `stringify` `إلى_نص` |
@@ -370,7 +370,7 @@ slug: 12-reference
 | `std.server` | `server.serve(address, handler[, max_requests])` · `server.text(status, body)` · `server.html(status, body)` · `server.json(status, value)` · `server.redirect(url)` |
 | `std.regex` | `regex.is_match` · `regex.find` · `regex.find_all` · `regex.captures` · `regex.replace` · `regex.split` (النمط أولًا ثم النص) |
 | `std.encoding` | `encoding.base64_encode` · `encoding.base64_decode` · `encoding.hex_encode` · `encoding.hex_decode` · `encoding.url_encode` · `encoding.url_decode` |
-| `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` |
+| `std.crypto` | `crypto.sha256(text)` · `crypto.hmac_sha256(key, message)` · `crypto.uuid()` · `crypto.token(bytes)` · `crypto.hash_password(password)` · `crypto.verify_password(password, stored)` |
 | `std.process` | `process.run(command, args[, timeout])` |
 | `std.py` | `py.call<T>(module, function, args[, timeout])` |
 | `std.ai` | `ai.infer<T>(model, instructions, input[, timeout])` · `ai.run<T>(model, instructions, input, tools, ...)` · `ai.stream(model, instructions, input, on_text[, timeout])` · `ai.embed(model, text[, timeout])` · `ai.similarity(a, b)` · `ai.search(model, query, texts[, timeout])` |

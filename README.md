@@ -58,8 +58,8 @@ OpenAI or Claude in `elomar.toml` without changing the code.
 > A working interpreter for the language, typed AI calls (an offline **mock**
 > provider, **OpenAI** and **Anthropic Claude**), agents with MCP, a standard
 > library (files, JSON, HTTP client and server, SQLite, regex, time, crypto,
-> Python, processes), packages with a public registry, editor support, a
-> bilingual tutorial and a browser playground.
+> password hashing, Python, processes), packages with a public registry,
+> editor support, a bilingual tutorial and a browser playground.
 > See [`docs/grammar.md`](docs/grammar.md) (in Arabic; [English translation](docs/grammar.en.md)) and the [changelog](CHANGELOG.md).
 
 ## Vision

@@ -752,6 +752,25 @@ fn crypto(func: &str, args: &[Value], span: Span) -> R<Value> {
                 &h[20..]
             ))
         }
+        "hash_password" => {
+            use argon2::password_hash::{PasswordHasher as _, SaltString};
+            let salt = SaltString::encode_b64(&secure_bytes(16, span)?)
+                .expect("16 bytes make a valid salt");
+            // Argon2id with the parameters OWASP recommends (19 MiB, 2 passes).
+            let hash = argon2::Argon2::default()
+                .hash_password(text(&args[0]).as_bytes(), &salt)
+                .expect("Argon2 accepts any password with the default parameters");
+            Value::str(hash.to_string())
+        }
+        "verify_password" => {
+            use argon2::password_hash::{PasswordHash, PasswordVerifier as _};
+            // A stored value that is not a valid hash matches nothing.
+            Value::Bool(PasswordHash::new(text(&args[1])).is_ok_and(|h| {
+                argon2::Argon2::default()
+                    .verify_password(text(&args[0]).as_bytes(), &h)
+                    .is_ok()
+            }))
+        }
         "token" => {
             let n = int(&args[0]);
             if !(1..=1024).contains(&n) {

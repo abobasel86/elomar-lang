@@ -29,6 +29,7 @@ url.workspace = true
 regex.workspace = true
 sha2.workspace = true
 hmac.workspace = true
+argon2.workspace = true
 base64.workspace = true
 getrandom = { workspace = true, optional = true }
 percent-encoding.workspace = true

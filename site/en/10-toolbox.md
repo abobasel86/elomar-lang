@@ -98,6 +98,29 @@ Write patterns as *raw strings*, `r"..."`: inside them a backslash and
 `{` mean themselves, so `r"\d{2,4}"` is exactly the pattern. (In a normal
 string, `{` starts interpolation and a backslash must be doubled.)
 
+## Storing passwords {#passwords}
+
+Never store a password itself, or its `sha256`: whoever reads the database
+could try billions of guesses a second against it. Store what
+`crypto.hash_password` gives (since 1.19), and check a login with
+`crypto.verify_password`:
+
+```elomar
+use std.crypto
+
+fn main() {
+    let stored = crypto.hash_password("correct horse")
+    print(stored.starts_with("$argon2id$"))
+    print(crypto.verify_password("correct horse", stored))
+    print(crypto.verify_password("wrong guess", stored))
+}
+```
+
+It uses Argon2id, an algorithm made to be slow and memory-hungry for
+guessers, with a new random salt each time, so the same password gives a
+different result every time it is hashed. Store the whole text: it holds
+the salt and the settings, and other languages' Argon2 libraries read it.
+
 ## The command line
 
 ```elomar

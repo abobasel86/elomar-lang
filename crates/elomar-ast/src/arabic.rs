@@ -294,6 +294,8 @@ pub const MODULE_FUNCTIONS: &[(&str, &str, &str)] = &[
     ("crypto", "توقيع", "hmac_sha256"),
     ("crypto", "معرف_فريد", "uuid"),
     ("crypto", "رمز_سري", "token"),
+    ("crypto", "جزئ_كلمة_مرور", "hash_password"),
+    ("crypto", "طابق_كلمة_مرور", "verify_password"),
     ("server", "شغل", "serve"),
     ("server", "نص", "text"),
     ("server", "صفحة", "html"),

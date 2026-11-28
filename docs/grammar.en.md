@@ -898,12 +898,15 @@ fn main() {
 |---|---|
 | `std.regex` | `is_match(p, text) -> Bool` · `find(p, text) -> Option<String>` · `find_all(p, text) -> List<String>` · `captures(p, text) -> Option<List<String>>` (element 0 is the whole match, then the groups) · `replace(p, text, with) -> String` (all matches, and `$1` for a group) · `split(p, text) -> List<String>` |
 | `std.encoding` | `base64_encode` · `hex_encode` · `url_encode` (`String -> String`) · `base64_decode` · `hex_decode` · `url_decode` (`String -> Option<String>`; `None` if the input is not valid or the result is not UTF-8) |
-| `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (version 4) · `token(bytes) -> String` (hex, from 1 to 1024 bytes) |
+| `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (version 4) · `token(bytes) -> String` (hex, from 1 to 1024 bytes) · `hash_password(password) -> String` · `verify_password(password, stored) -> Bool` |
 
 - The regular expression syntax is that of the Rust `regex` library (no backreferences, and guaranteed linear run time). Write patterns as raw strings: `r"\d{2,4}"`, because `{` in a normal string starts interpolation and the backslash needs doubling.
 - A pattern written as a string literal is checked at compile time (`E2023`). A pattern built at run time, if invalid, is runtime error `R0006`.
 - `uuid` and `token` come from a secure random source provided by the system, so they are fit for session IDs and keys, unlike `std.random`.
-- Do not store passwords with `sha256` alone. Use an algorithm made for passwords (planned).
+- Do not store passwords with `sha256` alone: store what `hash_password` gives (since 1.19). It is Argon2id with the
+  parameters OWASP recommends (19 MiB of memory, 2 passes, 1 lane) and a new 16-byte salt from the secure source each
+  time, in the standard PHC text form (`$argon2id$v=19$m=19456,t=2,p=1$...`). `verify_password` checks a password
+  against such a text, with the parameters written in it; a text that is not a valid hash gives `false`.
 
 ## 4.11.6 Web Server: `std.server`
 

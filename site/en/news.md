@@ -7,6 +7,15 @@ other: ar/news.html
 
 # What's new
 
+## Storing passwords
+
+- **`crypto.hash_password(password)`** gives a text to store instead of the
+  password, and **`crypto.verify_password(password, stored)`** checks a
+  login against it. In Arabic: `تشفير.جزئ_كلمة_مرور` and
+  `تشفير.طابق_كلمة_مرور`.
+- Argon2id, with a new random salt each time; other languages read the
+  result. See the [toolbox lesson](10-toolbox.html#passwords).
+
 ## 1.18: The last English names
 
 - **`استخدم قياسي.ملفات`**: `std` is `قياسي`.

@@ -882,12 +882,15 @@ fn main() {
 |---|---|
 | `std.regex` | `is_match(p, text) -> Bool` · `find(p, text) -> Option<String>` · `find_all(p, text) -> List<String>` · `captures(p, text) -> Option<List<String>>` (العنصر 0 المطابقة كلها ثم المجموعات) · `replace(p, text, with) -> String` (كل المطابقات، و`$1` للمجموعة) · `split(p, text) -> List<String>` |
 | `std.encoding` | `base64_encode` · `hex_encode` · `url_encode` (`String -> String`) · `base64_decode` · `hex_decode` · `url_decode` (`String -> Option<String>`؛ `None` إن لم يكن الإدخال صالحًا أو لم تكن النتيجة UTF-8) |
-| `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (الإصدار 4) · `token(bytes) -> String` (hex، من 1 إلى 1024 بايت) |
+| `std.crypto` | `sha256(text) -> String` (hex) · `hmac_sha256(key, message) -> String` (hex) · `uuid() -> String` (الإصدار 4) · `token(bytes) -> String` (hex، من 1 إلى 1024 بايت) · `hash_password(password) -> String` · `verify_password(password, stored) -> Bool` |
 
 - صيغة التعابير النمطية هي صيغة مكتبة Rust `regex` (بلا رجوع للخلف backreferences، وزمن تنفيذ خطي مضمون). اكتب الأنماط نصوصًا خامًا: `r"\d{2,4}"`، لأن `{` في النص العادي يبدأ إدراجًا والشرطة المائلة تحتاج مضاعفة.
 - النمط المكتوب نصًا حرفيًا يُفحص وقت الترجمة (`E2023`)؛ والنمط المبني وقت التشغيل إن كان غير صالح فخطأ تنفيذي `R0006`.
 - `uuid` و`token` من مصدر عشوائي آمن يوفره النظام، فتصلح لمعرّفات الجلسات والمفاتيح، بخلاف `std.random`.
-- لا تخزّن كلمات المرور بـ `sha256` وحده؛ استخدم خوارزمية مخصصة لكلمات المرور (مخطط لها).
+- لا تخزّن كلمات المرور بـ `sha256` وحده، بل خزّن ما ترجعه `hash_password` (منذ 1.19): Argon2id بالإعدادات التي
+  توصي بها OWASP (‏19 MiB من الذاكرة، ومروران، ومسار واحد) وملح جديد من 16 بايت من المصدر الآمن في كل مرة، بصيغة
+  PHC النصية القياسية (`$argon2id$v=19$m=19456,t=2,p=1$...`). و`verify_password` تتحقق من كلمة مرور مقابل هذا النص
+  بالإعدادات المكتوبة فيه، والنص الذي ليس تجزئة صالحة يعطي `false`.
 
 ## 4.11.6 خادم الويب: `std.server`
 

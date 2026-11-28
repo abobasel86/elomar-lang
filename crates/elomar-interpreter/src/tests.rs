@@ -965,6 +965,9 @@ fn main() {
   print(crypto.hmac_sha256("key", "The quick brown fox jumps over the lazy dog"))
   let id = crypto.uuid()
   print(id.length, id.slice(14, 15), crypto.token(16).length, crypto.uuid() != id)
+  let stored = crypto.hash_password("سر 123")
+  print(stored.starts_with("$argon2id$"), stored != crypto.hash_password("سر 123"))
+  print(crypto.verify_password("سر 123", stored), crypto.verify_password("سر 124", stored), crypto.verify_password("سر 123", "x"))
   print(regex.is_match(pattern, "x"))
 }"##;
     assert_eq!(err_code(src), "R0006");
@@ -978,7 +981,9 @@ fn main() {
          4869 Some(\"Hi\") a%20b%26c%3D%D8%AF Some(\"a b&c\")\n\
          ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\n\
          f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8\n\
-         36 4 32 true\n"
+         36 4 32 true\n\
+         true true\n\
+         true false false\n"
     );
 }
 

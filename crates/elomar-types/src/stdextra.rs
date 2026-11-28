@@ -249,7 +249,14 @@ pub(crate) const ENCODING_FUNCTIONS: [&str; 6] = [
     "url_encode",
     "url_decode",
 ];
-pub(crate) const CRYPTO_FUNCTIONS: [&str; 4] = ["sha256", "hmac_sha256", "uuid", "token"];
+pub(crate) const CRYPTO_FUNCTIONS: [&str; 6] = [
+    "sha256",
+    "hmac_sha256",
+    "uuid",
+    "token",
+    "hash_password",
+    "verify_password",
+];
 
 impl Checker {
     /// `regex.*(pattern, text, ...)`. A pattern written as a literal is
@@ -368,10 +375,16 @@ impl Checker {
             "sha256" => &[Ty::Str],
             "hmac_sha256" => &[Ty::Str, Ty::Str],
             "token" => &[Ty::Int],
+            "hash_password" => &[Ty::Str],
+            "verify_password" => &[Ty::Str, Ty::Str],
             _ => &[],
         };
         self.typed_args(&what, args, params, span);
-        Ty::Str
+        if name == "verify_password" {
+            Ty::Bool
+        } else {
+            Ty::Str
+        }
     }
 }
 
